@@ -18,6 +18,3 @@ server/public/
 
 # macOS
 .DS_Store
-
-# Scratch
-temporary.txt
