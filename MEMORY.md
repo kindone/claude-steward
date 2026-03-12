@@ -56,7 +56,10 @@ When spawning `claude` CLI from Node.js server (itself running in a Claude Code 
 - `ecosystem.config.cjs` — PM2 config: `steward-main` (:3001) + `steward-safe` (:3003)
 - `.env` — root level: `API_KEY`, `PORT`, `DATABASE_PATH`, `CLAUDE_PATH`, `SAFE_PORT`
 - `client/.env.local` — `VITE_API_KEY` (matches `API_KEY`)
-- `architecture.md` — full architecture doc (structure, flows, schema, gotchas, roadmap)
+- `docs/architecture.md` — structure, stack, flows, schema, SSE protocol, config, gotchas, dev/build guide
+- `docs/self-management.md` — upgrade flow, `/api/events` SSE, safe-mode core and freeze policy
+- `docs/roadmap.md` — all planned features
+- `README.md` — brief intro, quick start, links to docs
 - `TODO.md` — canonical task list
 
 ## Session Design
