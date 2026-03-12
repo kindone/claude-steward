@@ -278,7 +278,8 @@
     function setStreaming(active) {
       document.getElementById('send-btn').style.display = active ? 'none' : ''
       document.getElementById('stop-btn').style.display = active ? '' : 'none'
-      document.getElementById('msg-input').disabled = active
+      msgInput.disabled = active
+      if (!active) msgInput.focus()
     }
 
     async function sendMessage(text) {
@@ -427,21 +428,25 @@
       cancelStream = null
     }
 
-    document.getElementById('send-btn').addEventListener('click', () => {
-      const text = document.getElementById('msg-input').value.trim()
+    const msgInput = document.getElementById('msg-input')
+
+    function submitMessage() {
+      const text = msgInput.value.trim()
       if (!text) return
-      document.getElementById('msg-input').value = ''
+      msgInput.value = ''
       sendMessage(text)
-    })
+    }
+
+    document.getElementById('send-btn').addEventListener('click', submitMessage)
 
     document.getElementById('stop-btn').addEventListener('click', () => {
       cancelStream?.()
     })
 
-    document.getElementById('msg-input').addEventListener('keydown', e => {
+    msgInput.addEventListener('keydown', e => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
-        document.getElementById('send-btn').click()
+        submitMessage()
       }
     })
   </script>
