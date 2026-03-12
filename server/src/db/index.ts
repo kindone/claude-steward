@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 
 const DB_PATH = process.env.DATABASE_PATH ?? path.join(
   path.dirname(fileURLToPath(import.meta.url)),
-  '../../../steward.db'
+  '../../steward.db'   // server/src/db/ → server/steward.db
 )
 
 const db = new DatabaseSync(DB_PATH)
