@@ -1,0 +1,23 @@
+node_modules/
+dist/
+
+# SQLite database and WAL mode sidecars
+*.db
+*.db-shm
+*.db-wal
+
+# Environment
+.env
+client/.env.local
+
+# Build output served by Express during production
+server/public/
+
+# Claude Code local permission grants (machine-specific)
+.claude/settings.local.json
+
+# macOS
+.DS_Store
+
+# Scratch
+temporary.txt

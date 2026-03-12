@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚠ Safe Mode — Claude Steward</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1a0a0a;
+      color: #f0d0d0;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    header {
+      background: #7f1d1d;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 15px; font-weight: 700; color: #fca5a5; letter-spacing: 0.05em; }
+    header p  { font-size: 12px; color: #fca5a5; opacity: 0.75; }
+
+    #auth-screen {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 12px;
+    }
+    #auth-screen input {
+      background: #2a0f0f;
+      border: 1px solid #7f1d1d;
+      color: #f0d0d0;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 14px;
+      width: 280px;
+    }
+    #auth-screen button {
+      background: #7f1d1d;
+      color: #fca5a5;
+      border: none;
+      padding: 10px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+    }
+    #auth-screen button:hover { background: #991b1b; }
+    #auth-error { color: #fca5a5; font-size: 13px; }
+
+    #chat-screen {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .msg { max-width: 80%; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-word; }
+    .msg-user { align-self: flex-end; background: #7f1d1d; color: #fecaca; }
+    .msg-assistant { align-self: flex-start; background: #2a0f0f; border: 1px solid #4a1a1a; color: #f0d0d0; }
+    .msg-assistant.streaming::after { content: '▋'; animation: blink 1s step-end infinite; }
+    @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: 0; } }
+
+    #input-area {
+      padding: 12px 16px;
+      background: #220e0e;
+      border-top: 1px solid #4a1a1a;
+      display: flex;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    #input-area textarea {
+      flex: 1;
+      background: #2a0f0f;
+      border: 1px solid #4a1a1a;
+      color: #f0d0d0;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      resize: none;
+      font-family: inherit;
+    }
+    #input-area textarea:focus { outline: none; border-color: #7f1d1d; }
+    #send-btn, #stop-btn {
+      border: none;
+      padding: 0 18px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      align-self: flex-end;
+      height: 40px;
+    }
+    #send-btn { background: #7f1d1d; color: #fca5a5; }
+    #send-btn:hover:not(:disabled) { background: #991b1b; }
+    #send-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    #stop-btn { background: #450a0a; color: #fca5a5; display: none; }
+    #stop-btn:hover { background: #7f1d1d; }
+
+    #session-info {
+      padding: 4px 16px;
+      font-size: 11px;
+      color: #7f3030;
+      background: #1a0a0a;
+      border-bottom: 1px solid #2a0f0f;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    #signout-btn {
+      background: none;
+      border: none;
+      color: #4a2020;
+      cursor: pointer;
+      font-size: 11px;
+      padding: 0;
+    }
+    #signout-btn:hover { color: #fca5a5; }
+
+    .tool-log {
+      font-size: 12px;
+      color: #7f4040;
+      margin-bottom: 4px;
+      font-style: italic;
+      white-space: pre-wrap;
+    }
+    .tool-log:empty { display: none; }
+  </style>
+</head>
+<body>
+    <header>
+      <div>
+        <h1>⚠ SAFE MODE</h1>
+        <p>Emergency Claude terminal — full permissions, no approval prompts</p>
+      </div>
+    </header>
+
+  <div id="auth-screen">
+    <p style="font-size:13px;color:#fca5a5">Enter your API key to continue</p>
+    <input id="api-key-input" type="password" placeholder="API key" />
+    <button id="auth-btn">Connect</button>
+    <p id="auth-error"></p>
+  </div>
+
+  <div id="chat-screen">
+    <div id="session-info">
+      <span id="session-text">No active session</span>
+      <button id="signout-btn" title="Sign out and clear saved key">sign out</button>
+    </div>
+    <div id="messages"></div>
+    <div id="input-area">
+      <textarea id="msg-input" rows="3" placeholder="Message Claude… (Enter to send, Shift+Enter for newline)"></textarea>
+      <button id="send-btn">Send</button>
+      <button id="stop-btn">Stop</button>
+    </div>
+  </div>
+
+  <script>
+    let apiKey = ''
+    let claudeSessionId = null
+    let cancelStream = null
+
+    // Structured logger — all safe-mode output is prefixed for easy filtering.
+    // Filter with: console.debug or DevTools filter bar "[safe"
+    const log = {
+      info:  (...a) => console.log ('%c[safe]', 'color:#fca5a5;font-weight:bold', ...a),
+      warn:  (...a) => console.warn('%c[safe]', 'color:#fca5a5;font-weight:bold', ...a),
+      error: (...a) => console.error('%c[safe]', 'color:#fca5a5;font-weight:bold', ...a),
+      // verbose per-chunk trace — only visible when DevTools level includes Verbose
+      chunk: (...a) => console.debug('%c[safe:chunk]', 'color:#7f4040', ...a),
+    }
+    log.info('Safe-mode initialised', { href: location.href })
+
+    function showChat(key) {
+      log.info('showChat: entering chat UI')
+      apiKey = key
+      document.getElementById('auth-screen').style.display = 'none'
+      document.getElementById('chat-screen').style.display = 'flex'
+      document.getElementById('msg-input').focus()
+      claudeSessionId = null
+      updateSessionInfo()
+    }
+
+    // Auto-login with saved key
+    const savedKey = localStorage.getItem('steward-safe-key')
+    if (savedKey) {
+      log.info('Auto-login: trying saved key')
+      fetch('/ping', { headers: { 'Authorization': `Bearer ${savedKey}` } })
+        .then(r => {
+          if (r.ok) { log.info('Auto-login: success'); showChat(savedKey) }
+          else       { log.warn('Auto-login: rejected', r.status) }
+        })
+        .catch(e => log.warn('Auto-login: fetch failed', e.message))
+    }
+
+    // Auth
+    document.getElementById('auth-btn').addEventListener('click', async () => {
+      const key = document.getElementById('api-key-input').value.trim()
+      if (!key) return
+      log.info('Manual auth: attempting /ping')
+      try {
+        const res = await fetch('/ping', {
+          headers: { 'Authorization': `Bearer ${key}` },
+        })
+        if (res.status === 401) {
+          log.warn('Manual auth: 401 Unauthorized')
+          document.getElementById('auth-error').textContent = 'Invalid key'
+          return
+        }
+        if (!res.ok) {
+          log.error('Manual auth: unexpected status', res.status)
+          document.getElementById('auth-error').textContent = 'Server error'
+          return
+        }
+        log.info('Manual auth: success')
+      } catch (e) {
+        log.error('Manual auth: fetch failed', e)
+        document.getElementById('auth-error').textContent = 'Connection failed: ' + e.message
+        return
+      }
+      localStorage.setItem('steward-safe-key', key)
+      showChat(key)
+    })
+
+    document.getElementById('api-key-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('auth-btn').click()
+    })
+
+    function updateSessionInfo() {
+      const label = claudeSessionId ? `Session: ${claudeSessionId}` : 'No active session — next message starts a new one'
+      document.getElementById('session-text').textContent = label
+      log.info('updateSessionInfo', { claudeSessionId })
+    }
+
+    document.getElementById('signout-btn').addEventListener('click', () => {
+      log.info('Sign out — clearing saved key')
+      localStorage.removeItem('steward-safe-key')
+      location.reload()
+    })
+
+    function appendMessage(role, content, streaming = false) {
+      const el = document.createElement('div')
+      el.className = `msg msg-${role}` + (streaming ? ' streaming' : '')
+      if (role === 'assistant') {
+        const toolLog = document.createElement('div')
+        toolLog.className = 'tool-log'
+        const text = document.createElement('span')
+        text.textContent = content
+        el.appendChild(toolLog)
+        el.appendChild(text)
+      } else {
+        el.textContent = content
+      }
+      document.getElementById('messages').appendChild(el)
+      el.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      return el
+    }
+
+    function setStreaming(active) {
+      document.getElementById('send-btn').style.display = active ? 'none' : ''
+      document.getElementById('stop-btn').style.display = active ? '' : 'none'
+      document.getElementById('msg-input').disabled = active
+    }
+
+    async function sendMessage(text) {
+      log.info('sendMessage', { text: text.slice(0, 80), claudeSessionId })
+      appendMessage('user', text)
+      const assistantEl = appendMessage('assistant', '', true)
+      const toolLogEl = assistantEl.querySelector('.tool-log')
+      const textEl = assistantEl.querySelector('span')
+      setStreaming(true)
+
+      const controller = new AbortController()
+      cancelStream = () => { log.info('Stream aborted by user'); controller.abort() }
+
+      // Track tool activity across multi-turn responses
+      let toolHistory = []   // completed: "✓ Write: File created…"
+      let currentTool = ''   // active: "Write"
+
+      function renderToolLog() {
+        const lines = [...toolHistory]
+        if (currentTool) lines.push(`⚙ ${currentTool}…`)
+        toolLogEl.textContent = lines.join('\n')
+        assistantEl.scrollIntoView({ behavior: 'smooth', block: 'end' })
+      }
+
+      try {
+        log.info('POST /chat', { claudeSessionId })
+        const res = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text, claudeSessionId }),
+          signal: controller.signal,
+        })
+        log.info('/chat response', { status: res.status, ok: res.ok })
+
+        if (!res.ok) {
+          log.error('/chat non-ok response', res.status)
+          textEl.textContent = `⚠ Server error: HTTP ${res.status}`
+          assistantEl.classList.remove('streaming')
+          setStreaming(false)
+          return
+        }
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let chunkCount = 0
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) { log.info('Stream ended', { chunkCount }); break }
+          buffer += decoder.decode(value, { stream: true })
+          const lines = buffer.split('\n')
+          buffer = lines.pop() ?? ''
+
+          let pendingEvent = ''
+          for (const line of lines) {
+            if (line.startsWith('event: ')) { pendingEvent = line.slice(7).trim(); continue }
+            if (!line.startsWith('data: ')) continue
+            const raw = line.slice(6)
+            if (pendingEvent === 'chunk') {
+              chunkCount++
+              let chunk
+              try { chunk = JSON.parse(raw) } catch (e) {
+                log.warn('Malformed JSON chunk', raw.slice(0, 100), e.message)
+                pendingEvent = ''
+                continue
+              }
+
+              log.chunk(chunk.type, chunk.subtype ?? chunk.event?.type ?? '')
+
+              if (chunk.type === 'system' && chunk.subtype === 'init') {
+                log.info('system.init', {
+                  session_id: chunk.session_id,
+                  model: chunk.model,
+                  permissionMode: chunk.permissionMode,
+                  tools: chunk.tools,
+                })
+                if (!claudeSessionId) { claudeSessionId = chunk.session_id; updateSessionInfo() }
+              }
+
+              if (chunk.type === 'stream_event') {
+                const ev = chunk.event
+                if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
+                  log.info('Tool start', { tool: ev.content_block.name, id: ev.content_block.id })
+                  currentTool = ev.content_block.name
+                  renderToolLog()
+                }
+                if (ev.type === 'content_block_delta' && ev.delta?.type === 'text_delta') {
+                  textEl.textContent += ev.delta.text
+                  assistantEl.scrollIntoView({ behavior: 'smooth', block: 'end' })
+                }
+                if (ev.type === 'message_delta') {
+                  log.info('message_delta', { stop_reason: ev.delta?.stop_reason })
+                }
+              }
+
+              if (chunk.type === 'user') {
+                const results = chunk.message?.content ?? []
+                for (const r of results) {
+                  if (r.type === 'tool_result') {
+                    const summary = typeof r.content === 'string'
+                      ? r.content.split('\n')[0].slice(0, 60)
+                      : 'done'
+                    log.info('Tool result', { tool: currentTool, summary })
+                    toolHistory.push(`✓ ${currentTool}: ${summary}`)
+                    currentTool = ''
+                    renderToolLog()
+                  }
+                }
+              }
+
+              if (chunk.type === 'result') {
+                log.info('result chunk', {
+                  is_error: chunk.is_error,
+                  duration_ms: chunk.duration_ms,
+                  cost_usd: chunk.total_cost_usd,
+                  result_preview: chunk.result?.slice(0, 80),
+                })
+              }
+
+              if (chunk.type === 'rate_limit_event') {
+                log.warn('Rate limit event', chunk.rate_limit_info)
+              }
+
+            } else if (pendingEvent === 'error') {
+              let errMsg = raw
+              try { errMsg = JSON.parse(raw).message } catch { /* use raw */ }
+              log.error('SSE error event', errMsg)
+              textEl.textContent = '⚠ Error: ' + errMsg
+            }
+            pendingEvent = ''
+          }
+        }
+      } catch (e) {
+        if (e.name === 'AbortError') {
+          log.info('Fetch aborted')
+        } else {
+          log.error('Fetch error', e)
+          textEl.textContent = '⚠ ' + e.message
+        }
+      }
+
+      log.info('sendMessage complete')
+      assistantEl.classList.remove('streaming')
+      setStreaming(false)
+      cancelStream = null
+    }
+
+    document.getElementById('send-btn').addEventListener('click', () => {
+      const text = document.getElementById('msg-input').value.trim()
+      if (!text) return
+      document.getElementById('msg-input').value = ''
+      sendMessage(text)
+    })
+
+    document.getElementById('stop-btn').addEventListener('click', () => {
+      cancelStream?.()
+    })
+
+    document.getElementById('msg-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault()
+        document.getElementById('send-btn').click()
+      }
+    })
+  </script>
+</body>
+</html>
