@@ -18,6 +18,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 - [x] **Edit session title** — inline rename (double-click); `PATCH /api/sessions/:id`
 - [x] **Copy message button** — copy-to-clipboard on assistant bubbles
 - [x] **Keyboard shortcuts** — `Cmd+N` new session, `Cmd+[` / `Cmd+]` prev/next session
+- [ ] **File navigation prominence** — once a session is active, file management should be more prominent; discuss layout options (e.g. persistent file panel, top-level tab, or resizable split between files and sessions)
 
 ### Scheduler
 - [ ] **Scheduled conversation resume** — `schedules` table (`id`, `session_id`, `cron`, `prompt_context`, `enabled`); `node-cron` runner injects context-aware wake messages ("would you like to resume the conversation about X?")
