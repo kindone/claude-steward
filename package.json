@@ -1,13 +1,22 @@
 {
   "name": "claude-steward",
   "private": true,
-  "workspaces": ["server", "client"],
+  "type": "module",
+  "workspaces": [
+    "server",
+    "client"
+  ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=server\" \"npm run dev --workspace=client\"",
     "build": "npm run build --workspace=client && npm run build --workspace=server",
-    "start": "npm run start --workspace=server"
+    "start": "npm run start --workspace=server",
+    "test": "npm test --workspace=server && npm test --workspace=client",
+    "test:e2e": "playwright test",
+    "test:all": "npm test && npm run test:e2e",
+    "status": "node scripts/status.js"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "concurrently": "^9.1.0"
   }
 }
