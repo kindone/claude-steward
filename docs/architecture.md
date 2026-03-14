@@ -123,6 +123,7 @@ CREATE TABLE sessions (
   claude_session_id TEXT,             -- CLI handle; set after first message; used for --resume
   project_id        TEXT NOT NULL REFERENCES projects(id),  -- required since v2; orphans migrated on startup
   system_prompt     TEXT,             -- optional; passed as --system-prompt on every spawn
+  permission_mode   TEXT NOT NULL DEFAULT 'acceptEdits',    -- plan | acceptEdits | bypassPermissions
   created_at        INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at        INTEGER NOT NULL DEFAULT (unixepoch())
 )

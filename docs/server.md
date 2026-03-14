@@ -38,11 +38,12 @@ The `createApp()` / `listen` split exists so tests can import `createApp()` with
 | `POST` | `/api/chat` | ✓ | Start SSE stream; spawns Claude subprocess |
 | `GET` | `/api/sessions` | ✓ | List sessions; optional `?projectId=` filter |
 | `POST` | `/api/sessions` | ✓ | Create session; `projectId` required in body |
-| `PATCH` | `/api/sessions/:id` | ✓ | Update session fields: `{ title?, systemPrompt? }` |
+| `PATCH` | `/api/sessions/:id` | ✓ | Update session fields: `{ title?, systemPrompt?, permissionMode? }` |
 | `DELETE` | `/api/sessions/:id` | ✓ | Delete session and its messages |
 | `GET` | `/api/sessions/:id/messages` | ✓ | Full message history |
 | `GET` | `/api/projects` | ✓ | List projects |
 | `POST` | `/api/projects` | ✓ | Create project (validates path exists and is a directory) |
+| `PATCH` | `/api/projects/:id` | ✓ | Update project fields (legacy `permissionMode`; use session-level instead) |
 | `DELETE` | `/api/projects/:id` | ✓ | Delete project; returns 403 if path matches `APP_ROOT` |
 | `GET` | `/api/projects/:id/files` | ✓ | List directory contents; `?path=` subpath |
 | `GET` | `/api/projects/:id/files/content` | ✓ | Return file content (1 MB cap) |
@@ -112,7 +113,10 @@ claude --print <message>
        --include-partial-messages
        [--resume <claude_session_id>]
        [--system-prompt <text>]
+       [--permission-mode plan|acceptEdits|bypassPermissions]
 ```
+
+`permission_mode` is stored per session (default `acceptEdits`). `default` mode is intentionally never passed — it would stall waiting for interactive approval.
 
 ### NDJSON line handling
 

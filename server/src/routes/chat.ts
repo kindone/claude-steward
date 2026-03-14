@@ -65,6 +65,7 @@ router.post('/', (req, res) => {
     message,
     claudeSessionId: session.claude_session_id,
     systemPrompt: session.system_prompt,
+    permissionMode: session.permission_mode,
     res,
     signal: abortController.signal,
     cwd: project?.path,

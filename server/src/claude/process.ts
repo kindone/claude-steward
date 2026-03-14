@@ -43,6 +43,7 @@ export type SpawnOptions = {
   message: string
   claudeSessionId: string | null
   systemPrompt?: string | null
+  permissionMode?: string | null
   res: Response
   onSessionId: (id: string) => void
   onComplete?: (text: string) => void
@@ -59,7 +60,7 @@ function sendSseEvent(res: Response, event: string, data: unknown): void {
 // Allow overriding the claude binary path via env var, with ~/.local/bin fallback
 const CLAUDE_BIN = process.env.CLAUDE_PATH ?? `${process.env.HOME ?? '/usr/local'}/.local/bin/claude`
 
-export function spawnClaude({ message, claudeSessionId, systemPrompt, res, onSessionId, onComplete, onError, signal, cwd }: SpawnOptions): void {
+export function spawnClaude({ message, claudeSessionId, systemPrompt, permissionMode, res, onSessionId, onComplete, onError, signal, cwd }: SpawnOptions): void {
   const args = [
     '--print', message,
     '--output-format', 'stream-json',
@@ -73,6 +74,13 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, res, onSes
 
   if (systemPrompt) {
     args.push('--system-prompt', systemPrompt)
+  }
+
+  // 'default' means interactive prompts — unusable in our non-interactive spawn;
+  // skip the flag entirely and let Claude use its own default (which may stall).
+  // All other modes are passed explicitly.
+  if (permissionMode && permissionMode !== 'default') {
+    args.push('--permission-mode', permissionMode)
   }
 
   // Strip all Claude Code session vars. Inheriting CLAUDECODE=1 makes claude

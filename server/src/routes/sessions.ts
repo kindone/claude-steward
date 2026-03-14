@@ -1,6 +1,8 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { sessionQueries, messageQueries } from '../db/index.js'
+import { sessionQueries, messageQueries, type PermissionMode } from '../db/index.js'
+
+const VALID_MODES = new Set<PermissionMode>(['default', 'plan', 'acceptEdits', 'bypassPermissions'])
 
 const router = Router()
 
@@ -38,7 +40,7 @@ router.patch('/:id', (req, res) => {
     res.status(404).json({ error: 'Session not found' })
     return
   }
-  const { title, systemPrompt } = req.body as { title?: string; systemPrompt?: string | null }
+  const { title, systemPrompt, permissionMode } = req.body as { title?: string; systemPrompt?: string | null; permissionMode?: string }
 
   if (title !== undefined) {
     if (!title || typeof title !== 'string' || !title.trim()) {
@@ -55,6 +57,15 @@ router.patch('/:id', (req, res) => {
       : null
     sessionQueries.updateSystemPrompt(value, req.params.id)
     session.system_prompt = value
+  }
+
+  if (permissionMode !== undefined) {
+    if (!VALID_MODES.has(permissionMode as PermissionMode)) {
+      res.status(400).json({ error: `permissionMode must be one of: ${[...VALID_MODES].join(', ')}` })
+      return
+    }
+    sessionQueries.updatePermissionMode(permissionMode as PermissionMode, req.params.id)
+    session.permission_mode = permissionMode as PermissionMode
   }
 
   res.json(session)

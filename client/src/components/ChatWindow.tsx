@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { sendMessage, getMessages, updateSystemPrompt, type ClaudeErrorCode } from '../lib/api'
+import { sendMessage, getMessages, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode } from '../lib/api'
+
+const MODES: { value: PermissionMode; label: string; title: string }[] = [
+  { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
+  { value: 'acceptEdits',       label: 'Edit', title: 'Claude can read and write files but not run shell commands' },
+  { value: 'bypassPermissions', label: 'Full', title: 'Claude can run any tool including shell commands' },
+]
 import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
 
@@ -14,12 +20,14 @@ type Message = {
 type Props = {
   sessionId: string
   systemPrompt: string | null
+  permissionMode: PermissionMode
   onTitle?: (title: string) => void
   onActivity?: () => void
   onSystemPromptChange?: (prompt: string | null) => void
+  onPermissionModeChange?: (mode: PermissionMode) => void
 }
 
-export function ChatWindow({ sessionId, systemPrompt, onTitle, onActivity, onSystemPromptChange }: Props) {
+export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [streaming, setStreaming] = useState(false)
   const [promptOpen, setPromptOpen] = useState(false)
@@ -38,6 +46,11 @@ export function ChatWindow({ sessionId, systemPrompt, onTitle, onActivity, onSys
     await updateSystemPrompt(sessionId, value)
     onSystemPromptChange?.(value)
     setPromptOpen(false)
+  }
+
+  async function handleModeChange(mode: PermissionMode) {
+    await updatePermissionMode(sessionId, mode)
+    onPermissionModeChange?.(mode)
   }
 
   function handlePromptKeyDown(e: React.KeyboardEvent) {
@@ -105,15 +118,29 @@ export function ChatWindow({ sessionId, systemPrompt, onTitle, onActivity, onSys
 
   return (
     <div className="chat-window">
-      {/* System prompt bar */}
+      {/* Session header bar: system prompt toggle + permission mode selector */}
       <div className="chat-window__prompt-bar">
-        <button
-          className={`chat-window__prompt-toggle${systemPrompt ? ' chat-window__prompt-toggle--active' : ''}`}
-          onClick={() => setPromptOpen((o) => !o)}
-          title="System prompt"
-        >
-          {systemPrompt ? '⚙ System prompt set' : '⚙ System prompt'}
-        </button>
+        <div className="chat-window__header-row">
+          <button
+            className={`chat-window__prompt-toggle${systemPrompt ? ' chat-window__prompt-toggle--active' : ''}`}
+            onClick={() => setPromptOpen((o) => !o)}
+            title="System prompt"
+          >
+            {systemPrompt ? '⚙ Prompt set' : '⚙ Prompt'}
+          </button>
+          <span className="chat-window__mode-seg">
+            {MODES.map((m) => (
+              <button
+                key={m.value}
+                className={`chat-window__mode-btn${permissionMode === m.value ? ' chat-window__mode-btn--active' : ''}`}
+                onClick={() => handleModeChange(m.value)}
+                title={m.title}
+              >
+                {m.label}
+              </button>
+            ))}
+          </span>
+        </div>
         {promptOpen && (
           <div className="chat-window__prompt-editor">
             <textarea

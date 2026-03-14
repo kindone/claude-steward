@@ -5,10 +5,14 @@ const authHeaders = (): HeadersInit => ({
   Authorization: `Bearer ${API_KEY}`,
 })
 
+export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'bypassPermissions'
+
 export type Project = {
   id: string
   name: string
   path: string
+  allow_all_tools: number   // legacy
+  permission_mode: PermissionMode
   created_at: number
 }
 
@@ -24,6 +28,7 @@ export type Session = {
   claude_session_id: string | null
   project_id: string | null
   system_prompt: string | null
+  permission_mode: PermissionMode
   created_at: number
   updated_at: number
 }
@@ -61,6 +66,16 @@ export async function fetchMeta(): Promise<{ appRoot: string }> {
   const res = await fetch('/api/meta')
   if (!res.ok) throw new Error('Failed to fetch meta')
   return res.json() as Promise<{ appRoot: string }>
+}
+
+export async function updateProject(projectId: string, patch: { permissionMode?: PermissionMode }): Promise<Project> {
+  const res = await fetch(`/api/projects/${projectId}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify(patch),
+  })
+  if (!res.ok) throw new Error('Failed to update project')
+  return res.json() as Promise<Project>
 }
 
 export async function deleteProject(projectId: string): Promise<void> {
@@ -133,6 +148,16 @@ export async function updateSystemPrompt(sessionId: string, systemPrompt: string
     body: JSON.stringify({ systemPrompt }),
   })
   if (!res.ok) throw new Error('Failed to update system prompt')
+  return res.json() as Promise<Session>
+}
+
+export async function updatePermissionMode(sessionId: string, permissionMode: PermissionMode): Promise<Session> {
+  const res = await fetch(`/api/sessions/${sessionId}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ permissionMode }),
+  })
+  if (!res.ok) throw new Error('Failed to update permission mode')
   return res.json() as Promise<Session>
 }
 

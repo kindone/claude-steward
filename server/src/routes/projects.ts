@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { projectQueries } from '../db/index.js'
+import { projectQueries, type PermissionMode } from '../db/index.js'
 
 // Monorepo root — three directories up from server/src/routes/
 const APP_ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..')
@@ -37,6 +37,26 @@ router.post('/', (req, res) => {
 
   const project = projectQueries.create(uuidv4(), name.trim(), resolved)
   res.status(201).json(project)
+})
+
+const VALID_MODES = new Set<PermissionMode>(['default', 'plan', 'acceptEdits', 'bypassPermissions'])
+
+router.patch('/:id', (req, res) => {
+  const project = projectQueries.findById(req.params.id)
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' })
+    return
+  }
+  const { permissionMode } = req.body as { permissionMode?: string }
+  if (permissionMode !== undefined) {
+    if (!VALID_MODES.has(permissionMode as PermissionMode)) {
+      res.status(400).json({ error: `permissionMode must be one of: ${[...VALID_MODES].join(', ')}` })
+      return
+    }
+    projectQueries.updatePermissionMode(permissionMode as PermissionMode, req.params.id)
+    project.permission_mode = permissionMode as PermissionMode
+  }
+  res.json(project)
 })
 
 router.delete('/:id', (req, res) => {

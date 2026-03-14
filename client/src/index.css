@@ -365,6 +365,14 @@ body {
   white-space: nowrap;
 }
 
+.project-picker__item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+
 .project-picker__delete {
   display: none;
   background: none;
@@ -643,16 +651,23 @@ body {
   border-bottom: 1px solid #1a1a1a;
 }
 
+.chat-window__header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px;
+}
+
 .chat-window__prompt-toggle {
   background: none;
   border: none;
   color: #444;
   font-size: 12px;
   cursor: pointer;
-  padding: 6px 14px;
-  width: 100%;
+  padding: 6px 6px;
   text-align: left;
   transition: color 0.1s;
+  flex-shrink: 0;
 }
 
 .chat-window__prompt-toggle:hover {
@@ -665,6 +680,39 @@ body {
 
 .chat-window__prompt-toggle--active:hover {
   color: #3b82f6;
+}
+
+.chat-window__mode-seg {
+  display: inline-flex;
+  border: 1px solid #222;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.chat-window__mode-btn {
+  background: none;
+  border: none;
+  border-right: 1px solid #222;
+  color: #444;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 3px 8px;
+  line-height: 1.4;
+  transition: background 0.1s, color 0.1s;
+}
+
+.chat-window__mode-btn:last-child {
+  border-right: none;
+}
+
+.chat-window__mode-btn:hover {
+  background: #1a1a1a;
+  color: #888;
+}
+
+.chat-window__mode-btn--active {
+  background: #1e3a5f;
+  color: #60a5fa;
 }
 
 .chat-window__prompt-editor {

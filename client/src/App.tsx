@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  listProjects, createProject, deleteProject, fetchMeta,
+  listProjects, createProject, deleteProject, fetchMeta, updatePermissionMode,
   listSessions, createSession, deleteSession, renameSession,
   subscribeToAppEvents,
   type Project, type Session,
@@ -56,6 +56,11 @@ export default function App() {
     const project = await createProject(name, path)
     setProjects((prev) => [...prev, project])
     setActiveProjectId(project.id)
+  }
+
+  async function handlePermissionModeChange(sessionId: string, mode: import('./lib/api').PermissionMode) {
+    const updated = await updatePermissionMode(sessionId, mode)
+    setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)))
   }
 
   async function handleDeleteProject(id: string) {
@@ -182,6 +187,7 @@ export default function App() {
             key={activeSessionId}
             sessionId={activeSessionId}
             systemPrompt={sessions.find((s) => s.id === activeSessionId)?.system_prompt ?? null}
+            permissionMode={sessions.find((s) => s.id === activeSessionId)?.permission_mode ?? 'acceptEdits'}
             onTitle={(title) => handleTitleUpdate(activeSessionId, title)}
             onActivity={() => handleSessionActivity(activeSessionId)}
             onSystemPromptChange={(prompt) =>
@@ -189,6 +195,7 @@ export default function App() {
                 prev.map((s) => s.id === activeSessionId ? { ...s, system_prompt: prompt } : s)
               )
             }
+            onPermissionModeChange={(mode) => handlePermissionModeChange(activeSessionId, mode)}
           />
         ) : (
           <div className="app__empty">
