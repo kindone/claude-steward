@@ -26,7 +26,7 @@ export default defineConfig({
       url: 'http://localhost:3001/api/sessions',
       reuseExistingServer: true,
       timeout: 15_000,
-      env: { API_KEY: 'steward-dev-key' },
+      env: { API_KEY: process.env.API_KEY ?? 'steward-e2e-test-key' },
     },
     {
       command: 'npm run dev --workspace=client',
