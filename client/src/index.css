@@ -791,6 +791,55 @@ body {
   50% { opacity: 0; }
 }
 
+/* Copy button */
+.message__assistant-wrap {
+  position: relative;
+}
+
+.message__copy-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  color: #555;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  padding: 3px 6px;
+  opacity: 0;
+  transition: opacity 0.1s, color 0.1s;
+}
+
+.message--assistant:hover .message__copy-btn {
+  opacity: 1;
+}
+
+.message__copy-btn:hover {
+  color: #ccc;
+  border-color: #444;
+}
+
+.message__copy-btn--copied {
+  color: #4ade80 !important;
+  border-color: rgba(74, 222, 128, 0.3) !important;
+  opacity: 1 !important;
+}
+
+/* Inline rename input */
+.sidebar__rename-input {
+  flex: 1;
+  background: #0d0d0d;
+  border: 1px solid #2563eb;
+  border-radius: 4px;
+  color: #e8e8e8;
+  font-size: 13px;
+  padding: 2px 6px;
+  outline: none;
+  min-width: 0;
+}
+
 /* ── Input bar ── */
 .input-bar {
   display: flex;

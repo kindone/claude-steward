@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
@@ -17,6 +17,7 @@ type Props = {
 
 export function MessageBubble({ role, content, streaming = false, errorCode }: Props) {
   const contentRef = useRef<HTMLDivElement>(null)
+  const [copied, setCopied] = useState(false)
 
   useEffect(() => {
     if (contentRef.current && role === 'assistant' && !errorCode) {
@@ -25,6 +26,12 @@ export function MessageBubble({ role, content, streaming = false, errorCode }: P
       })
     }
   }, [content, role, errorCode])
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(content)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   if (errorCode) {
     const isSessionExpired = errorCode === 'session_expired'
@@ -41,11 +48,22 @@ export function MessageBubble({ role, content, streaming = false, errorCode }: P
       {role === 'user' ? (
         <p className="message__content message__content--plain">{content}</p>
       ) : (
-        <div
-          ref={contentRef}
-          className={`message__content message__content--markdown${streaming ? ' message__content--streaming' : ''}`}
-          dangerouslySetInnerHTML={{ __html: marked.parse(content) as string }}
-        />
+        <div className="message__assistant-wrap">
+          <div
+            ref={contentRef}
+            className={`message__content message__content--markdown${streaming ? ' message__content--streaming' : ''}`}
+            dangerouslySetInnerHTML={{ __html: marked.parse(content) as string }}
+          />
+          {!streaming && content && (
+            <button
+              className={`message__copy-btn${copied ? ' message__copy-btn--copied' : ''}`}
+              onClick={handleCopy}
+              title="Copy message"
+            >
+              {copied ? '✓' : '⎘'}
+            </button>
+          )}
+        </div>
       )}
     </div>
   )

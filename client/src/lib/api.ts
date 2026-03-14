@@ -109,6 +109,16 @@ export async function getMessages(sessionId: string): Promise<Message[]> {
   return res.json() as Promise<Message[]>
 }
 
+export async function renameSession(sessionId: string, title: string): Promise<Session> {
+  const res = await fetch(`/api/sessions/${sessionId}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ title }),
+  })
+  if (!res.ok) throw new Error('Failed to rename session')
+  return res.json() as Promise<Session>
+}
+
 export async function deleteSession(sessionId: string): Promise<void> {
   const res = await fetch(`/api/sessions/${sessionId}`, {
     method: 'DELETE',
@@ -174,6 +184,7 @@ export type ChunkHandler = {
   onTitle?: (title: string) => void
   onDone: () => void
   onError: (message: string, code?: ClaudeErrorCode) => void
+  onActivity?: () => void
 }
 
 export function sendMessage(
@@ -199,11 +210,13 @@ export function sendMessage(
       const reader = res.body!.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
+      let activityFired = false
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
+        if (!activityFired) { activityFired = true; handlers.onActivity?.() }
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
         buffer = lines.pop() ?? ''

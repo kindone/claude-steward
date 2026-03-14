@@ -14,10 +14,10 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 - [ ] **Claude as app maker** — scaffold new mini-apps via chat, modify files, trigger live-reload via sidecar manager
 
 ### Core UX
-- [ ] **Session reordering** — move active session to top of list on each new message (`updated_at` already tracked)
-- [ ] **Edit session title** — inline rename in sidebar (double-click or pencil icon); `PATCH /api/sessions/:id`
-- [ ] **Copy message button** — copy-to-clipboard on assistant bubbles
-- [ ] **Keyboard shortcuts** — `Cmd+N` new session, `Cmd+[` / `Cmd+]` prev/next session
+- [x] **Session reordering** — move active session to top on new message
+- [x] **Edit session title** — inline rename (double-click); `PATCH /api/sessions/:id`
+- [x] **Copy message button** — copy-to-clipboard on assistant bubbles
+- [x] **Keyboard shortcuts** — `Cmd+N` new session, `Cmd+[` / `Cmd+]` prev/next session
 
 ### Scheduler
 - [ ] **Scheduled conversation resume** — `schedules` table (`id`, `session_id`, `cron`, `prompt_context`, `enabled`); `node-cron` runner injects context-aware wake messages ("would you like to resume the conversation about X?")

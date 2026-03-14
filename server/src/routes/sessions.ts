@@ -28,6 +28,21 @@ router.get('/:id/messages', (req, res) => {
   res.json(messageQueries.listBySessionId(req.params.id))
 })
 
+router.patch('/:id', (req, res) => {
+  const session = sessionQueries.findById(req.params.id)
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' })
+    return
+  }
+  const { title } = req.body as { title?: string }
+  if (!title || typeof title !== 'string' || !title.trim()) {
+    res.status(400).json({ error: 'title is required' })
+    return
+  }
+  sessionQueries.updateTitle(title.trim(), req.params.id)
+  res.json({ ...session, title: title.trim() })
+})
+
 router.delete('/:id', (req, res) => {
   const session = sessionQueries.findById(req.params.id)
   if (!session) {

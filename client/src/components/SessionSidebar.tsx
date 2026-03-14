@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { Session, Project } from '../lib/api'
 import { ProjectPicker } from './ProjectPicker'
 import { FileTree } from './FileTree'
@@ -15,6 +15,7 @@ type Props = {
   onNewSession: () => void
   onDeleteSession: (id: string) => void
   onDeleteAllSessions: () => void
+  onRenameSession: (id: string, title: string) => Promise<void>
   loading: boolean
 }
 
@@ -30,9 +31,35 @@ export function SessionSidebar({
   onNewSession,
   onDeleteSession,
   onDeleteAllSessions,
+  onRenameSession,
   loading,
 }: Props) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editValue, setEditValue] = useState('')
+  const editInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (editingId) editInputRef.current?.select()
+  }, [editingId])
+
+  function startEditing(e: React.MouseEvent, session: Session) {
+    e.stopPropagation()
+    setPendingDeleteId(null)
+    setEditingId(session.id)
+    setEditValue(session.title)
+  }
+
+  async function commitRename() {
+    if (!editingId) return
+    const trimmed = editValue.trim()
+    if (trimmed) await onRenameSession(editingId, trimmed)
+    setEditingId(null)
+  }
+
+  function cancelRename() {
+    setEditingId(null)
+  }
 
   function handleSessionClick(id: string) {
     setPendingDeleteId(null)
@@ -104,7 +131,20 @@ export function SessionSidebar({
             className={`sidebar__item${s.id === activeSessionId ? ' sidebar__item--active' : ''}${pendingDeleteId === s.id ? ' sidebar__item--confirming' : ''}`}
             onClick={() => handleSessionClick(s.id)}
           >
-            {pendingDeleteId === s.id ? (
+            {editingId === s.id ? (
+              <input
+                ref={editInputRef}
+                className="sidebar__rename-input"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); commitRename() }
+                  if (e.key === 'Escape') cancelRename()
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : pendingDeleteId === s.id ? (
               <span className="sidebar__confirm">
                 <span className="sidebar__confirm-label">Delete?</span>
                 <button className="sidebar__confirm-yes" onClick={(e) => handleConfirmDelete(e, s.id)}>Yes</button>
@@ -112,7 +152,13 @@ export function SessionSidebar({
               </span>
             ) : (
               <>
-                <span className="sidebar__item-title">{s.title}</span>
+                <span
+                  className="sidebar__item-title"
+                  onDoubleClick={(e) => startEditing(e, s)}
+                  title="Double-click to rename"
+                >
+                  {s.title}
+                </span>
                 <button
                   className="sidebar__delete-btn"
                   onClick={(e) => handleDeleteClick(e, s.id)}

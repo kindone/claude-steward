@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   listProjects, createProject, deleteProject,
-  listSessions, createSession, deleteSession,
+  listSessions, createSession, deleteSession, renameSession,
   subscribeToAppEvents,
   type Project, type Session,
 } from './lib/api'
@@ -99,6 +99,51 @@ export default function App() {
     setActiveSessionId(null)
   }
 
+  function handleSessionActivity(sessionId: string) {
+    setSessions((prev) => {
+      const idx = prev.findIndex((s) => s.id === sessionId)
+      if (idx <= 0) return prev
+      const updated = [...prev]
+      const [moved] = updated.splice(idx, 1)
+      return [moved, ...updated]
+    })
+  }
+
+  async function handleRenameSession(sessionId: string, title: string) {
+    const updated = await renameSession(sessionId, title)
+    setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)))
+  }
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (!e.metaKey && !e.ctrlKey) return
+      if (e.key === 'n') {
+        e.preventDefault()
+        handleNewSession()
+      } else if (e.key === '[') {
+        e.preventDefault()
+        setSessions((prev) => {
+          const idx = prev.findIndex((s) => s.id === activeSessionId)
+          const next = prev[idx + 1]
+          if (next) setActiveSessionId(next.id)
+          return prev
+        })
+      } else if (e.key === ']') {
+        e.preventDefault()
+        setSessions((prev) => {
+          const idx = prev.findIndex((s) => s.id === activeSessionId)
+          const next = prev[idx - 1]
+          if (next) setActiveSessionId(next.id)
+          return prev
+        })
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId, sessions])
+
   return (
     <div className="app">
       {restarting && (
@@ -118,6 +163,7 @@ export default function App() {
         onNewSession={handleNewSession}
         onDeleteSession={handleDeleteSession}
         onDeleteAllSessions={handleDeleteAllSessions}
+        onRenameSession={handleRenameSession}
         loading={loading}
       />
       <main className="app__main">
@@ -126,6 +172,7 @@ export default function App() {
             key={activeSessionId}
             sessionId={activeSessionId}
             onTitle={(title) => handleTitleUpdate(activeSessionId, title)}
+            onActivity={() => handleSessionActivity(activeSessionId)}
           />
         ) : (
           <div className="app__empty">

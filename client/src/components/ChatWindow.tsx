@@ -14,9 +14,10 @@ type Message = {
 type Props = {
   sessionId: string
   onTitle?: (title: string) => void
+  onActivity?: () => void
 }
 
-export function ChatWindow({ sessionId, onTitle }: Props) {
+export function ChatWindow({ sessionId, onTitle, onActivity }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [streaming, setStreaming] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -52,6 +53,7 @@ export function ChatWindow({ sessionId, onTitle }: Props) {
 
     cancelRef.current = sendMessage(sessionId, text, {
       onTitle,
+      onActivity,
       onTextDelta: (delta) => {
         setMessages((prev) =>
           prev.map((m) =>
