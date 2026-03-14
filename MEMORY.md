@@ -1,90 +1,68 @@
-# Claude Steward — Project Memory
+# Claude Steward — Agent Memory
 
-## Vision
-
-Claude Steward is a self-hosted, always-on Claude Code environment accessible from anywhere (desktop + mobile). Core properties:
-
-- **Project-centric**: each "project" maps to a real directory on the server; Claude Code sessions work within that directory. Multiple projects, multiple sessions per project. A file system navigation UI lets you browse and work within a project's files.
-- **Remote-first**: designed to run on a server you control (VPS, home server, etc.), accessible over the web from any device — like a personal cloud Claude Code.
-- **Proactively scheduled**: you can ask Claude to resume a conversation at a future time ("remind me tomorrow evening"). A meta-agent stores the intent in SQLite, fires via `node-cron`, sends a push notification, and injects a context-aware wake message ("would you like to resume the conversation about X?").
-- **Extensible via file-based tools/skills**: scripts you write and grant permission for Claude to execute within a project. No server restart required.
-- **Mini-app platform**: projects can be "living artifacts" — embeddable web apps that Claude builds and maintains alongside the chat. Each mini-app declares a `steward-app.json` manifest (`name`, `type`, `devCommand`, `port`). The Steward spawns them as sidecar processes and embeds them via iframe in a split-panel view (chat left, app right; collapsible to full-screen). Standard types: `docs` (MkDocs-style learning material), `notebook` (Observable-style live code cells + visualizations), `webapp` (fully custom — e.g., a "Rome Hotels" travel research app with maps, photos, price comparisons). Claude can scaffold from templates or generate freeform.
-- **Self-managing**: the steward app itself is one of its own projects. Claude edits source files via chat, runs `npm run build`, then calls `POST /api/admin/reload` — which broadcasts a `reload` SSE event to all connected browsers and calls `process.exit(0)`. PM2/systemd detects the clean exit and restarts with the new `dist/`. Clients receive the reload event and refresh after a 1.5s window.
-- **Safe-mode core** (`safe/`): a frozen, dependency-free emergency terminal. A ~150-line plain Node.js HTTP server (`safe/server.js`) + single vanilla-JS HTML page (`safe/index.html`) that provides direct `claude` CLI access on a separate port (`:3003`). No React, no TypeScript, no build step — started by a separate PM2 process that is never part of the main upgrade cycle. **`safe/` is frozen once stabilized and must never be modified.**
-
-### Current schema
-`projects`, `sessions` (with `project_id` FK), and `messages`. See `docs/architecture.md` for full SQL.
-
-### safe/ is frozen
-`safe/server.js` and `safe/index.html` must not be modified once stabilized. They are the last-resort recovery tool — their value comes from never being touched by the upgrade cycle. Claude sessions working on the steward project must treat `safe/` as read-only.
+Read this first. For details, see `docs/` — start with `docs/architecture.md`.
 
 ---
 
-## Stack
-- **Server**: Node.js 23 + TypeScript (ESM), Express 5, `node:sqlite` (built-in), `tsx watch`
-- **Client**: Vite 6 + React 19, `marked`, `highlight.js`
-- **Monorepo**: npm workspaces (`server/` + `client/`)
-- **Dev**: server :3001, client :5173 (Vite proxy `/api` → :3001)
-- **Auth**: Bearer token via `API_KEY` env var; `.env` loaded by `dotenv` in `server/src/index.ts`
+## What This Is
 
-## Critical: Claude CLI Spawning Fixes
-When spawning `claude` CLI from Node.js server (itself running in a Claude Code session):
+A self-hosted, always-on Claude Code environment accessible from desktop and mobile. The key idea: you run it on a server you control, it wraps the `claude` CLI, and you chat with it from any browser. It is **not** a Claude.ai clone — it's a platform for running Claude Code sessions remotely against real project directories.
 
-1. **`CLAUDECODE=1` causes hanging** — strip all vars starting with `CLAUDE` from spawn env; `ANTHROPIC_BASE_URL` stays. See `server/src/claude/process.ts`.
-2. **`CI=true` is required** — without it, `stream-json --verbose` produces no output when stdout is piped.
-3. **`stdio: ['ignore', 'pipe', 'pipe']`** — close stdin on spawned process.
-4. **`req.on('close')` fires too early** — fires when request body is consumed, NOT on client disconnect. Use `res.on('close')` instead for SSE cleanup.
-5. **`--output-format stream-json --verbose --include-partial-messages`** — all three flags needed for token-by-token streaming.
-6. **No `assistant` chunk fallback** — with `--include-partial-messages`, only handle `stream_event.content_block_delta`. The final `assistant` chunk causes duplicates if also processed.
+Core properties (brief):
+- **Project-centric** — each project maps to a real server directory; sessions run `claude` with that directory as `cwd`
+- **Remote-first** — VPS/home server, accessed over the web
+- **Self-managing** — the steward app is one of its own projects; Claude can edit, build, and hot-reload it via chat
+- **Safe-mode core** (`safe/`) — frozen emergency terminal, survives main app crashes, never touched by the upgrade cycle
+- **Scheduled reminders** *(planned)* — `node-cron` + push notifications to resume conversations
+- **Mini-app platform** *(planned)* — projects can be embeddable web apps with a `steward-app.json` manifest
 
-## Key File Paths
-- `server/src/claude/process.ts` — claude CLI spawn, SSE pipe, session ID extraction, `onComplete` accumulator
-- `server/src/routes/chat.ts` — SSE endpoint; auto-title; user + assistant message persistence; `AbortController` for stop/cancel
-- `server/src/routes/sessions.ts` — `GET/POST /api/sessions`, `GET /api/sessions/:id/messages`, `DELETE /api/sessions/:id`
-- `server/src/routes/events.ts` — `GET /api/events`; app-level SSE stream (reload events, future notifications)
-- `server/src/routes/admin.ts` — `POST /api/admin/reload` (broadcast reload + exit), `GET /api/admin/version`
-- `server/src/lib/connections.ts` — global `Set<Response>` registry for app-level SSE connections; `broadcastEvent()`
-- `server/src/db/index.ts` — `node:sqlite`, WAL mode, `sessionQueries` + `messageQueries`
-- `server/src/index.ts` — Express entry, dotenv config with explicit path `../../.env`
-- `client/src/lib/api.ts` — fetch wrappers, fetch-based SSE client, `subscribeToAppEvents()`
-- `client/src/App.tsx` — root layout, session list state, delete handler, reload overlay
-- `client/src/components/ChatWindow.tsx` — loads message history on mount; streaming + stop
-- `client/src/components/MessageInput.tsx` — Send / Stop button
-- `client/src/components/SessionSidebar.tsx` — session list, delete button (hover)
-- `safe/server.js` — ⚠️ FROZEN — plain Node.js emergency terminal server (no deps, no build)
-- `safe/index.html` — ⚠️ FROZEN — vanilla JS emergency chat UI (red theme, stateless)
-- `ecosystem.config.cjs` — PM2 config: `steward-main` (:3001) + `steward-safe` (:3003)
-- `.env` — root level: `API_KEY`, `PORT`, `DATABASE_PATH`, `CLAUDE_PATH`, `SAFE_PORT`
-- `client/.env.local` — `VITE_API_KEY` (matches `API_KEY`)
-- `docs/architecture.md` — repo layout, port map, cross-program interfaces, shared config + DB schema
-- `docs/server.md` — Express routes, session lifecycle, SSE protocol, Claude subprocess gotchas
-- `docs/client.md` — component tree, state, SSE client, Vite config, testing
-- `docs/safe.md` — safe-mode server + UI internals, freeze policy
-- `docs/self-management.md` — upgrade flow, `/api/events` SSE, PM2 config
-- `docs/roadmap.md` — all planned features
-- `README.md` — brief intro, quick start, links to docs
-- `TODO.md` — canonical task list
+---
 
-## Session Design
-- Server UUID (`id`) exposed to client; `claude_session_id` populated from first `system.init` chunk
-- First message: no `--resume`; `claude_session_id` stored after init chunk received
-- Subsequent messages: `--resume <claude_session_id>` for conversation continuity
+## Current Implementation State
 
-## Auto-Title Design
-- On first message (when `session.title === 'New Chat'`): truncate message text to ≤40 chars at word boundary, update DB, emit `event: title` SSE event before spawning claude
-- Client `api.ts` parses `title` event → calls `onTitle?.(title)` → `ChatWindow` passes it up → `App.handleTitleUpdate` patches the session in state
-- Title appears in sidebar before first token arrives
+Built and working:
+- Project CRUD + file browser (server routes + client UI)
+- Session management scoped to projects
+- Chat streaming via Claude CLI subprocess → SSE → React client
+- Session reordering, inline rename, delete, keyboard shortcuts
+- Copy button on assistant messages
+- Structured error handling for failed `--resume` (clears `claude_session_id`, shows amber/red banner)
+- App-level SSE for live reload (`/api/events`)
+- Self-upgrade via `POST /api/admin/reload` → `process.exit(0)` → PM2 restart
+- Safe-mode core on `:3003` (frozen)
+- Vitest integration tests (server + client), Playwright E2E smoke tests
+- `npm run status` — checks all three ports
 
-## SSE Event Protocol
-Four event types from `POST /api/chat`:
-1. `title` — `{ title: string }` — first message only, emitted before any claude output
-2. `chunk` — raw claude NDJSON line — forwarded from claude stdout
-3. `done` — `{ session_id: string }` — after `result` chunk; server closes response
-4. `error` — `{ message: string }` — on spawn error or non-zero exit
+See `TODO.md` for what's next. See `archived_tasks.md` for completed work.
 
-## Node:sqlite Notes
-- `better-sqlite3` fails to compile on Node 23 — use `node:sqlite` (built-in, experimental)
-- API uses `db.prepare(sql).get(...)` / `.all()` / `.run(...)` — wrap in functions
+---
 
-## Launch Config
-`.claude/launch.json` has both `server` (port 3001) and `client` (port 5173) configurations.
+## Key Decisions & Why
+
+**`node:sqlite` not `better-sqlite3`** — `better-sqlite3` fails to compile on Node 23 due to a V8 ABI mismatch. `node:sqlite` is built-in and works. Downside: it's marked experimental; the API is `db.prepare().get/all/run()`.
+
+**`fetch()` + manual SSE parser, not `EventSource`** — `EventSource` doesn't support custom headers. Every request needs `Authorization: Bearer`, so the client uses a `ReadableStream` parser.
+
+**`--resume <claude_session_id>` for continuity** — The session has two IDs: a server UUID (`id`) and a CLI handle (`claude_session_id`). The CLI handle comes from the first `system.init` chunk and is stored in the DB. Failed resumes clear it automatically so the next message starts fresh.
+
+**`safe/` has zero dependencies** — its value is survival when the main app is broken. Introducing any `npm install` dependency would make it part of the build cycle and break that guarantee.
+
+**Capacitor (not Tauri) for mobile packaging** — Capacitor supports remote URL mode so there are no bundled assets; the app always loads from the server URL. This means updates to the server are immediately reflected on mobile without an app store release.
+
+---
+
+## Hard Constraints
+
+**`safe/` is frozen.** `safe/server.js`, `safe/index.html`, and `safe/package.json` must not be modified once stabilized. Claude sessions working on the steward project must treat `safe/` as read-only.
+
+---
+
+## Claude CLI Gotchas
+
+These have caused significant bugs — do not skip:
+
+1. **`CLAUDECODE=1` causes hanging** — when spawned from inside a Claude Code session, the child inherits this var and waits for IPC that never comes. Strip all `CLAUDE*` vars from the spawn env (except `ANTHROPIC_BASE_URL`). See `server/src/claude/process.ts`.
+2. **`CI=true` is required** — `--output-format stream-json --verbose` produces no output when stdout is a pipe without it (TTY detection).
+3. **Close stdin** — use `stdio: ['ignore', 'pipe', 'pipe']`; otherwise Claude may block on stdin.
+4. **Use `res.on('close')` not `req.on('close')`** — Express fires `req.on('close')` when the request body is consumed, not on client disconnect. SSE cleanup must use `res.on('close')`.
+5. **Don't process both `content_block_delta` and `assistant` chunks** — with `--include-partial-messages`, the final `assistant` chunk duplicates the full accumulated text. Only handle `content_block_delta`.
