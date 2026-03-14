@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
+import type { ClaudeErrorCode } from '../lib/api'
 
 marked.use({
   breaks: true,
@@ -11,18 +12,29 @@ type Props = {
   role: 'user' | 'assistant'
   content: string
   streaming?: boolean
+  errorCode?: ClaudeErrorCode
 }
 
-export function MessageBubble({ role, content, streaming = false }: Props) {
+export function MessageBubble({ role, content, streaming = false, errorCode }: Props) {
   const contentRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (contentRef.current && role === 'assistant') {
+    if (contentRef.current && role === 'assistant' && !errorCode) {
       contentRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
         hljs.highlightElement(block as HTMLElement)
       })
     }
-  }, [content, role])
+  }, [content, role, errorCode])
+
+  if (errorCode) {
+    const isSessionExpired = errorCode === 'session_expired'
+    return (
+      <div className={`message message--error message--error--${isSessionExpired ? 'info' : 'fatal'}`}>
+        <span className="message__error-icon">{isSessionExpired ? '⚠' : '✕'}</span>
+        <p className="message__error-text">{content}</p>
+      </div>
+    )
+  }
 
   return (
     <div className={`message message--${role}`}>

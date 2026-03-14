@@ -16,5 +16,11 @@ server/public/
 # Claude Code local permission grants (machine-specific)
 .claude/settings.local.json
 
+# Test artifacts
+test-results/
+playwright-report/
+coverage/
+screenshots/
+
 # macOS
 .DS_Store

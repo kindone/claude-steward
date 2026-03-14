@@ -1,17 +1,10 @@
 # Claude Steward — TODO
 
-Tasks are grouped by status and roughly ordered by priority within each group.
-Completed items should be moved to archived_tasks.md
+Canonical task list. Completed items → `archived_tasks.md`. Milestone context → `docs/roadmap.md`.
 
 ---
 
 ## Planned
-
-### Projects milestone (next sprint)
-- [ ] **`projects` table** — `id`, `name`, `path` (server directory), `created_at`; add `project_id` FK to `sessions`
-- [ ] **Project switcher UI** — list projects in sidebar header; create project (name + server path); switch active project
-- [ ] **Session scoping** — sessions list filtered by active project; new sessions inherit project `path` as `--cwd` for claude
-- [ ] **File system navigation** — simple tree view browsing the project's `path`; file open/view to start
 
 ### Mini-App Platform
 - [ ] **`steward-app.json` manifest spec** — `name`, `type`, `devCommand`, `port`, `buildCommand`; the pluggable contract that makes any project embeddable
@@ -42,4 +35,4 @@ Completed items should be moved to archived_tasks.md
 - [ ] **Steward-as-project** — add the steward repo itself as a project in the UI once the projects milestone is done
 
 ### Packaging
-- [ ] **Mobile wrapper** — React Native / Flutter thin shell (Capacitor or Expo WebView) once feature set stabilizes
+- [ ] **Capacitor shell** — thin native wrapper (iOS + Android + desktop) using Capacitor's remote URL mode pointing at the server; `mobile/` package in monorepo with `capacitor.config.ts`; no bundled assets — always loads from server URL

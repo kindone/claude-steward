@@ -18,6 +18,7 @@
 - [x] **Reload endpoint** — `POST /api/admin/reload`; broadcasts `event: reload` to all app connections; `process.exit(0)`; `GET /api/admin/version`
 - [x] **Client reload handler** — `subscribeToAppEvents()` in `api.ts` with auto-reconnect; "Restarting…" overlay in `App.tsx`; `window.location.reload()` after 1.5s
 - [x] **PM2 ecosystem config** — `ecosystem.config.cjs`; `steward-main` (:3001, restartable) + `steward-safe` (:3003, frozen)
+- [x] **Projects milestone** — `projects` table + `project_id` FK on `sessions`; CRUD API (`/api/projects`); file listing + content endpoints with path traversal guard; project switcher in sidebar (dropdown picker, create/delete); session scoping by project; `--cwd` passed to claude spawn; collapsible file tree with directory expand and file viewer modal
 - [x] **Stop/cancel streaming** — Stop button in `MessageInput`; `AbortController` on client fetch; `SIGTERM` on child process; `signal?: AbortSignal` in `SpawnOptions`
 - [x] **Message persistence** — `messages` table in SQLite; user + assistant messages inserted on send/complete; `GET /api/sessions/:id/messages`; history loaded in `ChatWindow` on mount
 - [x] **Delete sessions** — `DELETE /api/sessions/:id`; cascade-delete messages; delete button in sidebar (hover, with confirm)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { sendMessage, getMessages } from '../lib/api'
+import { sendMessage, getMessages, type ClaudeErrorCode } from '../lib/api'
 import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
 
@@ -8,6 +8,7 @@ type Message = {
   role: 'user' | 'assistant'
   content: string
   streaming: boolean
+  errorCode?: ClaudeErrorCode
 }
 
 type Props = {
@@ -66,11 +67,11 @@ export function ChatWindow({ sessionId, onTitle }: Props) {
         )
         setStreaming(false)
       },
-      onError: (errorMsg) => {
+      onError: (errorMsg, code) => {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId
-              ? { ...m, content: `**Error:** ${errorMsg}`, streaming: false }
+              ? { ...m, content: errorMsg, streaming: false, errorCode: code }
               : m
           )
         )
@@ -93,6 +94,7 @@ export function ChatWindow({ sessionId, onTitle }: Props) {
             role={m.role}
             content={m.content}
             streaming={m.streaming}
+            errorCode={m.errorCode}
           />
         ))}
         <div ref={bottomRef} />

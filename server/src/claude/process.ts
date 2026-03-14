@@ -32,13 +32,22 @@ type ResultChunk = {
 
 type ClaudeChunk = SystemInitChunk | StreamEventChunk | AssistantChunk | ResultChunk
 
+export type ClaudeError = {
+  message: string
+  /** 'session_expired' when a --resume attempt failed; 'process_error' for other failures */
+  code: 'session_expired' | 'process_error'
+  detail?: string
+}
+
 export type SpawnOptions = {
   message: string
   claudeSessionId: string | null
   res: Response
   onSessionId: (id: string) => void
   onComplete?: (text: string) => void
+  onError?: (err: ClaudeError) => void
   signal?: AbortSignal
+  cwd?: string
 }
 
 function sendSseEvent(res: Response, event: string, data: unknown): void {
@@ -49,7 +58,7 @@ function sendSseEvent(res: Response, event: string, data: unknown): void {
 // Allow overriding the claude binary path via env var, with ~/.local/bin fallback
 const CLAUDE_BIN = process.env.CLAUDE_PATH ?? `${process.env.HOME ?? '/usr/local'}/.local/bin/claude`
 
-export function spawnClaude({ message, claudeSessionId, res, onSessionId, onComplete, signal }: SpawnOptions): void {
+export function spawnClaude({ message, claudeSessionId, res, onSessionId, onComplete, onError, signal, cwd }: SpawnOptions): void {
   const args = [
     '--print', message,
     '--output-format', 'stream-json',
@@ -81,6 +90,7 @@ export function spawnClaude({ message, claudeSessionId, res, onSessionId, onComp
     env: { ...cleanEnv, CI: 'true' },
     shell: false,
     stdio: ['ignore', 'pipe', 'pipe'],
+    ...(cwd ? { cwd } : {}),
   })
 
   signal?.addEventListener('abort', () => {
@@ -90,6 +100,13 @@ export function spawnClaude({ message, claudeSessionId, res, onSessionId, onComp
   const rl = createInterface({ input: child.stdout, crlfDelay: Infinity })
   let sessionIdEmitted = false
   let accumulatedText = ''
+  let stderrOutput = ''
+
+  child.stderr.on('data', (data: Buffer) => {
+    const text = data.toString()
+    stderrOutput += text
+    console.error('[claude stderr]', text)
+  })
 
   rl.on('line', (line) => {
     if (!line.trim()) return
@@ -123,18 +140,30 @@ export function spawnClaude({ message, claudeSessionId, res, onSessionId, onComp
     }
   })
 
-  child.stderr.on('data', (data: Buffer) => {
-    console.error('[claude stderr]', data.toString())
-  })
-
   child.on('error', (err) => {
-    sendSseEvent(res, 'error', { message: err.message })
+    const claudeErr: ClaudeError = { message: err.message, code: 'process_error' }
+    onError?.(claudeErr)
+    sendSseEvent(res, 'error', claudeErr)
     res.end()
   })
 
   child.on('close', (code) => {
     if (code !== 0 && !res.writableEnded) {
-      sendSseEvent(res, 'error', { message: `claude exited with code ${code}` })
+      const isResumeAttempt = Boolean(claudeSessionId)
+      const detail = stderrOutput.trim() || undefined
+      const claudeErr: ClaudeError = isResumeAttempt
+        ? {
+            message: 'The previous Claude session could not be resumed. Your next message will start a fresh conversation.',
+            code: 'session_expired',
+            detail,
+          }
+        : {
+            message: detail ?? `Claude exited with code ${code}`,
+            code: 'process_error',
+            detail,
+          }
+      onError?.(claudeErr)
+      sendSseEvent(res, 'error', claudeErr)
       res.end()
     }
   })

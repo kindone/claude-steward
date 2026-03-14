@@ -239,6 +239,24 @@ npm install
 npm run dev                   # starts server :3001 + client :5173 concurrently
 ```
 
+## Testing
+
+Three tiers, all requiring only `npm install` to set up:
+
+```bash
+npm test                      # Tier 1+2: server integration tests + client component tests (fast, no Claude needed)
+npm run test:e2e              # Tier 3: Playwright E2E smoke tests (requires dev servers running or starts them)
+npm run test:all              # All three tiers in sequence
+```
+
+| Tier | Tool | What it covers |
+|---|---|---|
+| Server integration | Vitest + supertest | Auth, project CRUD, path traversal security, session scoping, SSE chat stream (Claude mocked) |
+| Client components | Vitest + RTL + msw | ProjectPicker, SessionSidebar, FileTree — interaction and rendering |
+| E2E smoke | Playwright (Chromium) | App loads, project picker, session creation — no Claude required |
+
+**AI feedback loop**: Claude runs `npm test` after making changes. Tests are isolated (in-memory SQLite per file, msw for API mocking), fast (~4s total for unit tests), and produce actionable failure messages. The Claude subprocess is mocked in server tests so no real API calls are made.
+
 The Vite dev server proxies `/api/*` to `localhost:3001`, so the client makes all requests to its own origin.
 
 ## Production Build
