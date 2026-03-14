@@ -209,16 +209,9 @@
     if (savedKey) {
       log.info('Auto-login: trying saved key')
       fetch('/ping', { headers: { 'Authorization': `Bearer ${savedKey}` } })
-        .then(async r => {
-          if (r.ok) { log.info('Auto-login: success'); showChat(savedKey); return }
-          if (r.status === 429) {
-            const body = await r.json().catch(() => ({}))
-            const mins = Math.ceil((body.retryAfter ?? 1800) / 60)
-            log.warn('Auto-login: rate limited', r.status)
-            showAuthError(`Too many failed attempts. Try again in ${mins} min.`)
-            return
-          }
-          log.warn('Auto-login: rejected', r.status)
+        .then(r => {
+          if (r.ok) { log.info('Auto-login: success'); showChat(savedKey) }
+          else       { log.warn('Auto-login: rejected', r.status) }
         })
         .catch(e => log.warn('Auto-login: fetch failed', e.message))
     }
@@ -232,13 +225,6 @@
         const res = await fetch('/ping', {
           headers: { 'Authorization': `Bearer ${key}` },
         })
-        if (res.status === 429) {
-          const body = await res.json().catch(() => ({}))
-          const mins = Math.ceil((body.retryAfter ?? 1800) / 60)
-          log.warn('Manual auth: rate limited')
-          showAuthError(`Too many failed attempts. Try again in ${mins} min.`)
-          return
-        }
         if (res.status === 401) {
           log.warn('Manual auth: 401 Unauthorized')
           showAuthError('Invalid key')

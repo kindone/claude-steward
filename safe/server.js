@@ -41,70 +41,73 @@ const API_KEY = process.env.API_KEY ?? ''
 const CLAUDE_BIN = process.env.CLAUDE_PATH ?? `${process.env.HOME ?? '/usr/local'}/.local/bin/claude`
 const INDEX_HTML = path.join(__dirname, 'index.html')
 
-// ── Brute-force protection ────────────────────────────────────────────────────
+// ── Brute-force protection (progressive delays / tar-pitting) ─────────────────
+//
+// Never hard-locks — safe-mode is the last resort, locking it out creates a DoS.
+// Instead, each consecutive failure from the same IP waits longer before getting
+// a response.  Brute-forcing a 32-char key becomes astronomically slow.
+//
+// X-Forwarded-For is only trusted from loopback (a real local reverse proxy).
+// An external attacker cannot spoof it to delay/block a legitimate user.
 
-const MAX_ATTEMPTS = 5
-const WINDOW_MS    = 15 * 60 * 1000   // rolling window before count resets
-const LOCKOUT_MS   = 30 * 60 * 1000   // lockout duration after MAX_ATTEMPTS
+// Delay applied before responding to failure N (0-indexed):
+//   0 failures prior → respond instantly, 1 → 1 s, 2 → 5 s, 3 → 15 s, 4+ → 30 s
+const DELAY_SCHEDULE_MS = [0, 1_000, 5_000, 15_000, 30_000]
+const WINDOW_MS = 15 * 60 * 1000   // rolling window; count resets after silence
 
-// Map<ip, { count, windowStart, lockedUntil }>
+// Map<ip, { count, windowStart }>
 const authAttempts = new Map()
 
-// Prune fully-expired entries hourly to prevent unbounded growth
+// Prune stale entries hourly
 setInterval(() => {
   const now = Date.now()
   for (const [ip, rec] of authAttempts) {
-    if (rec.lockedUntil < now && now - rec.windowStart > WINDOW_MS) {
-      authAttempts.delete(ip)
-    }
+    if (now - rec.windowStart > WINDOW_MS) authAttempts.delete(ip)
   }
 }, 60 * 60 * 1000).unref()
 
 function clientIp(req) {
-  const fwd = req.headers['x-forwarded-for']
-  return (fwd ? fwd.split(',')[0] : (req.socket.remoteAddress ?? '')).trim()
+  const remote = req.socket.remoteAddress ?? ''
+  // Only trust X-Forwarded-For when the direct connection is from loopback
+  const isLocalProxy = remote === '127.0.0.1' || remote === '::1' || remote === '::ffff:127.0.0.1'
+  if (isLocalProxy) {
+    const fwd = req.headers['x-forwarded-for']
+    if (fwd) return fwd.split(',')[0].trim()
+  }
+  return remote
 }
 
-function checkLockout(ip) {
+function failureDelay(ip) {
+  const now = Date.now()
   const rec = authAttempts.get(ip)
-  if (!rec || rec.lockedUntil <= Date.now()) return null
-  return Math.ceil((rec.lockedUntil - Date.now()) / 1000)  // seconds remaining
+  if (!rec || now - rec.windowStart > WINDOW_MS) return 0
+  return DELAY_SCHEDULE_MS[Math.min(rec.count, DELAY_SCHEDULE_MS.length - 1)]
 }
 
 function recordFailure(ip) {
   const now = Date.now()
   let rec = authAttempts.get(ip)
-  if (!rec || now - rec.windowStart > WINDOW_MS) {
-    rec = { count: 0, windowStart: now, lockedUntil: 0 }
-  }
+  if (!rec || now - rec.windowStart > WINDOW_MS) rec = { count: 0, windowStart: now }
   rec.count++
-  if (rec.count >= MAX_ATTEMPTS) {
-    rec.lockedUntil = now + LOCKOUT_MS
-    console.warn(`[safe-mode] ${ip} locked out after ${rec.count} failed auth attempts`)
-  }
   authAttempts.set(ip, rec)
+  if (rec.count > 1) console.warn(`[safe-mode] Auth failure #${rec.count} from ${ip} (delay ${failureDelay(ip)}ms next)`)
 }
 
-function clearFailures(ip) {
-  authAttempts.delete(ip)
-}
+function clearFailures(ip) { authAttempts.delete(ip) }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)) }
 
 function send(res, status, contentType, body) {
   res.writeHead(status, { 'Content-Type': contentType })
   res.end(body)
 }
 
-function requireAuth(req, res) {
+async function requireAuth(req, res) {
   const ip = clientIp(req)
-
-  const retryAfter = checkLockout(ip)
-  if (retryAfter !== null) {
-    res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) })
-    res.end(JSON.stringify({ error: 'Too many failed attempts. Try again later.', retryAfter }))
-    return false
-  }
+  const delay = failureDelay(ip)
+  if (delay > 0) await sleep(delay)
 
   const auth = req.headers['authorization'] ?? ''
   if (!API_KEY || auth !== `Bearer ${API_KEY}`) {
@@ -119,8 +122,8 @@ function requireAuth(req, res) {
 
 // Spawn the claude CLI and pipe NDJSON output back as SSE.
 // Strip CLAUDE* env vars to prevent IPC hang when run inside a Claude Code session.
-function handleChat(req, res) {
-  if (!requireAuth(req, res)) return
+async function handleChat(req, res) {
+  if (!await requireAuth(req, res)) return
 
   let body = ''
   req.on('data', chunk => { body += chunk })
@@ -216,7 +219,7 @@ function handleChat(req, res) {
   })
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
     res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Authorization,Content-Type', 'Access-Control-Allow-Methods': 'GET,POST' })
@@ -234,7 +237,7 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === 'GET' && req.url === '/ping') {
-    if (!requireAuth(req, res)) return
+    if (!await requireAuth(req, res)) return
     send(res, 200, 'application/json', JSON.stringify({ ok: true }))
     return
   }

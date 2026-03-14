@@ -36,7 +36,7 @@ A hand-written HTTP server with two endpoints:
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/` | Serves `index.html` inline |
-| `GET` | `/ping` | Auth check (returns `200`, `401`, or `429`); no Claude spawn |
+| `GET` | `/ping` | Auth check (returns `200` or `401`); no Claude spawn |
 | `POST` | `/chat` | Streams Claude output as SSE |
 
 ### `.env` parsing
@@ -45,15 +45,22 @@ A hand-written HTTP server with two endpoints:
 
 ### Auth and brute-force protection
 
-Every request checks `Authorization: Bearer <token>`. Failed attempts are tracked per client IP in an in-memory map:
+Every request checks `Authorization: Bearer <token>`. Uses **progressive delays (tar-pitting)** rather than hard lockouts — safe-mode is the last resort, locking it out entirely would be a DoS against the owner.
 
-- **5 failures** within a 15-minute rolling window triggers a **30-minute lockout**
-- Locked IPs receive `429 Too Many Requests` with a `Retry-After` header (seconds)
-- A successful auth immediately clears the failure record for that IP
-- Stale entries are pruned hourly to prevent unbounded memory growth
-- `X-Forwarded-For` is respected for reverse-proxy deployments
+Delay schedule before returning a `401` response (by prior failure count from that IP):
 
-The client UI displays "Too many failed attempts. Try again in N min." on `429`, both on manual login and auto-login from `localStorage`.
+| Failures so far | Delay before response |
+|---|---|
+| 0 | 0 ms (instant) |
+| 1 | 1 s |
+| 2 | 5 s |
+| 3 | 15 s |
+| 4+ | 30 s |
+
+- Counts reset after 15 minutes of silence
+- A successful auth immediately clears the failure record
+- `X-Forwarded-For` is only trusted when the direct connection is from loopback (`127.0.0.1` / `::1`), preventing external IP spoofing that could delay a legitimate user
+- Stale entries pruned hourly
 
 ### Chat endpoint
 
