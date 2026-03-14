@@ -64,6 +64,7 @@ router.post('/', (req, res) => {
   spawnClaude({
     message,
     claudeSessionId: session.claude_session_id,
+    systemPrompt: session.system_prompt,
     res,
     signal: abortController.signal,
     cwd: project?.path,

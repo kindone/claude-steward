@@ -45,10 +45,12 @@ claude-steward/               ← npm workspace root
 ```
 Browser (client)
   │
-  │  All requests carry:  Authorization: Bearer <API_KEY>
+  ├─ GET  /api/meta                       app metadata (no auth); { appRoot }
   │
-  ├─ GET/POST/DELETE /api/projects        project CRUD
-  ├─ GET/POST/DELETE /api/sessions        session CRUD (filterable by projectId)
+  │  All requests below carry:  Authorization: Bearer <API_KEY>
+  │
+  ├─ GET/POST/DELETE /api/projects        project CRUD (DELETE blocked for APP_ROOT)
+  ├─ GET/POST/PATCH/DELETE /api/sessions  session CRUD (filterable by projectId)
   ├─ GET  /api/sessions/:id/messages      history
   ├─ POST /api/chat                       SSE stream (chat responses)
   ├─ GET  /api/events                     SSE stream (app-level: reload, notifications)
@@ -120,6 +122,7 @@ CREATE TABLE sessions (
   title             TEXT NOT NULL DEFAULT 'New Chat',
   claude_session_id TEXT,             -- CLI handle; set after first message; used for --resume
   project_id        TEXT REFERENCES projects(id),
+  system_prompt     TEXT,             -- optional; passed as --system-prompt on every spawn
   created_at        INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at        INTEGER NOT NULL DEFAULT (unixepoch())
 )

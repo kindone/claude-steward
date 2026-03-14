@@ -7,9 +7,10 @@ type Props = {
   onSelect: (id: string | null) => void
   onCreate: (name: string, path: string) => Promise<void>
   onDelete: (id: string) => void
+  protectedPath?: string | null
 }
 
-export function ProjectPicker({ projects, activeProjectId, onSelect, onCreate, onDelete }: Props) {
+export function ProjectPicker({ projects, activeProjectId, onSelect, onCreate, onDelete, protectedPath }: Props) {
   const [open, setOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
@@ -87,13 +88,15 @@ export function ProjectPicker({ projects, activeProjectId, onSelect, onCreate, o
                 onClick={() => { onSelect(p.id); setOpen(false) }}
               >
                 <span className="project-picker__item-name">{p.name}</span>
-                <button
-                  className="project-picker__delete"
-                  onClick={(e) => handleDelete(e, p.id)}
-                  title="Delete project"
-                >
-                  ×
-                </button>
+                {p.path !== protectedPath && (
+                  <button
+                    className="project-picker__delete"
+                    onClick={(e) => handleDelete(e, p.id)}
+                    title="Delete project"
+                  >
+                    ×
+                  </button>
+                )}
               </li>
             ))}
           </ul>

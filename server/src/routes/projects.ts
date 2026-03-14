@@ -2,7 +2,11 @@ import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import fs from 'node:fs'
 import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { projectQueries } from '../db/index.js'
+
+// Monorepo root — three directories up from server/src/routes/
+const APP_ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..')
 
 const router = Router()
 
@@ -39,6 +43,10 @@ router.delete('/:id', (req, res) => {
   const project = projectQueries.findById(req.params.id)
   if (!project) {
     res.status(404).json({ error: 'Project not found' })
+    return
+  }
+  if (path.resolve(project.path) === APP_ROOT) {
+    res.status(403).json({ error: 'The steward project cannot be deleted' })
     return
   }
   projectQueries.delete(req.params.id)

@@ -9,6 +9,7 @@ type Props = {
   onSelectProject: (id: string | null) => void
   onCreateProject: (name: string, path: string) => Promise<void>
   onDeleteProject: (id: string) => void
+  protectedProjectPath?: string | null
   sessions: Session[]
   activeSessionId: string | null
   onSelectSession: (id: string) => void
@@ -25,6 +26,7 @@ export function SessionSidebar({
   onSelectProject,
   onCreateProject,
   onDeleteProject,
+  protectedProjectPath,
   sessions,
   activeSessionId,
   onSelectSession,
@@ -100,6 +102,7 @@ export function SessionSidebar({
           onSelect={onSelectProject}
           onCreate={onCreateProject}
           onDelete={onDeleteProject}
+          protectedPath={protectedProjectPath}
         />
       </div>
 

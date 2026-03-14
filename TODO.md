@@ -35,5 +35,8 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 ### Self-management
 - [ ] **Steward-as-project** — add the steward repo itself as a project in the UI once the projects milestone is done
 
+### Safe Core
+- [ ] **Extending safe core** — discuss splitting into multiple focused safe-cores: current one stays as the Claude Code emergency interface; a second could expose read-only DB queries (session/project browser); further cores could cover other admin tasks. Consider shared port-allocation convention and a lightweight process registry.
+
 ### Packaging
 - [ ] **Capacitor shell** — thin native wrapper (iOS + Android + desktop) using Capacitor's remote URL mode pointing at the server; `mobile/` package in monorepo with `capacitor.config.ts`; no bundled assets — always loads from server URL

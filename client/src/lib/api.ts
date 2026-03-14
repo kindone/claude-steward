@@ -23,6 +23,7 @@ export type Session = {
   title: string
   claude_session_id: string | null
   project_id: string | null
+  system_prompt: string | null
   created_at: number
   updated_at: number
 }
@@ -54,6 +55,12 @@ export async function createProject(name: string, path: string): Promise<Project
     throw new Error(body.error ?? 'Failed to create project')
   }
   return res.json() as Promise<Project>
+}
+
+export async function fetchMeta(): Promise<{ appRoot: string }> {
+  const res = await fetch('/api/meta')
+  if (!res.ok) throw new Error('Failed to fetch meta')
+  return res.json() as Promise<{ appRoot: string }>
 }
 
 export async function deleteProject(projectId: string): Promise<void> {
@@ -116,6 +123,16 @@ export async function renameSession(sessionId: string, title: string): Promise<S
     body: JSON.stringify({ title }),
   })
   if (!res.ok) throw new Error('Failed to rename session')
+  return res.json() as Promise<Session>
+}
+
+export async function updateSystemPrompt(sessionId: string, systemPrompt: string | null): Promise<Session> {
+  const res = await fetch(`/api/sessions/${sessionId}`, {
+    method: 'PATCH',
+    headers: authHeaders(),
+    body: JSON.stringify({ systemPrompt }),
+  })
+  if (!res.ok) throw new Error('Failed to update system prompt')
   return res.json() as Promise<Session>
 }
 

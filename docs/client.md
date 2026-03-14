@@ -29,7 +29,7 @@ client/src/
 ```
 App
 ├── SessionSidebar
-│   ├── ProjectPicker        (dropdown for project select/create/delete)
+│   ├── ProjectPicker        (dropdown for project select/create/delete; delete hidden for protected project)
 │   ├── session list
 │   │   ├── inline rename    (double-click title → input field)
 │   │   ├── inline delete confirmation
@@ -37,6 +37,7 @@ App
 │   └── FileTree             (shown when a project is active)
 │       └── file viewer      (inline, opens on file click)
 └── ChatWindow  (keyed on sessionId — remounts on session switch)
+    ├── system prompt bar    (collapsible; ⚙ toggle; textarea + Save/Cancel/Clear)
     ├── MessageBubble[]      (one per message; streaming + error states + copy button)
     └── MessageInput         (textarea + Send/Stop)
 ```
@@ -53,6 +54,7 @@ All global state lives in `App.tsx`. No external store.
 | `activeProjectId` | `string \| null` | Controls session filtering and new-session scoping |
 | `sessions` | `Session[]` | Reloaded whenever `activeProjectId` changes |
 | `activeSessionId` | `string \| null` | Which session is open in ChatWindow |
+| `appRoot` | `string \| null` | Server's `APP_ROOT` from `/api/meta`; used to suppress delete on the steward project |
 | `loading` | `boolean` | Session list loading indicator |
 | `restarting` | `boolean` | Overlay shown during app-level reload |
 
@@ -146,6 +148,7 @@ All functions accept/return typed objects and throw on non-OK responses.
 
 | Function | Description |
 |---|---|
+| `fetchMeta()` | `GET /api/meta` — `{ appRoot }` |
 | `listProjects()` | `GET /api/projects` |
 | `createProject(name, path)` | `POST /api/projects` |
 | `deleteProject(id)` | `DELETE /api/projects/:id` |
@@ -153,7 +156,8 @@ All functions accept/return typed objects and throw on non-OK responses.
 | `getFileContent(projectId, path)` | File content (string) |
 | `listSessions(projectId?)` | `GET /api/sessions?projectId=` |
 | `createSession(projectId?)` | `POST /api/sessions` |
-| `renameSession(id, title)` | `PATCH /api/sessions/:id` |
+| `renameSession(id, title)` | `PATCH /api/sessions/:id` with `{ title }` |
+| `updateSystemPrompt(id, prompt)` | `PATCH /api/sessions/:id` with `{ systemPrompt }` |
 | `deleteSession(id)` | `DELETE /api/sessions/:id` |
 | `getMessages(sessionId)` | `GET /api/sessions/:id/messages` |
 | `sendMessage(sessionId, text, handlers)` | Starts chat SSE; returns cancel fn |

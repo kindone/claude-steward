@@ -34,13 +34,26 @@ router.patch('/:id', (req, res) => {
     res.status(404).json({ error: 'Session not found' })
     return
   }
-  const { title } = req.body as { title?: string }
-  if (!title || typeof title !== 'string' || !title.trim()) {
-    res.status(400).json({ error: 'title is required' })
-    return
+  const { title, systemPrompt } = req.body as { title?: string; systemPrompt?: string | null }
+
+  if (title !== undefined) {
+    if (!title || typeof title !== 'string' || !title.trim()) {
+      res.status(400).json({ error: 'title must be a non-empty string' })
+      return
+    }
+    sessionQueries.updateTitle(title.trim(), req.params.id)
+    session.title = title.trim()
   }
-  sessionQueries.updateTitle(title.trim(), req.params.id)
-  res.json({ ...session, title: title.trim() })
+
+  if (systemPrompt !== undefined) {
+    const value = typeof systemPrompt === 'string' && systemPrompt.trim()
+      ? systemPrompt.trim()
+      : null
+    sessionQueries.updateSystemPrompt(value, req.params.id)
+    session.system_prompt = value
+  }
+
+  res.json(session)
 })
 
 router.delete('/:id', (req, res) => {

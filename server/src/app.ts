@@ -10,6 +10,8 @@ import eventsRouter from './routes/events.js'
 import adminRouter from './routes/admin.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+// Monorepo root — two levels up from server/src/
+const APP_ROOT = path.resolve(__dirname, '../..')
 const NODE_ENV = process.env.NODE_ENV ?? 'development'
 
 export function createApp() {
@@ -20,6 +22,11 @@ export function createApp() {
   if (NODE_ENV === 'development') {
     app.use(cors({ origin: 'http://localhost:5173' }))
   }
+
+  // Public metadata endpoint (no auth required)
+  app.get('/api/meta', (_req, res) => {
+    res.json({ appRoot: APP_ROOT })
+  })
 
   app.use('/api', requireApiKey)
   app.use('/api/chat', chatRouter)

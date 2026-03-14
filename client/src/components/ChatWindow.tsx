@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { sendMessage, getMessages, type ClaudeErrorCode } from '../lib/api'
+import { sendMessage, getMessages, updateSystemPrompt, type ClaudeErrorCode } from '../lib/api'
 import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
 
@@ -13,15 +13,36 @@ type Message = {
 
 type Props = {
   sessionId: string
+  systemPrompt: string | null
   onTitle?: (title: string) => void
   onActivity?: () => void
+  onSystemPromptChange?: (prompt: string | null) => void
 }
 
-export function ChatWindow({ sessionId, onTitle, onActivity }: Props) {
+export function ChatWindow({ sessionId, systemPrompt, onTitle, onActivity, onSystemPromptChange }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [streaming, setStreaming] = useState(false)
+  const [promptOpen, setPromptOpen] = useState(false)
+  const [promptDraft, setPromptDraft] = useState(systemPrompt ?? '')
   const bottomRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<(() => void) | null>(null)
+
+  // Sync draft when switching sessions
+  useEffect(() => {
+    setPromptDraft(systemPrompt ?? '')
+    setPromptOpen(false)
+  }, [sessionId, systemPrompt])
+
+  async function handlePromptSave() {
+    const value = promptDraft.trim() || null
+    await updateSystemPrompt(sessionId, value)
+    onSystemPromptChange?.(value)
+    setPromptOpen(false)
+  }
+
+  function handlePromptKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Escape') { setPromptDraft(systemPrompt ?? ''); setPromptOpen(false) }
+  }
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -84,6 +105,37 @@ export function ChatWindow({ sessionId, onTitle, onActivity }: Props) {
 
   return (
     <div className="chat-window">
+      {/* System prompt bar */}
+      <div className="chat-window__prompt-bar">
+        <button
+          className={`chat-window__prompt-toggle${systemPrompt ? ' chat-window__prompt-toggle--active' : ''}`}
+          onClick={() => setPromptOpen((o) => !o)}
+          title="System prompt"
+        >
+          {systemPrompt ? '⚙ System prompt set' : '⚙ System prompt'}
+        </button>
+        {promptOpen && (
+          <div className="chat-window__prompt-editor">
+            <textarea
+              className="chat-window__prompt-textarea"
+              value={promptDraft}
+              onChange={(e) => setPromptDraft(e.target.value)}
+              onKeyDown={handlePromptKeyDown}
+              placeholder="Instructions sent to Claude before every message in this session…"
+              rows={4}
+              autoFocus
+            />
+            <div className="chat-window__prompt-actions">
+              <button className="chat-window__prompt-save" onClick={handlePromptSave}>Save</button>
+              <button className="chat-window__prompt-cancel" onClick={() => { setPromptDraft(systemPrompt ?? ''); setPromptOpen(false) }}>Cancel</button>
+              {systemPrompt && (
+                <button className="chat-window__prompt-clear" onClick={async () => { await updateSystemPrompt(sessionId, null); onSystemPromptChange?.(null); setPromptDraft(''); setPromptOpen(false) }}>Clear</button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="chat-window__messages">
         {messages.length === 0 && (
           <div className="chat-window__empty">

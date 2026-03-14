@@ -31,10 +31,13 @@ db.exec(`
   )
 `)
 
-// Idempotent migration: add project_id FK to sessions if not already present.
+// Idempotent migrations
 try {
   db.exec(`ALTER TABLE sessions ADD COLUMN project_id TEXT REFERENCES projects(id)`)
-} catch { /* column already exists — safe to ignore */ }
+} catch { /* already exists */ }
+try {
+  db.exec(`ALTER TABLE sessions ADD COLUMN system_prompt TEXT`)
+} catch { /* already exists */ }
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
@@ -60,6 +63,7 @@ export type Session = {
   title: string
   claude_session_id: string | null
   project_id: string | null
+  system_prompt: string | null
   created_at: number
   updated_at: number
 }
@@ -111,6 +115,9 @@ const updateClaudeSessionIdStmt = db.prepare(
 const updateTitleStmt = db.prepare(
   `UPDATE sessions SET title = ?, updated_at = unixepoch() WHERE id = ?`
 )
+const updateSystemPromptStmt = db.prepare(
+  `UPDATE sessions SET system_prompt = ?, updated_at = unixepoch() WHERE id = ?`
+)
 const deleteSessionStmt = db.prepare(`DELETE FROM sessions WHERE id = ?`)
 
 export const sessionQueries = {
@@ -125,6 +132,8 @@ export const sessionQueries = {
   clearClaudeSessionId: (id: string) =>
     updateClaudeSessionIdStmt.run(null, id),
   updateTitle: (title: string, id: string) => updateTitleStmt.run(title, id),
+  updateSystemPrompt: (systemPrompt: string | null, id: string) =>
+    updateSystemPromptStmt.run(systemPrompt, id),
   delete: (id: string) => deleteSessionStmt.run(id),
 }
 

@@ -32,22 +32,23 @@ The `createApp()` / `listen` split exists so tests can import `createApp()` with
 
 ## Routes
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/api/chat` | Start SSE stream; spawns Claude subprocess |
-| `GET` | `/api/sessions` | List sessions; optional `?projectId=` filter |
-| `POST` | `/api/sessions` | Create session; optional `projectId` in body |
-| `PATCH` | `/api/sessions/:id` | Rename session (`{ title }` in body) |
-| `DELETE` | `/api/sessions/:id` | Delete session and its messages |
-| `GET` | `/api/sessions/:id/messages` | Full message history |
-| `GET` | `/api/projects` | List projects |
-| `POST` | `/api/projects` | Create project (validates path exists and is a directory) |
-| `DELETE` | `/api/projects/:id` | Delete project; nullifies sessions' `project_id` |
-| `GET` | `/api/projects/:id/files` | List directory contents; `?path=` subpath |
-| `GET` | `/api/projects/:id/files/content` | Return file content (1 MB cap) |
-| `GET` | `/api/events` | App-level SSE (reload, future notifications) |
-| `GET` | `/api/admin/version` | Package version |
-| `POST` | `/api/admin/reload` | Broadcast reload event then `process.exit(0)` |
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `GET` | `/api/meta` | none | App metadata: `{ appRoot }` |
+| `POST` | `/api/chat` | ✓ | Start SSE stream; spawns Claude subprocess |
+| `GET` | `/api/sessions` | ✓ | List sessions; optional `?projectId=` filter |
+| `POST` | `/api/sessions` | ✓ | Create session; optional `projectId` in body |
+| `PATCH` | `/api/sessions/:id` | ✓ | Update session fields: `{ title?, systemPrompt? }` |
+| `DELETE` | `/api/sessions/:id` | ✓ | Delete session and its messages |
+| `GET` | `/api/sessions/:id/messages` | ✓ | Full message history |
+| `GET` | `/api/projects` | ✓ | List projects |
+| `POST` | `/api/projects` | ✓ | Create project (validates path exists and is a directory) |
+| `DELETE` | `/api/projects/:id` | ✓ | Delete project; returns 403 if path matches `APP_ROOT` |
+| `GET` | `/api/projects/:id/files` | ✓ | List directory contents; `?path=` subpath |
+| `GET` | `/api/projects/:id/files/content` | ✓ | Return file content (1 MB cap) |
+| `GET` | `/api/events` | ✓ | App-level SSE (reload, future notifications) |
+| `GET` | `/api/admin/version` | ✓ | Package version |
+| `POST` | `/api/admin/reload` | ✓ | Broadcast reload event then `process.exit(0)` |
 
 File routes use `safeResolvePath()` to prevent path traversal; dotfiles are filtered from directory listings.
 
@@ -108,6 +109,7 @@ claude --print <message>
        --verbose
        --include-partial-messages
        [--resume <claude_session_id>]
+       [--system-prompt <text>]
 ```
 
 ### NDJSON line handling

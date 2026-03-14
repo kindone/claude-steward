@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  listProjects, createProject, deleteProject,
+  listProjects, createProject, deleteProject, fetchMeta,
   listSessions, createSession, deleteSession, renameSession,
   subscribeToAppEvents,
   type Project, type Session,
@@ -13,6 +13,7 @@ export default function App() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [appRoot, setAppRoot] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [restarting, setRestarting] = useState(false)
 
@@ -25,11 +26,10 @@ export default function App() {
     })
   }, [])
 
-  // Load projects on mount
+  // Load projects and meta on mount
   useEffect(() => {
-    listProjects()
-      .then(setProjects)
-      .catch(console.error)
+    listProjects().then(setProjects).catch(console.error)
+    fetchMeta().then((m) => setAppRoot(m.appRoot)).catch(console.error)
   }, [])
 
   // Load sessions whenever the active project changes
@@ -157,6 +157,7 @@ export default function App() {
         onSelectProject={handleSelectProject}
         onCreateProject={handleCreateProject}
         onDeleteProject={handleDeleteProject}
+        protectedProjectPath={appRoot}
         sessions={sessions}
         activeSessionId={activeSessionId}
         onSelectSession={setActiveSessionId}
@@ -171,8 +172,14 @@ export default function App() {
           <ChatWindow
             key={activeSessionId}
             sessionId={activeSessionId}
+            systemPrompt={sessions.find((s) => s.id === activeSessionId)?.system_prompt ?? null}
             onTitle={(title) => handleTitleUpdate(activeSessionId, title)}
             onActivity={() => handleSessionActivity(activeSessionId)}
+            onSystemPromptChange={(prompt) =>
+              setSessions((prev) =>
+                prev.map((s) => s.id === activeSessionId ? { ...s, system_prompt: prompt } : s)
+              )
+            }
           />
         ) : (
           <div className="app__empty">
