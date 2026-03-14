@@ -107,9 +107,12 @@ This starts two processes: `steward-main` (main app, upgradeable) and `steward-s
 
 | Doc | Contents |
 |---|---|
-| [Architecture](docs/architecture.md) | Repo structure, tech stack, request flows, session lifecycle, database schema, SSE protocol, config reference, Claude CLI gotchas, dev/build guide |
-| [Self-Management & Safe-Mode](docs/self-management.md) | In-app upgrade flow, `/api/events` SSE stream, safe-mode core properties and freeze policy |
-| [Roadmap](docs/roadmap.md) | Planned features: projects milestone, mini-app platform, scheduler, MCP, packaging |
+| [Architecture](docs/architecture.md) | Repo layout, port map, cross-program interfaces, shared config and database schema |
+| [Server](docs/server.md) | Express routes, session lifecycle, SSE protocol, Claude subprocess gotchas, testing |
+| [Client](docs/client.md) | Component tree, state management, SSE client, Vite config, testing |
+| [Safe-Mode Core](docs/safe.md) | Emergency terminal internals, freeze policy |
+| [Self-Management](docs/self-management.md) | In-app upgrade flow, app-level SSE events, PM2 config |
+| [Roadmap](docs/roadmap.md) | Planned features: scheduler, MCP, Capacitor packaging, mini-app platform |
 
 ---
 

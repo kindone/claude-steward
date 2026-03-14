@@ -1,148 +1,88 @@
-# Architecture
+# Architecture Overview
+
+This document covers the overall system structure, how the three programs relate, and the shared configuration and data model. For internal details see the program-specific docs.
+
+| Doc | Scope |
+|---|---|
+| [Server](server.md) | Express routes, session lifecycle, SSE protocol, Claude subprocess |
+| [Client](client.md) | React components, state, SSE client, Vite config |
+| [Safe-Mode Core](safe.md) | Emergency terminal internals and freeze policy |
+| [Self-Management](self-management.md) | In-app upgrade flow, app-level events |
+| [Roadmap](roadmap.md) | Planned features |
+
+---
 
 ## Repository Structure
 
 ```
 claude-steward/               ← npm workspace root
 ├── package.json              ← workspace config, concurrently dev script
+├── ecosystem.config.cjs      ← PM2 process config (production)
 ├── .env                      ← secrets (gitignored)
 ├── .env.example              ← committed template
+├── scripts/
+│   └── status.js             ← npm run status — checks all three ports
 │
-├── server/                   ← Node.js 23 + TypeScript (ESM)
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── src/
-│       ├── index.ts          ← Express entry point, dotenv, middleware wiring
-│       ├── auth/
-│       │   └── middleware.ts ← Bearer token check
-│       ├── claude/
-│       │   └── process.ts    ← claude CLI spawn, SSE pipe, env cleanup, onComplete accumulator
-│       ├── db/
-│       │   └── index.ts      ← node:sqlite setup, sessionQueries + messageQueries
-│       ├── lib/
-│       │   └── connections.ts ← global Set<Response> registry for app-level SSE
-│       └── routes/
-│           ├── chat.ts       ← POST /api/chat — SSE streaming, message persistence, AbortController
-│           ├── sessions.ts   ← GET/POST /api/sessions, GET /:id/messages, DELETE /:id
-│           ├── events.ts     ← GET /api/events — app-level SSE (reload, notifications)
-│           └── admin.ts      ← POST /api/admin/reload, GET /api/admin/version
-│
-├── client/                   ← Vite 6 + React 19
-│   ├── package.json
-│   ├── vite.config.ts        ← proxy /api → :3001, build → ../server/public
-│   ├── index.html
-│   └── src/
-│       ├── main.tsx
-│       ├── index.css         ← dark theme, all styles
-│       ├── App.tsx           ← root layout, session state, delete handler, reload overlay
-│       ├── lib/
-│       │   └── api.ts        ← fetch wrappers, fetch-based SSE client, subscribeToAppEvents
-│       └── components/
-│           ├── SessionSidebar.tsx  ← session list, new button, delete button
-│           ├── ChatWindow.tsx      ← message history load, streaming deltas, stop
-│           ├── MessageBubble.tsx   ← markdown via marked, syntax via highlight.js
-│           └── MessageInput.tsx    ← textarea, Send / Stop button
-│
-└── safe/                     ← ⚠️ FROZEN emergency terminal (see self-management.md)
-    ├── server.js             ← plain Node.js HTTP server, zero dependencies
-    ├── index.html            ← vanilla JS UI, red theme
-    └── package.json          ← { "type": "module" }
+├── server/                   ← Node.js 23 + TypeScript (ESM)  → :3001
+├── client/                   ← Vite 6 + React 19              → :5173 (dev)
+└── safe/                     ← FROZEN emergency terminal       → :3003
 ```
 
 ---
 
-## Tech Stack
+## Port Map
 
-| Layer | Choice | Why |
+| Port | Program | Notes |
 |---|---|---|
-| Server runtime | Node.js 23 (ESM) | Built-in `node:sqlite`; no native addon compile issues |
-| Server framework | Express 5 | Minimal, well-typed |
-| Database | `node:sqlite` (built-in) | `better-sqlite3` fails on Node 23 (V8 ABI mismatch) |
-| AI engine | `claude` CLI subprocess | Full Claude Code capabilities without SDK limitations |
-| Client bundler | Vite 6 | Fast HMR, straightforward proxy config |
-| UI framework | React 19 | Future path to React Native packaging |
-| Markdown | `marked` | Lightweight, synchronous parse |
-| Syntax highlight | `highlight.js` | Post-render, targets `pre code` blocks |
-| Dev runner | `tsx watch` | Hot-reload TypeScript without a separate compile step |
+| `3001` | Main server | API + static files in production |
+| `3003` | Safe-mode core | Always-on, independent PM2 process |
+| `5173` | Client dev server | Vite; proxies `/api` → `:3001`. Not present in production |
 
 ---
 
-## Request Flow
-
-### Sending a message
+## Program Interfaces
 
 ```
-Browser (React)
-  │  POST /api/chat  { sessionId, message }
-  │  Authorization: Bearer <API_KEY>
-  ▼
-Express (chat.ts)
-  │  1. Validate body + auth
-  │  2. Look up session in SQLite
-  │  3. If first message: generate title, update DB, queue SSE title event
-  │  4. Insert user message into messages table
-  │  5. Set SSE headers, call res.flushHeaders()
-  │  6. Emit  event: title  (if new session)
-  │  7. spawnClaude(message, claudeSessionId?, res, signal, onComplete)
-  ▼
-claude CLI subprocess (process.ts)
-  │  args: --print <msg> --output-format stream-json --verbose
-  │        --include-partial-messages [--resume <claude_session_id>]
-  │  env:  all CLAUDE* vars stripped; CI=true; stdin closed
+Browser (client)
   │
-  │  stdout lines (NDJSON) → readline → parsed
-  │    system.init   → extract session_id, call onSessionId(), store in DB
-  │    stream_event  → accumulate text delta; forward as  event: chunk
-  │    result        → call onComplete(accumulatedText), forward as  event: chunk
-  │                    then  event: done, close res
-  ▼
-Express (chat.ts) — onComplete callback
-  │  Insert assistant message into messages table
-  ▼
-Browser SSE reader (api.ts)
-  │  fetch() with ReadableStream (not EventSource — needs auth header)
-  │  Manual SSE line parser: event: / data: pairs
-  │    title chunk  → onTitle()  → App updates sidebar title in state
-  │    chunk        → filter content_block_delta → onTextDelta()
-  │    done         → onDone()
-  │    error        → onError()
-  ▼
-ChatWindow / MessageBubble
-  │  Appends delta to assistant message content
-  │  marked.parse() re-runs on each update
-  │  highlight.js runs on new pre code blocks after render
+  │  All requests carry:  Authorization: Bearer <API_KEY>
+  │
+  ├─ GET/POST/DELETE /api/projects        project CRUD
+  ├─ GET/POST/DELETE /api/sessions        session CRUD (filterable by projectId)
+  ├─ GET  /api/sessions/:id/messages      history
+  ├─ POST /api/chat                       SSE stream (chat responses)
+  ├─ GET  /api/events                     SSE stream (app-level: reload, notifications)
+  ├─ GET  /api/admin/version
+  └─ POST /api/admin/reload               triggers live reload via PM2
+       │
+       ▼
+  Main server (:3001)
+       │  spawns
+       ▼
+  claude CLI subprocess
+       │  stdout NDJSON → server → SSE → browser
+
+Browser (safe-mode tab)
+  │  Same API_KEY bearer token
+  └─ POST /chat  (SSE stream)
+  └─ GET  /ping
+       │
+       ▼
+  Safe-mode server (:3003)
+       │  spawns
+       ▼
+  claude CLI  (--dangerously-skip-permissions)
 ```
 
-### Stop / cancel
+---
 
-```
-User clicks Stop
-  → client: cancelRef.current() → AbortController.abort() → fetch cancelled
-  → server: res.on('close') fires → abortController.abort()
-  → process.ts: signal 'abort' listener → child.kill('SIGTERM')
-```
+## Authentication
 
-### Session lifecycle
+A single shared secret (`API_KEY`) is used as a Bearer token for both servers. Both client apps send `Authorization: Bearer <API_KEY>` on every request.
 
-```
-POST /api/sessions
-  → creates row: { id: uuid, title: "New Chat", claude_session_id: null }
+The main server checks this in `server/src/auth/middleware.ts` applied to all `/api/*` routes. The safe-mode server checks it inline in `safe/server.js`.
 
-First message in session:
-  → title updated to truncated message text (≤40 chars, word boundary)
-  → title SSE event emitted immediately (before first token)
-  → user message inserted into messages table
-  → after system.init chunk: claude_session_id stored
-  → after result chunk: assistant message inserted into messages table
-
-Subsequent messages:
-  → --resume <claude_session_id> passed to CLI
-  → Claude maintains full conversation context internally
-
-Opening a past session:
-  → GET /api/sessions/:id/messages
-  → ChatWindow renders full history before any new input
-```
+The client reads the key from `VITE_API_KEY` (build-time) via `client/.env.local`.
 
 ---
 
@@ -152,28 +92,34 @@ All config lives in `.env` at the monorepo root.
 
 | Variable | Default | Description |
 |---|---|---|
-| `API_KEY` | — | Bearer token; required. Set in both `.env` and `client/.env.local` as `VITE_API_KEY` |
+| `API_KEY` | — | Bearer token; required. Also set in `client/.env.local` as `VITE_API_KEY` |
 | `PORT` | `3001` | Main server port |
 | `SAFE_PORT` | `3003` | Safe-mode server port |
-| `DATABASE_PATH` | `server/steward.db` | Optional override for the SQLite file path (absolute or cwd-relative). Defaults to `server/steward.db` via a file-location-based fallback in `db/index.ts`. |
-| `NODE_ENV` | `development` | `production` enables static file serving and disables CORS |
+| `DATABASE_PATH` | `server/steward.db` | Optional SQLite path override |
+| `NODE_ENV` | `development` | `production` enables static file serving, disables CORS |
 | `CLAUDE_PATH` | `~/.local/bin/claude` | Absolute path to the `claude` CLI binary |
 
-`dotenv` is loaded in `server/src/index.ts` with an explicit path (`../../.env` from `server/src/`) before any `process.env` access.
-
-The client reads `VITE_API_KEY` from `client/.env.local` at build time via `import.meta.env`.
+`dotenv` is loaded in `server/src/index.ts` with an explicit path (`../../.env`) before any `process.env` access.
 
 ---
 
-## Database Schema
+## Shared Data Model
 
-Current tables in `steward.db` (WAL mode):
+`server/steward.db` (SQLite, WAL mode) is the single source of truth. The safe-mode server is stateless and has no DB access.
 
 ```sql
+CREATE TABLE projects (
+  id         TEXT PRIMARY KEY,
+  name       TEXT NOT NULL,
+  path       TEXT NOT NULL,           -- absolute path on the server filesystem
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+)
+
 CREATE TABLE sessions (
-  id                TEXT PRIMARY KEY,       -- server UUID, exposed to client
+  id                TEXT PRIMARY KEY, -- server UUID, exposed to client
   title             TEXT NOT NULL DEFAULT 'New Chat',
-  claude_session_id TEXT,                   -- from CLI's system.init chunk; used for --resume
+  claude_session_id TEXT,             -- CLI handle; set after first message; used for --resume
+  project_id        TEXT REFERENCES projects(id),
   created_at        INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at        INTEGER NOT NULL DEFAULT (unixepoch())
 )
@@ -181,89 +127,26 @@ CREATE TABLE sessions (
 CREATE TABLE messages (
   id         TEXT PRIMARY KEY,
   session_id TEXT NOT NULL REFERENCES sessions(id),
-  role       TEXT NOT NULL,                 -- 'user' | 'assistant'
+  role       TEXT NOT NULL,           -- 'user' | 'assistant'
   content    TEXT NOT NULL,
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
 )
 ```
 
-The two-ID session design separates concerns: `id` is a stable client-facing identifier; `claude_session_id` is an opaque CLI handle that only exists after the first message completes initialization.
-
-**Upcoming (projects milestone):** a `projects` table (`id`, `name`, `path`) will be added and `sessions` will gain a `project_id` FK. The `messages` table references only `session_id` and requires no changes.
+The two-ID session design separates concerns: `id` is a stable client-facing identifier; `claude_session_id` is an opaque CLI handle that only exists after the first message and is cleared automatically if a `--resume` attempt fails.
 
 ---
 
-## SSE Protocol
+## Tech Stack Summary
 
-The `/api/chat` endpoint is a persistent SSE stream. Events emitted in order:
-
-| Event | Data | When |
+| Layer | Choice | Why |
 |---|---|---|
-| `title` | `{ title: string }` | First message only; emitted before any claude output |
-| `chunk` | Raw claude NDJSON object | Every line from claude stdout |
-| `done` | `{ session_id: string }` | After claude `result` chunk; server closes response |
-| `error` | `{ message: string }` | On spawn error or non-zero exit |
-
-The client uses `fetch()` + `ReadableStream` instead of `EventSource` because `EventSource` does not support custom request headers (needed for `Authorization: Bearer`).
-
----
-
-## Critical: claude CLI Subprocess Gotchas
-
-These bugs are non-obvious and cost significant debugging time:
-
-**1. `CLAUDECODE=1` causes hanging**
-When spawned from inside a Claude Code session, the child inherits `CLAUDECODE=1`. This makes the child wait indefinitely for IPC from a parent session that never responds. Fix: strip all env vars starting with `CLAUDE` before spawning. The child authenticates via `~/.claude/` credentials instead.
-
-**2. `CI=true` is required for pipe output**
-`--output-format stream-json --verbose` suppresses all output when stdout is a pipe (TTY detection). Fix: always set `CI=true` in the spawn environment.
-
-**3. Close stdin**
-Use `stdio: ['ignore', 'pipe', 'pipe']`. Without `'ignore'`, claude may block waiting for stdin input.
-
-**4. `req.on('close')` fires too early**
-Express fires `req.on('close')` when the request body is fully consumed by `express.json()` middleware — not when the client disconnects. Fix: use `res.on('close')` for SSE cleanup.
-
-**5. No `assistant` chunk fallback**
-With `--include-partial-messages`, the `stream_event.content_block_delta` chunks deliver text token-by-token. The final `assistant` chunk contains the full accumulated text. Reading both causes duplicate content. Fix: only handle `content_block_delta`; ignore the `assistant` chunk.
-
----
-
-## Development
-
-```bash
-cp .env.example .env          # fill in API_KEY and CLAUDE_PATH
-echo "VITE_API_KEY=<same key>" > client/.env.local
-
-npm install
-npm run dev                   # starts server :3001 + client :5173 concurrently
-```
-
-## Testing
-
-Three tiers, all requiring only `npm install` to set up:
-
-```bash
-npm test                      # Tier 1+2: server integration tests + client component tests (fast, no Claude needed)
-npm run test:e2e              # Tier 3: Playwright E2E smoke tests (requires dev servers running or starts them)
-npm run test:all              # All three tiers in sequence
-```
-
-| Tier | Tool | What it covers |
-|---|---|---|
-| Server integration | Vitest + supertest | Auth, project CRUD, path traversal security, session scoping, SSE chat stream (Claude mocked) |
-| Client components | Vitest + RTL + msw | ProjectPicker, SessionSidebar, FileTree — interaction and rendering |
-| E2E smoke | Playwright (Chromium) | App loads, project picker, session creation — no Claude required |
-
-**AI feedback loop**: Claude runs `npm test` after making changes. Tests are isolated (in-memory SQLite per file, msw for API mocking), fast (~4s total for unit tests), and produce actionable failure messages. The Claude subprocess is mocked in server tests so no real API calls are made.
-
-The Vite dev server proxies `/api/*` to `localhost:3001`, so the client makes all requests to its own origin.
-
-## Production Build
-
-```bash
-npm run build   # client → server/public/, then tsc for server
-npm start       # node dist/index.js — serves static files + API on one port
-```
-
-In production, Express serves `server/public/index.html` for all non-API routes.
+| Server runtime | Node.js 23 (ESM) | Built-in `node:sqlite`; no native addon compile issues |
+| Server framework | Express 5 | Minimal, well-typed |
+| Database | `node:sqlite` (built-in) | `better-sqlite3` fails on Node 23 (V8 ABI mismatch) |
+| AI engine | `claude` CLI subprocess | Full Claude Code capabilities without SDK limitations |
+| Client bundler | Vite 6 | Fast HMR, straightforward proxy config |
+| UI framework | React 19 | Future path to React Native/Capacitor packaging |
+| Markdown | `marked` | Lightweight, synchronous parse |
+| Syntax highlight | `highlight.js` | Post-render, targets `pre code` blocks |
+| Dev runner | `tsx watch` | Hot-reload TypeScript without a separate compile step |

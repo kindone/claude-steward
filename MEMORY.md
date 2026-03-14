@@ -12,8 +12,8 @@ Claude Steward is a self-hosted, always-on Claude Code environment accessible fr
 - **Self-managing**: the steward app itself is one of its own projects. Claude edits source files via chat, runs `npm run build`, then calls `POST /api/admin/reload` — which broadcasts a `reload` SSE event to all connected browsers and calls `process.exit(0)`. PM2/systemd detects the clean exit and restarts with the new `dist/`. Clients receive the reload event and refresh after a 1.5s window.
 - **Safe-mode core** (`safe/`): a frozen, dependency-free emergency terminal. A ~150-line plain Node.js HTTP server (`safe/server.js`) + single vanilla-JS HTML page (`safe/index.html`) that provides direct `claude` CLI access on a separate port (`:3003`). No React, no TypeScript, no build step — started by a separate PM2 process that is never part of the main upgrade cycle. **`safe/` is frozen once stabilized and must never be modified.**
 
-### Schema roadmap note
-Current schema: `sessions` + `messages`. Next milestone adds a `projects` table and `project_id` FK to `sessions`. The `messages` table references only `session_id` and will not require changes.
+### Current schema
+`projects`, `sessions` (with `project_id` FK), and `messages`. See `docs/architecture.md` for full SQL.
 
 ### safe/ is frozen
 `safe/server.js` and `safe/index.html` must not be modified once stabilized. They are the last-resort recovery tool — their value comes from never being touched by the upgrade cycle. Claude sessions working on the steward project must treat `safe/` as read-only.
@@ -56,8 +56,11 @@ When spawning `claude` CLI from Node.js server (itself running in a Claude Code 
 - `ecosystem.config.cjs` — PM2 config: `steward-main` (:3001) + `steward-safe` (:3003)
 - `.env` — root level: `API_KEY`, `PORT`, `DATABASE_PATH`, `CLAUDE_PATH`, `SAFE_PORT`
 - `client/.env.local` — `VITE_API_KEY` (matches `API_KEY`)
-- `docs/architecture.md` — structure, stack, flows, schema, SSE protocol, config, gotchas, dev/build guide
-- `docs/self-management.md` — upgrade flow, `/api/events` SSE, safe-mode core and freeze policy
+- `docs/architecture.md` — repo layout, port map, cross-program interfaces, shared config + DB schema
+- `docs/server.md` — Express routes, session lifecycle, SSE protocol, Claude subprocess gotchas
+- `docs/client.md` — component tree, state, SSE client, Vite config, testing
+- `docs/safe.md` — safe-mode server + UI internals, freeze policy
+- `docs/self-management.md` — upgrade flow, `/api/events` SSE, PM2 config
 - `docs/roadmap.md` — all planned features
 - `README.md` — brief intro, quick start, links to docs
 - `TODO.md` — canonical task list
