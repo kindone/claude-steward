@@ -86,7 +86,7 @@ Implemented as a `keydown` listener in `App.tsx` (registered once per `activeSes
 
 The server chat stream uses `Content-Type: text/event-stream`, but the client uses `fetch()` + `ReadableStream` instead of `EventSource`:
 
-> **Why not `EventSource`?**  
+> **Why not `EventSource`?**
 > The browser's built-in `EventSource` API does not support custom request headers. Since every request must carry `Authorization: Bearer <API_KEY>`, a manual fetch-based parser is required.
 
 `sendMessage()` in `api.ts` reads the response body as a stream and parses SSE lines manually:

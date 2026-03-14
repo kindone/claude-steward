@@ -36,16 +36,24 @@ A hand-written HTTP server with two endpoints:
 | Method | Path | Description |
 |---|---|---|
 | `GET` | `/` | Serves `index.html` inline |
-| `GET` | `/ping` | Auth check (returns 200 or 401/403); no Claude spawn |
+| `GET` | `/ping` | Auth check (returns `200`, `401`, or `429`); no Claude spawn |
 | `POST` | `/chat` | Streams Claude output as SSE |
 
 ### `.env` parsing
 
 `server.js` has no access to `dotenv`. It reads the `.env` file with a manual line parser (regex per line) to extract `API_KEY` and `SAFE_PORT`.
 
-### Auth
+### Auth and brute-force protection
 
-Every request checks `Authorization: Bearer <token>`. Returns `401` if header is missing or malformed, `403` if the token is wrong.
+Every request checks `Authorization: Bearer <token>`. Failed attempts are tracked per client IP in an in-memory map:
+
+- **5 failures** within a 15-minute rolling window triggers a **30-minute lockout**
+- Locked IPs receive `429 Too Many Requests` with a `Retry-After` header (seconds)
+- A successful auth immediately clears the failure record for that IP
+- Stale entries are pruned hourly to prevent unbounded memory growth
+- `X-Forwarded-For` is respected for reverse-proxy deployments
+
+The client UI displays "Too many failed attempts. Try again in N min." on `429`, both on manual login and auto-login from `localStorage`.
 
 ### Chat endpoint
 

@@ -41,5 +41,8 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 ### Permissions
 - [ ] **Fine-grained tool permissions per session** — the current Plan/Edit/Full triad is coarse. Explore `--allowedTools` / `--disallowedTools` CLI flags (support patterns like `Bash(npm:*)`) to allow command-level whitelists and blacklists. Possible UX: an "Advanced" mode in the session header that exposes an editable allowed-tools list, stored as `allowed_tools TEXT` on the sessions row and passed via `--allowedTools` at spawn time.
 
+### Authentication
+- [ ] **Proper auth** — the current shared `API_KEY` is fine for local use but needs replacing for always-on remote/mobile access. Preferred approach: **Google OAuth** — restricts to a specific Google account, handles token refresh, works cleanly with Capacitor's in-app browser. Server validates Google ID tokens and issues a short-lived session token; safe-mode keeps its own independent password (it's an emergency backdoor, must stay self-contained). Prerequisites: HTTPS in production, Google Cloud OAuth credentials. Alternatives worth considering: Passkeys/WebAuthn (no third-party dependency, native on iOS/Android), or network-level auth (Tailscale/WireGuard) for purely self-hosted single-user setups.
+
 ### Packaging
 - [ ] **Capacitor shell** — thin native wrapper (iOS + Android + desktop) using Capacitor's remote URL mode pointing at the server; `mobile/` package in monorepo with `capacitor.config.ts`; no bundled assets — always loads from server URL

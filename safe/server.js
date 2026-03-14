@@ -41,17 +41,79 @@ const API_KEY = process.env.API_KEY ?? ''
 const CLAUDE_BIN = process.env.CLAUDE_PATH ?? `${process.env.HOME ?? '/usr/local'}/.local/bin/claude`
 const INDEX_HTML = path.join(__dirname, 'index.html')
 
+// ── Brute-force protection ────────────────────────────────────────────────────
+
+const MAX_ATTEMPTS = 5
+const WINDOW_MS    = 15 * 60 * 1000   // rolling window before count resets
+const LOCKOUT_MS   = 30 * 60 * 1000   // lockout duration after MAX_ATTEMPTS
+
+// Map<ip, { count, windowStart, lockedUntil }>
+const authAttempts = new Map()
+
+// Prune fully-expired entries hourly to prevent unbounded growth
+setInterval(() => {
+  const now = Date.now()
+  for (const [ip, rec] of authAttempts) {
+    if (rec.lockedUntil < now && now - rec.windowStart > WINDOW_MS) {
+      authAttempts.delete(ip)
+    }
+  }
+}, 60 * 60 * 1000).unref()
+
+function clientIp(req) {
+  const fwd = req.headers['x-forwarded-for']
+  return (fwd ? fwd.split(',')[0] : (req.socket.remoteAddress ?? '')).trim()
+}
+
+function checkLockout(ip) {
+  const rec = authAttempts.get(ip)
+  if (!rec || rec.lockedUntil <= Date.now()) return null
+  return Math.ceil((rec.lockedUntil - Date.now()) / 1000)  // seconds remaining
+}
+
+function recordFailure(ip) {
+  const now = Date.now()
+  let rec = authAttempts.get(ip)
+  if (!rec || now - rec.windowStart > WINDOW_MS) {
+    rec = { count: 0, windowStart: now, lockedUntil: 0 }
+  }
+  rec.count++
+  if (rec.count >= MAX_ATTEMPTS) {
+    rec.lockedUntil = now + LOCKOUT_MS
+    console.warn(`[safe-mode] ${ip} locked out after ${rec.count} failed auth attempts`)
+  }
+  authAttempts.set(ip, rec)
+}
+
+function clearFailures(ip) {
+  authAttempts.delete(ip)
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function send(res, status, contentType, body) {
   res.writeHead(status, { 'Content-Type': contentType })
   res.end(body)
 }
 
 function requireAuth(req, res) {
+  const ip = clientIp(req)
+
+  const retryAfter = checkLockout(ip)
+  if (retryAfter !== null) {
+    res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) })
+    res.end(JSON.stringify({ error: 'Too many failed attempts. Try again later.', retryAfter }))
+    return false
+  }
+
   const auth = req.headers['authorization'] ?? ''
   if (!API_KEY || auth !== `Bearer ${API_KEY}`) {
+    recordFailure(ip)
     send(res, 401, 'application/json', JSON.stringify({ error: 'Unauthorized' }))
     return false
   }
+
+  clearFailures(ip)
   return true
 }
 

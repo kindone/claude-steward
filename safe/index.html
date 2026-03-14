@@ -200,14 +200,25 @@
       updateSessionInfo()
     }
 
+    function showAuthError(msg) {
+      document.getElementById('auth-error').textContent = msg
+    }
+
     // Auto-login with saved key
     const savedKey = localStorage.getItem('steward-safe-key')
     if (savedKey) {
       log.info('Auto-login: trying saved key')
       fetch('/ping', { headers: { 'Authorization': `Bearer ${savedKey}` } })
-        .then(r => {
-          if (r.ok) { log.info('Auto-login: success'); showChat(savedKey) }
-          else       { log.warn('Auto-login: rejected', r.status) }
+        .then(async r => {
+          if (r.ok) { log.info('Auto-login: success'); showChat(savedKey); return }
+          if (r.status === 429) {
+            const body = await r.json().catch(() => ({}))
+            const mins = Math.ceil((body.retryAfter ?? 1800) / 60)
+            log.warn('Auto-login: rate limited', r.status)
+            showAuthError(`Too many failed attempts. Try again in ${mins} min.`)
+            return
+          }
+          log.warn('Auto-login: rejected', r.status)
         })
         .catch(e => log.warn('Auto-login: fetch failed', e.message))
     }
@@ -221,20 +232,27 @@
         const res = await fetch('/ping', {
           headers: { 'Authorization': `Bearer ${key}` },
         })
+        if (res.status === 429) {
+          const body = await res.json().catch(() => ({}))
+          const mins = Math.ceil((body.retryAfter ?? 1800) / 60)
+          log.warn('Manual auth: rate limited')
+          showAuthError(`Too many failed attempts. Try again in ${mins} min.`)
+          return
+        }
         if (res.status === 401) {
           log.warn('Manual auth: 401 Unauthorized')
-          document.getElementById('auth-error').textContent = 'Invalid key'
+          showAuthError('Invalid key')
           return
         }
         if (!res.ok) {
           log.error('Manual auth: unexpected status', res.status)
-          document.getElementById('auth-error').textContent = 'Server error'
+          showAuthError('Server error')
           return
         }
         log.info('Manual auth: success')
       } catch (e) {
         log.error('Manual auth: fetch failed', e)
-        document.getElementById('auth-error').textContent = 'Connection failed: ' + e.message
+        showAuthError('Connection failed: ' + e.message)
         return
       }
       localStorage.setItem('steward-safe-key', key)
