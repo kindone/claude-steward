@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import type { Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { sessionQueries, messageQueries } from '../db/index.js'
+import { sessionQueries, messageQueries, projectQueries } from '../db/index.js'
 import { spawnClaude } from '../claude/process.js'
 
 function sendSseEvent(res: Response, event: string, data: unknown): void {
@@ -58,6 +58,7 @@ router.post('/', (req, res) => {
 
   messageQueries.insert(uuidv4(), sessionId, 'user', message)
 
+  const project = session.project_id ? projectQueries.findById(session.project_id) : undefined
   const abortController = new AbortController()
 
   spawnClaude({
@@ -65,6 +66,7 @@ router.post('/', (req, res) => {
     claudeSessionId: session.claude_session_id,
     res,
     signal: abortController.signal,
+    cwd: project?.path,
     onSessionId: (claudeSessionId) => {
       if (!session.claude_session_id) {
         sessionQueries.updateClaudeSessionId(claudeSessionId, sessionId)
@@ -74,6 +76,14 @@ router.post('/', (req, res) => {
     onComplete: (assistantText) => {
       if (assistantText) {
         messageQueries.insert(uuidv4(), sessionId, 'assistant', assistantText)
+      }
+    },
+    onError: () => {
+      // Clear the stale claude_session_id so the next message starts fresh
+      // instead of looping on another failed --resume attempt.
+      if (session.claude_session_id) {
+        sessionQueries.clearClaudeSessionId(sessionId)
+        session.claude_session_id = null
       }
     },
   })

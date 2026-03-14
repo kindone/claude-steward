@@ -1,42 +1,15 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
-import express from 'express'
-import cors from 'cors'
-import { requireApiKey } from './auth/middleware.js'
-import chatRouter from './routes/chat.js'
-import sessionsRouter from './routes/sessions.js'
-import eventsRouter from './routes/events.js'
-import adminRouter from './routes/admin.js'
+import { createApp } from './app.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // .env lives in the monorepo root (two levels up from server/src/)
 dotenv.config({ path: path.join(__dirname, '../../.env') })
+
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
-const NODE_ENV = process.env.NODE_ENV ?? 'development'
 
-const app = express()
-
-app.use(express.json())
-
-if (NODE_ENV === 'development') {
-  app.use(cors({ origin: 'http://localhost:5173' }))
-}
-
-app.use('/api', requireApiKey)
-app.use('/api/chat', chatRouter)
-app.use('/api/sessions', sessionsRouter)
-app.use('/api/events', eventsRouter)
-app.use('/api/admin', adminRouter)
-
-if (NODE_ENV === 'production') {
-  const publicDir = path.join(__dirname, '../public')
-  app.use(express.static(publicDir))
-  app.get('*', (_req, res) => {
-    res.sendFile(path.join(publicDir, 'index.html'))
-  })
-}
-
+const app = createApp()
 app.listen(PORT, () => {
   console.log(`claude-steward server running on http://localhost:${PORT}`)
 })

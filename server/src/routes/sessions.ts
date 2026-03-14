@@ -4,13 +4,18 @@ import { sessionQueries, messageQueries } from '../db/index.js'
 
 const router = Router()
 
-router.get('/', (_req, res) => {
-  res.json(sessionQueries.list())
+router.get('/', (req, res) => {
+  const { projectId } = req.query as { projectId?: string }
+  const sessions = projectId
+    ? sessionQueries.listByProject(projectId)
+    : sessionQueries.list()
+  res.json(sessions)
 })
 
-router.post('/', (_req, res) => {
+router.post('/', (req, res) => {
+  const { projectId } = req.body as { projectId?: string }
   const id = uuidv4()
-  const session = sessionQueries.create(id, 'New Chat')
+  const session = sessionQueries.create(id, 'New Chat', projectId)
   res.status(201).json(session)
 })
 

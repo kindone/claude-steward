@@ -10,6 +10,16 @@ const DB_PATH = process.env.DATABASE_PATH ?? path.join(
 const db = new DatabaseSync(DB_PATH)
 
 db.exec('PRAGMA journal_mode = WAL')
+db.exec('PRAGMA foreign_keys = ON')
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS projects (
+    id         TEXT PRIMARY KEY,
+    name       TEXT NOT NULL,
+    path       TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )
+`)
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS sessions (
@@ -21,6 +31,11 @@ db.exec(`
   )
 `)
 
+// Idempotent migration: add project_id FK to sessions if not already present.
+try {
+  db.exec(`ALTER TABLE sessions ADD COLUMN project_id TEXT REFERENCES projects(id)`)
+} catch { /* column already exists — safe to ignore */ }
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS messages (
     id         TEXT PRIMARY KEY,
@@ -31,10 +46,20 @@ db.exec(`
   )
 `)
 
+// ── Types ────────────────────────────────────────────────────────────────────
+
+export type Project = {
+  id: string
+  name: string
+  path: string
+  created_at: number
+}
+
 export type Session = {
   id: string
   title: string
   claude_session_id: string | null
+  project_id: string | null
   created_at: number
   updated_at: number
 }
@@ -47,29 +72,63 @@ export type Message = {
   created_at: number
 }
 
-const createStmt = db.prepare(
-  `INSERT INTO sessions (id, title) VALUES (?, ?) RETURNING *`
+// ── Project queries ───────────────────────────────────────────────────────────
+
+const createProjectStmt = db.prepare(
+  `INSERT INTO projects (id, name, path) VALUES (?, ?, ?) RETURNING *`
 )
-const findByIdStmt = db.prepare(`SELECT * FROM sessions WHERE id = ?`)
-const listStmt = db.prepare(`SELECT * FROM sessions ORDER BY updated_at DESC`)
+const listProjectsStmt = db.prepare(`SELECT * FROM projects ORDER BY created_at ASC`)
+const findProjectByIdStmt = db.prepare(`SELECT * FROM projects WHERE id = ?`)
+const deleteProjectStmt = db.prepare(`DELETE FROM projects WHERE id = ?`)
+const nullifyProjectSessionsStmt = db.prepare(
+  `UPDATE sessions SET project_id = NULL WHERE project_id = ?`
+)
+
+export const projectQueries = {
+  create: (id: string, name: string, path: string) =>
+    createProjectStmt.get(id, name, path) as Project,
+  list: () => listProjectsStmt.all() as Project[],
+  findById: (id: string) => findProjectByIdStmt.get(id) as Project | undefined,
+  delete: (id: string) => {
+    nullifyProjectSessionsStmt.run(id)
+    deleteProjectStmt.run(id)
+  },
+}
+
+// ── Session queries ───────────────────────────────────────────────────────────
+
+const createSessionStmt = db.prepare(
+  `INSERT INTO sessions (id, title, project_id) VALUES (?, ?, ?) RETURNING *`
+)
+const findSessionByIdStmt = db.prepare(`SELECT * FROM sessions WHERE id = ?`)
+const listAllSessionsStmt = db.prepare(`SELECT * FROM sessions ORDER BY updated_at DESC`)
+const listSessionsByProjectStmt = db.prepare(
+  `SELECT * FROM sessions WHERE project_id = ? ORDER BY updated_at DESC`
+)
 const updateClaudeSessionIdStmt = db.prepare(
   `UPDATE sessions SET claude_session_id = ?, updated_at = unixepoch() WHERE id = ?`
 )
 const updateTitleStmt = db.prepare(
   `UPDATE sessions SET title = ?, updated_at = unixepoch() WHERE id = ?`
 )
-
 const deleteSessionStmt = db.prepare(`DELETE FROM sessions WHERE id = ?`)
 
 export const sessionQueries = {
-  create: (id: string, title: string) => createStmt.get(id, title) as Session,
-  findById: (id: string) => findByIdStmt.get(id) as Session | undefined,
-  list: () => listStmt.all() as Session[],
+  create: (id: string, title: string, projectId?: string | null) =>
+    createSessionStmt.get(id, title, projectId ?? null) as Session,
+  findById: (id: string) => findSessionByIdStmt.get(id) as Session | undefined,
+  list: () => listAllSessionsStmt.all() as Session[],
+  listByProject: (projectId: string) =>
+    listSessionsByProjectStmt.all(projectId) as Session[],
   updateClaudeSessionId: (claudeSessionId: string, id: string) =>
     updateClaudeSessionIdStmt.run(claudeSessionId, id),
+  clearClaudeSessionId: (id: string) =>
+    updateClaudeSessionIdStmt.run(null, id),
   updateTitle: (title: string, id: string) => updateTitleStmt.run(title, id),
   delete: (id: string) => deleteSessionStmt.run(id),
 }
+
+// ── Message queries ───────────────────────────────────────────────────────────
 
 const insertMessageStmt = db.prepare(
   `INSERT INTO messages (id, session_id, role, content) VALUES (?, ?, ?, ?)`

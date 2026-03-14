@@ -5,10 +5,24 @@ const authHeaders = (): HeadersInit => ({
   Authorization: `Bearer ${API_KEY}`,
 })
 
+export type Project = {
+  id: string
+  name: string
+  path: string
+  created_at: number
+}
+
+export type FileEntry = {
+  name: string
+  type: 'file' | 'directory'
+  path: string
+}
+
 export type Session = {
   id: string
   title: string
   claude_session_id: string | null
+  project_id: string | null
   created_at: number
   updated_at: number
 }
@@ -21,17 +35,70 @@ export type Message = {
   created_at: number
 }
 
-export async function createSession(): Promise<Session> {
+// ── Projects ──────────────────────────────────────────────────────────────────
+
+export async function listProjects(): Promise<Project[]> {
+  const res = await fetch('/api/projects', { headers: authHeaders() })
+  if (!res.ok) throw new Error('Failed to list projects')
+  return res.json() as Promise<Project[]>
+}
+
+export async function createProject(name: string, path: string): Promise<Project> {
+  const res = await fetch('/api/projects', {
+    method: 'POST',
+    headers: authHeaders(),
+    body: JSON.stringify({ name, path }),
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Unknown error' })) as { error: string }
+    throw new Error(body.error ?? 'Failed to create project')
+  }
+  return res.json() as Promise<Project>
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+  const res = await fetch(`/api/projects/${projectId}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  })
+  if (!res.ok) throw new Error('Failed to delete project')
+}
+
+export async function listFiles(projectId: string, filePath = ''): Promise<FileEntry[]> {
+  const url = `/api/projects/${projectId}/files${filePath ? `?path=${encodeURIComponent(filePath)}` : ''}`
+  const res = await fetch(url, { headers: authHeaders() })
+  if (!res.ok) throw new Error('Failed to list files')
+  return res.json() as Promise<FileEntry[]>
+}
+
+export async function getFileContent(projectId: string, filePath: string): Promise<string> {
+  const res = await fetch(
+    `/api/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`,
+    { headers: authHeaders() }
+  )
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Unknown error' })) as { error: string }
+    throw new Error(body.error ?? 'Failed to load file')
+  }
+  const data = await res.json() as { content: string }
+  return data.content
+}
+
+// ── Sessions ──────────────────────────────────────────────────────────────────
+
+export async function createSession(projectId?: string | null): Promise<Session> {
   const res = await fetch('/api/sessions', {
     method: 'POST',
     headers: authHeaders(),
+    body: JSON.stringify({ projectId: projectId ?? null }),
   })
   if (!res.ok) throw new Error('Failed to create session')
   return res.json() as Promise<Session>
 }
 
-export async function listSessions(): Promise<Session[]> {
-  const res = await fetch('/api/sessions', { headers: authHeaders() })
+export async function listSessions(projectId?: string | null): Promise<Session[]> {
+  const url = projectId ? `/api/sessions?projectId=${projectId}` : '/api/sessions'
+  const res = await fetch(url, { headers: authHeaders() })
   if (!res.ok) throw new Error('Failed to list sessions')
   return res.json() as Promise<Session[]>
 }
@@ -100,11 +167,13 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
   return () => { cancelled = true; controller.abort() }
 }
 
+export type ClaudeErrorCode = 'session_expired' | 'process_error' | 'http_error'
+
 export type ChunkHandler = {
   onTextDelta: (text: string) => void
   onTitle?: (title: string) => void
   onDone: () => void
-  onError: (message: string) => void
+  onError: (message: string, code?: ClaudeErrorCode) => void
 }
 
 export function sendMessage(
@@ -123,7 +192,7 @@ export function sendMessage(
     .then(async (res) => {
       if (!res.ok) {
         const body = await res.text()
-        handlers.onError(`HTTP ${res.status}: ${body}`)
+        handlers.onError(`HTTP ${res.status}: ${body}`, 'http_error')
         return
       }
 
@@ -154,8 +223,8 @@ export function sendMessage(
               } catch { /* ignore */ }
             } else if (pendingEvent === 'error') {
               try {
-                const payload = JSON.parse(raw) as { message: string }
-                handlers.onError(payload.message)
+                const payload = JSON.parse(raw) as { message: string; code?: ClaudeErrorCode }
+                handlers.onError(payload.message, payload.code)
               } catch {
                 handlers.onError(raw)
               }
