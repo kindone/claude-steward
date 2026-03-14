@@ -4,6 +4,17 @@ Read this first. For details, see `docs/` — start with `docs/architecture.md`.
 
 ---
 
+## Documentation Rules
+
+- **Keep docs current.** When code changes, update the relevant doc in the same commit. Stale docs are worse than no docs.
+- **Parent doc owns the interface; child doc owns the internals.** If a subsystem grows large enough for its own file, the parent doc keeps a section describing what it is, how other parts connect to it, and what it exposes. The child doc covers how it works inside. An agent reading only the parent should understand the system well enough to reason about it.
+- **One doc per program or major subsystem.** `docs/server.md`, `docs/client.md`, `docs/safe.md` each cover one deployable unit. New features that have their own lifecycle, config, or deployment concern (scheduler, mini-app platform, MCP) get their own doc when they outgrow a section.
+- **`docs/architecture.md` is the map, not the territory.** It covers only: repo layout, port map, cross-program interfaces, auth boundary, shared config, and the DB schema. No internal implementation details belong there.
+- **`MEMORY.md` is for agents, not humans.** Keep it short. Only include things an LLM needs that aren't obvious from the code or docs: vision, current state, key *why* decisions, hard constraints, and dangerous gotchas. Do not duplicate content already in `docs/`.
+For user-facing introduction, see `README.md`
+
+---
+
 ## What This Is
 
 A self-hosted, always-on Claude Code environment accessible from desktop and mobile. The key idea: you run it on a server you control, it wraps the `claude` CLI, and you chat with it from any browser. It is **not** a Claude.ai clone — it's a platform for running Claude Code sessions remotely against real project directories.
