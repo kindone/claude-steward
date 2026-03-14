@@ -30,11 +30,14 @@ client/src/
 App
 ├── SessionSidebar
 │   ├── ProjectPicker        (dropdown for project select/create/delete)
-│   ├── session list         (inline delete confirmation, clear-all)
+│   ├── session list
+│   │   ├── inline rename    (double-click title → input field)
+│   │   ├── inline delete confirmation
+│   │   └── clear-all button (header; 2+ sessions only)
 │   └── FileTree             (shown when a project is active)
 │       └── file viewer      (inline, opens on file click)
 └── ChatWindow  (keyed on sessionId — remounts on session switch)
-    ├── MessageBubble[]      (one per message; streaming + error states)
+    ├── MessageBubble[]      (one per message; streaming + error states + copy button)
     └── MessageInput         (textarea + Send/Stop)
 ```
 
@@ -55,6 +58,24 @@ All global state lives in `App.tsx`. No external store.
 
 `ChatWindow` manages its own local state (messages, streaming flag) and is fully reset on session switch via React's `key` prop.
 
+### Session list behaviour
+
+- **Reordering** — when the first SSE byte arrives from a `sendMessage` call, `onActivity()` fires and the session is moved to index 0 in the `sessions` array. The list always reflects recency.
+- **Inline rename** — double-clicking a session title shows an `<input>` in-place. Enter or blur commits via `PATCH /api/sessions/:id`; Escape cancels.
+- **Inline delete confirmation** — clicking × shows "Delete? Yes / No" within the row; no browser dialog.
+- **Clear all** — appears in the section header when 2+ sessions exist; uses `window.confirm` for this destructive bulk action.
+- **Session count badge** — displayed next to the "Sessions" label.
+
+### Keyboard shortcuts
+
+| Shortcut | Action |
+|---|---|
+| `Cmd/Ctrl+N` | New session |
+| `Cmd/Ctrl+[` | Previous session (down the list) |
+| `Cmd/Ctrl+]` | Next session (up the list) |
+
+Implemented as a `keydown` listener in `App.tsx` (registered once per `activeSessionId`/`sessions` change).
+
 ---
 
 ## SSE Client
@@ -68,6 +89,7 @@ The server chat stream uses `Content-Type: text/event-stream`, but the client us
 
 ```
 buffer accumulates chunks from ReadableStream
+→ on first read: onActivity?() fires (session reorder)
 → split on '\n'
 → 'event: '  lines set pendingEvent
 → 'data: '   lines dispatch based on pendingEvent:
@@ -92,6 +114,10 @@ Claude errors carry a `code` field:
 | `http_error` | Red fatal banner ✕ | Non-2xx HTTP response from the server |
 
 `MessageBubble` renders errors as styled banners rather than attempting markdown parsing.
+
+### Copy button
+
+Completed assistant messages show a copy-to-clipboard button (⎘) on hover, positioned top-right of the bubble. It copies the raw markdown source (not the rendered HTML). After copying it briefly shows ✓ for 1.5s.
 
 ---
 
@@ -127,6 +153,7 @@ All functions accept/return typed objects and throw on non-OK responses.
 | `getFileContent(projectId, path)` | File content (string) |
 | `listSessions(projectId?)` | `GET /api/sessions?projectId=` |
 | `createSession(projectId?)` | `POST /api/sessions` |
+| `renameSession(id, title)` | `PATCH /api/sessions/:id` |
 | `deleteSession(id)` | `DELETE /api/sessions/:id` |
 | `getMessages(sessionId)` | `GET /api/sessions/:id/messages` |
 | `sendMessage(sessionId, text, handlers)` | Starts chat SSE; returns cancel fn |

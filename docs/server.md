@@ -37,6 +37,7 @@ The `createApp()` / `listen` split exists so tests can import `createApp()` with
 | `POST` | `/api/chat` | Start SSE stream; spawns Claude subprocess |
 | `GET` | `/api/sessions` | List sessions; optional `?projectId=` filter |
 | `POST` | `/api/sessions` | Create session; optional `projectId` in body |
+| `PATCH` | `/api/sessions/:id` | Rename session (`{ title }` in body) |
 | `DELETE` | `/api/sessions/:id` | Delete session and its messages |
 | `GET` | `/api/sessions/:id/messages` | Full message history |
 | `GET` | `/api/projects` | List projects |
