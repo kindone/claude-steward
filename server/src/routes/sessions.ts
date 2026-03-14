@@ -14,6 +14,10 @@ router.get('/', (req, res) => {
 
 router.post('/', (req, res) => {
   const { projectId } = req.body as { projectId?: string }
+  if (!projectId || typeof projectId !== 'string') {
+    res.status(400).json({ error: 'projectId is required' })
+    return
+  }
   const id = uuidv4()
   const session = sessionQueries.create(id, 'New Chat', projectId)
   res.status(201).json(session)

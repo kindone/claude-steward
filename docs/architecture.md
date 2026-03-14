@@ -121,7 +121,7 @@ CREATE TABLE sessions (
   id                TEXT PRIMARY KEY, -- server UUID, exposed to client
   title             TEXT NOT NULL DEFAULT 'New Chat',
   claude_session_id TEXT,             -- CLI handle; set after first message; used for --resume
-  project_id        TEXT REFERENCES projects(id),
+  project_id        TEXT NOT NULL REFERENCES projects(id),  -- required since v2; orphans migrated on startup
   system_prompt     TEXT,             -- optional; passed as --system-prompt on every spawn
   created_at        INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at        INTEGER NOT NULL DEFAULT (unixepoch())

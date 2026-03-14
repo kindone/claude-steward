@@ -29,7 +29,7 @@ client/src/
 ```
 App
 ├── SessionSidebar
-│   ├── ProjectPicker        (dropdown for project select/create/delete; delete hidden for protected project)
+│   ├── ProjectPicker        (dropdown for project select/create/delete; no "No project" option; delete hidden for protected project)
 │   ├── session list
 │   │   ├── inline rename    (double-click title → input field)
 │   │   ├── inline delete confirmation
@@ -51,7 +51,7 @@ All global state lives in `App.tsx`. No external store.
 | State | Type | Description |
 |---|---|---|
 | `projects` | `Project[]` | Loaded once on mount |
-| `activeProjectId` | `string \| null` | Controls session filtering and new-session scoping |
+| `activeProjectId` | `string \| null` | Active project; auto-set to first project on load; null only while loading or when no projects exist |
 | `sessions` | `Session[]` | Reloaded whenever `activeProjectId` changes |
 | `activeSessionId` | `string \| null` | Which session is open in ChatWindow |
 | `appRoot` | `string \| null` | Server's `APP_ROOT` from `/api/meta`; used to suppress delete on the steward project |
@@ -155,7 +155,7 @@ All functions accept/return typed objects and throw on non-OK responses.
 | `listFiles(projectId, path?)` | Directory listing |
 | `getFileContent(projectId, path)` | File content (string) |
 | `listSessions(projectId?)` | `GET /api/sessions?projectId=` |
-| `createSession(projectId?)` | `POST /api/sessions` |
+| `createSession(projectId)` | `POST /api/sessions` — `projectId` required |
 | `renameSession(id, title)` | `PATCH /api/sessions/:id` with `{ title }` |
 | `updateSystemPrompt(id, prompt)` | `PATCH /api/sessions/:id` with `{ systemPrompt }` |
 | `deleteSession(id)` | `DELETE /api/sessions/:id` |

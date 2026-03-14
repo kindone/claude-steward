@@ -26,9 +26,12 @@ export default function App() {
     })
   }, [])
 
-  // Load projects and meta on mount
+  // Load projects and meta on mount; auto-select the first project
   useEffect(() => {
-    listProjects().then(setProjects).catch(console.error)
+    listProjects().then((loaded) => {
+      setProjects(loaded)
+      if (loaded.length > 0) setActiveProjectId(loaded[0].id)
+    }).catch(console.error)
     fetchMeta().then((m) => setAppRoot(m.appRoot)).catch(console.error)
   }, [])
 
@@ -57,11 +60,17 @@ export default function App() {
 
   async function handleDeleteProject(id: string) {
     await deleteProject(id)
-    setProjects((prev) => prev.filter((p) => p.id !== id))
-    if (activeProjectId === id) setActiveProjectId(null)
+    setProjects((prev) => {
+      const remaining = prev.filter((p) => p.id !== id)
+      if (activeProjectId === id) {
+        setActiveProjectId(remaining.length > 0 ? remaining[0].id : null)
+      }
+      return remaining
+    })
   }
 
   async function handleNewSession() {
+    if (!activeProjectId) return
     try {
       const session = await createSession(activeProjectId)
       setSessions((prev) => [session, ...prev])
@@ -183,10 +192,14 @@ export default function App() {
           />
         ) : (
           <div className="app__empty">
-            <p>{activeProjectId ? 'No sessions in this project yet.' : 'Select a project or create a new chat.'}</p>
-            <button className="app__empty-btn" onClick={handleNewSession}>
-              New Chat
-            </button>
+            {activeProjectId ? (
+              <>
+                <p>No sessions in this project yet.</p>
+                <button className="app__empty-btn" onClick={handleNewSession}>New Chat</button>
+              </>
+            ) : (
+              <p>Create a project to start chatting.</p>
+            )}
           </div>
         )}
       </main>

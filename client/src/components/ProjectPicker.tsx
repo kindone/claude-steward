@@ -67,7 +67,7 @@ export function ProjectPicker({ projects, activeProjectId, onSelect, onCreate, o
         title="Switch project"
       >
         <span className="project-picker__label">
-          {activeProject ? activeProject.name : 'No project'}
+          {activeProject ? activeProject.name : 'Select project…'}
         </span>
         <span className="project-picker__chevron">{open ? '▴' : '▾'}</span>
       </button>
@@ -75,12 +75,6 @@ export function ProjectPicker({ projects, activeProjectId, onSelect, onCreate, o
       {open && (
         <div className="project-picker__dropdown">
           <ul className="project-picker__list">
-            <li
-              className={`project-picker__item${!activeProjectId ? ' project-picker__item--active' : ''}`}
-              onClick={() => { onSelect(null); setOpen(false) }}
-            >
-              <span>No project</span>
-            </li>
             {projects.map((p) => (
               <li
                 key={p.id}

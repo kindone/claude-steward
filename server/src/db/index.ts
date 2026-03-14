@@ -158,4 +158,17 @@ export const messageQueries = {
     deleteMessagesBySessionStmt.run(sessionId),
 }
 
+/**
+ * Assign any sessions with no project to the project whose path matches appRoot.
+ * Call once on startup after removing the "no project" session option.
+ */
+export function migrateOrphanedSessions(appRoot: string): void {
+  const steward = db.prepare(`SELECT id FROM projects WHERE path = ?`).get(appRoot) as { id: string } | undefined
+  if (!steward) return
+  const result = db.prepare(`UPDATE sessions SET project_id = ? WHERE project_id IS NULL`).run(steward.id)
+  if (result.changes > 0) {
+    console.log(`[db] migrated ${result.changes} orphaned session(s) to project ${steward.id}`)
+  }
+}
+
 export default db

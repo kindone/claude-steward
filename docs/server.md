@@ -37,7 +37,7 @@ The `createApp()` / `listen` split exists so tests can import `createApp()` with
 | `GET` | `/api/meta` | none | App metadata: `{ appRoot }` |
 | `POST` | `/api/chat` | ✓ | Start SSE stream; spawns Claude subprocess |
 | `GET` | `/api/sessions` | ✓ | List sessions; optional `?projectId=` filter |
-| `POST` | `/api/sessions` | ✓ | Create session; optional `projectId` in body |
+| `POST` | `/api/sessions` | ✓ | Create session; `projectId` required in body |
 | `PATCH` | `/api/sessions/:id` | ✓ | Update session fields: `{ title?, systemPrompt? }` |
 | `DELETE` | `/api/sessions/:id` | ✓ | Delete session and its messages |
 | `GET` | `/api/sessions/:id/messages` | ✓ | Full message history |
@@ -56,8 +56,10 @@ File routes use `safeResolvePath()` to prevent path traversal; dotfiles are filt
 
 ## Session Lifecycle
 
+On startup, `migrateOrphanedSessions(APP_ROOT)` runs once: any sessions with `project_id IS NULL` are reassigned to the steward project (identified by path = `APP_ROOT`). This is a one-time idempotent cleanup from before project-scoping was enforced.
+
 ```
-POST /api/sessions
+POST /api/sessions   { projectId }    ← required; 400 if absent
   → INSERT { id: uuid, title: "New Chat", claude_session_id: null, project_id }
 
 First message (POST /api/chat):

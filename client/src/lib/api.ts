@@ -93,11 +93,11 @@ export async function getFileContent(projectId: string, filePath: string): Promi
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
-export async function createSession(projectId?: string | null): Promise<Session> {
+export async function createSession(projectId: string): Promise<Session> {
   const res = await fetch('/api/sessions', {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ projectId: projectId ?? null }),
+    body: JSON.stringify({ projectId }),
   })
   if (!res.ok) throw new Error('Failed to create session')
   return res.json() as Promise<Session>
