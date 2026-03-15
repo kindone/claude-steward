@@ -26,7 +26,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 - [ ] **Scheduler UI** — list/create/toggle schedules; associate with a session; set reminder text
 
 ### Workspace / Files
-- [ ] **System prompt per session** — optional text injected before every message; stored in `sessions` table; UI to set it
+- [x] **System prompt per session** — optional text injected before every message; stored in `sessions` table; UI to set it (⚙ Prompt toggle in chat header)
 - [ ] **MCP support** — pass `--mcp-config <path>` to spawn args; `mcp_configs` table per project; UI to manage JSON configs
 
 ### Integrations
