@@ -19,6 +19,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 - [x] **Copy message button** — copy-to-clipboard on assistant bubbles
 - [x] **Keyboard shortcuts** — `Cmd+N` new session, `Cmd+[` / `Cmd+]` prev/next session
 - [ ] **File navigation prominence** — once a session is active, file management should be more prominent; discuss layout options (e.g. persistent file panel, top-level tab, or resizable split between files and sessions)
+- [ ] **Terminal access panel** — lightweight shell panel (per project) where the user can issue commands directly (e.g. `git status`, `npm test`); output streamed back via SSE or a simple exec endpoint; complements Claude sessions for quick one-off commands without involving Claude
 - [ ] **Tool activity indicator shows tool name** — the streaming indicator currently always shows "bash" regardless of which tool Claude is using; should display the actual tool name from `content_block_start` (e.g. "Read", "Edit", "Bash", "WebSearch") so the user knows what's happening
 - [ ] **Preserve streaming response on navigation** — if the user switches sessions or closes the page mid-stream, the in-progress assistant response is lost; server should let the Claude subprocess finish and persist the completed response to the DB even after the SSE client disconnects, so it appears when the user returns to that session
 
