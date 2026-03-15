@@ -19,6 +19,7 @@ type Props = {
   onRenameSession: (id: string, title: string) => Promise<void>
   loading: boolean
   onClose?: () => void
+  onLogout?: () => void
 }
 
 export function SessionSidebar({
@@ -37,6 +38,7 @@ export function SessionSidebar({
   onRenameSession,
   loading,
   onClose,
+  onLogout,
 }: Props) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -221,6 +223,21 @@ export function SessionSidebar({
 
       {/* File tree (only when a project is active) */}
       {activeProjectId && <FileTree projectId={activeProjectId} />}
+
+      {/* Sign out — desktop only (mobile has it in the header bar) */}
+      {onLogout && (
+        <div className="hidden md:block border-t border-[#1f1f1f] p-2">
+          <button
+            onClick={onLogout}
+            className="flex w-full items-center gap-2 px-2 py-2 rounded text-xs text-[#555] hover:text-[#aaa] hover:bg-[#1a1a1a] transition-colors"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+            Sign out
+          </button>
+        </div>
+      )}
     </aside>
   )
 }

@@ -16,6 +16,10 @@ server/public/
 # Claude Code local permission grants (machine-specific)
 .claude/settings.local.json
 
+# TypeScript compiler output in source directories (tsc without outDir)
+client/src/**/*.js
+client/src/**/*.js.map
+
 # Test artifacts
 test-results/
 playwright-report/

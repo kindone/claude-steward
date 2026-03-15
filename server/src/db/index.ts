@@ -60,6 +60,26 @@ db.exec(`
   )
 `)
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS passkey_credentials (
+    id           TEXT PRIMARY KEY,
+    public_key   BLOB NOT NULL,
+    counter      INTEGER NOT NULL,
+    transports   TEXT,
+    created_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+    last_used_at INTEGER
+  )
+`)
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS auth_sessions (
+    id           TEXT PRIMARY KEY,
+    created_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+    expires_at   INTEGER NOT NULL,
+    last_seen_at INTEGER
+  )
+`)
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'bypassPermissions'
@@ -187,6 +207,83 @@ export const messageQueries = {
     listMessagesBySessionStmt.all(sessionId) as Message[],
   deleteBySessionId: (sessionId: string) =>
     deleteMessagesBySessionStmt.run(sessionId),
+}
+
+// ── Auth types ────────────────────────────────────────────────────────────────
+
+export type PasskeyCredential = {
+  id: string
+  public_key: Buffer
+  counter: number
+  transports: string | null
+  created_at: number
+  last_used_at: number | null
+}
+
+export type AuthSession = {
+  id: string
+  created_at: number
+  expires_at: number
+  last_seen_at: number | null
+}
+
+// ── Passkey credential queries ─────────────────────────────────────────────────
+
+const insertCredentialStmt = db.prepare(
+  `INSERT INTO passkey_credentials (id, public_key, counter, transports)
+   VALUES (?, ?, ?, ?)`
+)
+const listCredentialsStmt = db.prepare(
+  `SELECT * FROM passkey_credentials ORDER BY created_at ASC`
+)
+const findCredentialByIdStmt = db.prepare(
+  `SELECT * FROM passkey_credentials WHERE id = ?`
+)
+const updateCredentialCounterStmt = db.prepare(
+  `UPDATE passkey_credentials SET counter = ?, last_used_at = unixepoch() WHERE id = ?`
+)
+const deleteCredentialStmt = db.prepare(
+  `DELETE FROM passkey_credentials WHERE id = ?`
+)
+
+export const credentialQueries = {
+  insert: (id: string, publicKey: Buffer, counter: number, transports: string | null) =>
+    insertCredentialStmt.run(id, publicKey, counter, transports),
+  list: () => listCredentialsStmt.all() as PasskeyCredential[],
+  findById: (id: string) => findCredentialByIdStmt.get(id) as PasskeyCredential | undefined,
+  updateCounter: (id: string, counter: number) =>
+    updateCredentialCounterStmt.run(counter, id),
+  delete: (id: string) => deleteCredentialStmt.run(id),
+}
+
+// ── Auth session queries ────────────────────────────────────────────────────────
+
+const SESSION_TTL_DAYS = 30
+
+const insertAuthSessionStmt = db.prepare(
+  `INSERT INTO auth_sessions (id, expires_at) VALUES (?, unixepoch() + ?)
+   RETURNING *`
+)
+const findAuthSessionStmt = db.prepare(
+  `SELECT * FROM auth_sessions WHERE id = ? AND expires_at > unixepoch()`
+)
+const touchAuthSessionStmt = db.prepare(
+  `UPDATE auth_sessions SET last_seen_at = unixepoch() WHERE id = ?`
+)
+const deleteAuthSessionStmt = db.prepare(
+  `DELETE FROM auth_sessions WHERE id = ?`
+)
+const purgeExpiredSessionsStmt = db.prepare(
+  `DELETE FROM auth_sessions WHERE expires_at <= unixepoch()`
+)
+
+export const authSessionQueries = {
+  create: (id: string) =>
+    insertAuthSessionStmt.get(id, SESSION_TTL_DAYS * 86400) as AuthSession,
+  findValid: (id: string) => findAuthSessionStmt.get(id) as AuthSession | undefined,
+  touch: (id: string) => touchAuthSessionStmt.run(id),
+  delete: (id: string) => deleteAuthSessionStmt.run(id),
+  purgeExpired: () => purgeExpiredSessionsStmt.run(),
 }
 
 /**

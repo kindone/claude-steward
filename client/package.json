@@ -12,6 +12,7 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@simplewebauthn/browser": "^13.3.0",
     "highlight.js": "^11.11.1",
     "marked": "^15.0.7",
     "react": "^19.0.0",

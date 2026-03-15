@@ -2,13 +2,18 @@ import { useState, useEffect } from 'react'
 import {
   listProjects, createProject, deleteProject, fetchMeta, updatePermissionMode,
   listSessions, createSession, deleteSession, renameSession,
-  subscribeToAppEvents,
+  subscribeToAppEvents, getAuthStatus, logout,
   type Project, type Session,
 } from './lib/api'
 import { SessionSidebar } from './components/SessionSidebar'
 import { ChatWindow } from './components/ChatWindow'
+import AuthPage from './components/AuthPage'
+
+type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
 
 export default function App() {
+  const [authState, setAuthState] = useState<AuthState>('loading')
+  const [hasCredentials, setHasCredentials] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
@@ -18,7 +23,32 @@ export default function App() {
   const [restarting, setRestarting] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // Check auth on mount
   useEffect(() => {
+    getAuthStatus()
+      .then(({ authenticated, hasCredentials: hasCreds }) => {
+        setHasCredentials(hasCreds)
+        setAuthState(authenticated ? 'authenticated' : 'unauthenticated')
+      })
+      .catch(() => setAuthState('unauthenticated'))
+  }, [])
+
+  async function handleAuthenticated() {
+    setAuthState('authenticated')
+    setHasCredentials(true)
+  }
+
+  async function handleLogout() {
+    await logout()
+    setAuthState('unauthenticated')
+    setProjects([])
+    setSessions([])
+    setActiveProjectId(null)
+    setActiveSessionId(null)
+  }
+
+  useEffect(() => {
+    if (authState !== 'authenticated') return
     return subscribeToAppEvents({
       onReload: () => {
         setRestarting(true)
@@ -27,14 +57,15 @@ export default function App() {
     })
   }, [])
 
-  // Load projects and meta on mount; auto-select the first project
+  // Load projects and meta once authenticated
   useEffect(() => {
+    if (authState !== 'authenticated') return
     listProjects().then((loaded) => {
       setProjects(loaded)
       if (loaded.length > 0) setActiveProjectId(loaded[0].id)
     }).catch(console.error)
     fetchMeta().then((m) => setAppRoot(m.appRoot)).catch(console.error)
-  }, [])
+  }, [authState])
 
   // Load sessions whenever the active project changes
   useEffect(() => {
@@ -165,6 +196,18 @@ export default function App() {
   const activeSession = sessions.find((s) => s.id === activeSessionId)
   const mobileTitle = activeSession?.title ?? activeProject?.name ?? 'Claude Steward'
 
+  if (authState === 'loading') {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-[#0d0d0d]">
+        <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#333] border-t-[#666]" />
+      </div>
+    )
+  }
+
+  if (authState === 'unauthenticated') {
+    return <AuthPage hasCredentials={hasCredentials} onAuthenticated={handleAuthenticated} />
+  }
+
   return (
     <div className="flex h-dvh relative overflow-hidden bg-[#0d0d0d] text-[#e8e8e8]">
       {/* Restart overlay */}
@@ -203,6 +246,7 @@ export default function App() {
           onRenameSession={handleRenameSession}
           loading={loading}
           onClose={() => setSidebarOpen(false)}
+          onLogout={handleLogout}
         />
       </div>
 
@@ -217,9 +261,18 @@ export default function App() {
           >
             ☰
           </button>
-          <span className="flex-1 text-sm text-[#888] truncate text-center pr-11">
+          <span className="flex-1 text-sm text-[#888] truncate text-center">
             {mobileTitle}
           </span>
+          <button
+            onClick={handleLogout}
+            className="w-11 h-11 flex items-center justify-center text-[#555] hover:text-[#aaa] flex-shrink-0"
+            title="Sign out"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+            </svg>
+          </button>
         </div>
 
         {activeSessionId ? (

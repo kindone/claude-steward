@@ -51,8 +51,8 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 
 ### Auth & Security
 - [x] **HTTPS** — nginx reverse proxy on the EC2 instance; Let's Encrypt cert via certbot for both `steward.jradoo.com` (→ `:5173` dev / `:3001` prod) and `safe.steward.jradoo.com` (→ `:3003`); `http → https` redirect; auto-renewing
-- [ ] **Passkeys (WebAuthn)** — replace shared `API_KEY` with device-bound passkey auth; `@simplewebauthn/server` + `@simplewebauthn/browser`; server stores credential IDs + public keys in DB; issues a session cookie after successful assertion; safe-mode retains its own independent auth (separate from main app); prerequisite: HTTPS
-- [ ] **Remove `VITE_API_KEY` from build** — currently the API key is baked into the JS bundle at build time; once Passkeys land, client auth is cookie-based and no secrets live in the bundle
+- [x] **Passkeys (WebAuthn)** — `@simplewebauthn/server` + `@simplewebauthn/browser`; `passkey_credentials` + `auth_sessions` tables; `/api/auth/register|login/start|finish`, `/api/auth/logout`, `/api/auth/status`; `HttpOnly` session cookie issued on success; `requireAuth` middleware accepts cookie first, API key as fallback; `LoginPage` / `RegisterPage` gate the entire app UI; safe-mode retains its own independent auth
+- [ ] **Remove `VITE_API_KEY` from build** — currently the API key is still accepted as fallback bearer token; once all devices have passkeys registered, remove `VITE_API_KEY` from `.env`, strip the `Authorization` header from `api.ts`, and delete the bearer fallback from `requireAuth`
 
 ### Testing
 - [ ] **Migration unit tests** — cover the three startup scenarios in Vitest: (1) fresh DB → `seedStewardProject` creates the project with correct name/path; (2) existing DB with orphaned sessions → `migrateOrphanedSessions` reassigns them; (3) existing DB with steward project already present → both functions are true no-ops (no duplicates). Each test gets its own `DATABASE_PATH` temp file via the existing `setup.ts` pattern.

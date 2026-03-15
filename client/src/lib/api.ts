@@ -1,9 +1,83 @@
-const API_KEY = import.meta.env.VITE_API_KEY as string
+const API_KEY = import.meta.env.VITE_API_KEY as string | undefined
 
-const authHeaders = (): HeadersInit => ({
-  'Content-Type': 'application/json',
-  Authorization: `Bearer ${API_KEY}`,
-})
+// Include credentials (session cookie) in every request.
+// Fall back to Bearer token if VITE_API_KEY is still set (transitional).
+const authHeaders = (): HeadersInit => {
+  const h: HeadersInit = { 'Content-Type': 'application/json' }
+  if (API_KEY) h['Authorization'] = `Bearer ${API_KEY}`
+  return h
+}
+
+const credentialsOpt = { credentials: 'include' } as const
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+export type AuthStatus = {
+  authenticated: boolean
+  hasCredentials: boolean
+}
+
+export async function getAuthStatus(): Promise<AuthStatus> {
+  const res = await fetch('/api/auth/status', credentialsOpt)
+  if (!res.ok) throw new Error('Failed to fetch auth status')
+  return res.json() as Promise<AuthStatus>
+}
+
+export async function startRegistration(): Promise<unknown> {
+  const res = await fetch('/api/auth/register/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(body.error ?? 'Failed to start registration')
+  }
+  return res.json()
+}
+
+export async function finishRegistration(response: unknown): Promise<void> {
+  const res = await fetch('/api/auth/register/finish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(response),
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(body.error ?? 'Registration failed')
+  }
+}
+
+export async function startLogin(): Promise<unknown> {
+  const res = await fetch('/api/auth/login/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(body.error ?? 'Failed to start login')
+  }
+  return res.json()
+}
+
+export async function finishLogin(response: unknown): Promise<void> {
+  const res = await fetch('/api/auth/login/finish', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(response),
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(body.error ?? 'Login failed')
+  }
+}
+
+export async function logout(): Promise<void> {
+  await fetch('/api/auth/logout', { method: 'POST', ...credentialsOpt })
+}
 
 export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'bypassPermissions'
 
@@ -44,7 +118,7 @@ export type Message = {
 // ── Projects ──────────────────────────────────────────────────────────────────
 
 export async function listProjects(): Promise<Project[]> {
-  const res = await fetch('/api/projects', { headers: authHeaders() })
+  const res = await fetch('/api/projects', { headers: authHeaders(), ...credentialsOpt })
   if (!res.ok) throw new Error('Failed to list projects')
   return res.json() as Promise<Project[]>
 }
@@ -54,6 +128,7 @@ export async function createProject(name: string, path: string): Promise<Project
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ name, path }),
+    ...credentialsOpt,
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: 'Unknown error' })) as { error: string }
@@ -73,6 +148,7 @@ export async function updateProject(projectId: string, patch: { permissionMode?:
     method: 'PATCH',
     headers: authHeaders(),
     body: JSON.stringify(patch),
+    ...credentialsOpt,
   })
   if (!res.ok) throw new Error('Failed to update project')
   return res.json() as Promise<Project>
@@ -82,13 +158,14 @@ export async function deleteProject(projectId: string): Promise<void> {
   const res = await fetch(`/api/projects/${projectId}`, {
     method: 'DELETE',
     headers: authHeaders(),
+    ...credentialsOpt,
   })
   if (!res.ok) throw new Error('Failed to delete project')
 }
 
 export async function listFiles(projectId: string, filePath = ''): Promise<FileEntry[]> {
   const url = `/api/projects/${projectId}/files${filePath ? `?path=${encodeURIComponent(filePath)}` : ''}`
-  const res = await fetch(url, { headers: authHeaders() })
+  const res = await fetch(url, { headers: authHeaders(), ...credentialsOpt })
   if (!res.ok) throw new Error('Failed to list files')
   return res.json() as Promise<FileEntry[]>
 }
@@ -96,7 +173,7 @@ export async function listFiles(projectId: string, filePath = ''): Promise<FileE
 export async function getFileContent(projectId: string, filePath: string): Promise<string> {
   const res = await fetch(
     `/api/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`,
-    { headers: authHeaders() }
+    { headers: authHeaders(), ...credentialsOpt }
   )
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: 'Unknown error' })) as { error: string }
@@ -113,6 +190,7 @@ export async function createSession(projectId: string): Promise<Session> {
     method: 'POST',
     headers: authHeaders(),
     body: JSON.stringify({ projectId }),
+    ...credentialsOpt,
   })
   if (!res.ok) throw new Error('Failed to create session')
   return res.json() as Promise<Session>
@@ -120,13 +198,13 @@ export async function createSession(projectId: string): Promise<Session> {
 
 export async function listSessions(projectId?: string | null): Promise<Session[]> {
   const url = projectId ? `/api/sessions?projectId=${projectId}` : '/api/sessions'
-  const res = await fetch(url, { headers: authHeaders() })
+  const res = await fetch(url, { headers: authHeaders(), ...credentialsOpt })
   if (!res.ok) throw new Error('Failed to list sessions')
   return res.json() as Promise<Session[]>
 }
 
 export async function getMessages(sessionId: string): Promise<Message[]> {
-  const res = await fetch(`/api/sessions/${sessionId}/messages`, { headers: authHeaders() })
+  const res = await fetch(`/api/sessions/${sessionId}/messages`, { headers: authHeaders(), ...credentialsOpt })
   if (!res.ok) throw new Error('Failed to load messages')
   return res.json() as Promise<Message[]>
 }
@@ -136,6 +214,7 @@ export async function renameSession(sessionId: string, title: string): Promise<S
     method: 'PATCH',
     headers: authHeaders(),
     body: JSON.stringify({ title }),
+    ...credentialsOpt,
   })
   if (!res.ok) throw new Error('Failed to rename session')
   return res.json() as Promise<Session>
@@ -146,6 +225,7 @@ export async function updateSystemPrompt(sessionId: string, systemPrompt: string
     method: 'PATCH',
     headers: authHeaders(),
     body: JSON.stringify({ systemPrompt }),
+    ...credentialsOpt,
   })
   if (!res.ok) throw new Error('Failed to update system prompt')
   return res.json() as Promise<Session>
@@ -156,6 +236,7 @@ export async function updatePermissionMode(sessionId: string, permissionMode: Pe
     method: 'PATCH',
     headers: authHeaders(),
     body: JSON.stringify({ permissionMode }),
+    ...credentialsOpt,
   })
   if (!res.ok) throw new Error('Failed to update permission mode')
   return res.json() as Promise<Session>
@@ -165,6 +246,7 @@ export async function deleteSession(sessionId: string): Promise<void> {
   const res = await fetch(`/api/sessions/${sessionId}`, {
     method: 'DELETE',
     headers: authHeaders(),
+    ...credentialsOpt,
   })
   if (!res.ok) throw new Error('Failed to delete session')
 }
@@ -186,6 +268,7 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
       const res = await fetch('/api/events', {
         headers: authHeaders(),
         signal: controller.signal,
+        ...credentialsOpt,
       })
 
       const reader = res.body!.getReader()
@@ -242,6 +325,7 @@ export function sendMessage(
     headers: authHeaders(),
     body: JSON.stringify({ sessionId, message }),
     signal: controller.signal,
+    ...credentialsOpt,
   })
     .then(async (res) => {
       if (!res.ok) {

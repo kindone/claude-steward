@@ -2,7 +2,9 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import express from 'express'
 import cors from 'cors'
-import { requireApiKey } from './auth/middleware.js'
+import cookieParser from 'cookie-parser'
+import { requireAuth } from './auth/middleware.js'
+import authRouter from './routes/auth.js'
 import chatRouter from './routes/chat.js'
 import sessionsRouter from './routes/sessions.js'
 import projectsRouter from './routes/projects.js'
@@ -18,19 +20,21 @@ export function createApp() {
   const app = express()
 
   app.use(express.json())
+  app.use(cookieParser())
 
   if (NODE_ENV === 'development') {
     const allowedOrigins = ['http://localhost:5173']
     if (process.env.APP_DOMAIN) allowedOrigins.push(`https://${process.env.APP_DOMAIN}`)
-    app.use(cors({ origin: allowedOrigins }))
+    app.use(cors({ origin: allowedOrigins, credentials: true }))
   }
 
-  // Public metadata endpoint (no auth required)
+  // Public endpoints — no auth required
   app.get('/api/meta', (_req, res) => {
     res.json({ appRoot: APP_ROOT })
   })
+  app.use('/api/auth', authRouter)
 
-  app.use('/api', requireApiKey)
+  app.use('/api', requireAuth)
   app.use('/api/chat', chatRouter)
   app.use('/api/sessions', sessionsRouter)
   app.use('/api/projects', projectsRouter)
@@ -40,7 +44,7 @@ export function createApp() {
   if (NODE_ENV === 'production') {
     const publicDir = path.join(__dirname, '../public')
     app.use(express.static(publicDir))
-    app.get('*', (_req, res) => {
+    app.get('/{*path}', (_req, res) => {
       res.sendFile(path.join(publicDir, 'index.html'))
     })
   }
