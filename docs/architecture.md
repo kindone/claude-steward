@@ -7,7 +7,7 @@ This document covers the overall system structure, how the three programs relate
 | [Server](server.md) | Express routes, session lifecycle, SSE protocol, Claude subprocess |
 | [Client](client.md) | React components, state, SSE client, Vite config |
 | [Safe-Mode Core](safe.md) | Emergency terminal internals and freeze policy |
-| [Self-Management](self-management.md) | In-app upgrade flow, app-level events |
+| [Self-Management](self-management.md) | In-app upgrade flow, PM2 process management, nginx dev/prod switching |
 | [Roadmap](roadmap.md) | Planned features |
 
 ---
@@ -36,46 +36,69 @@ claude-steward/               ← npm workspace root
 
 | Port | Program | Notes |
 |---|---|---|
+| `80` | nginx | Redirects → HTTPS |
+| `443` | nginx | TLS termination; routes by domain (see below) |
 | `3001` | Main server | API + static files in production |
 | `3003` | Safe-mode core | Always-on, independent PM2 process |
 | `5173` | Client dev server | Vite; proxies `/api` → `:3001`. Not present in production |
+
+### Domain routing (nginx)
+
+| Domain | nginx upstream | When |
+|---|---|---|
+| `steward.jradoo.com` | `127.0.0.1:5173` | Dev mode |
+| `steward.jradoo.com` | `127.0.0.1:3001` | Production mode |
+| `safe.steward.jradoo.com` | `127.0.0.1:3003` | Always |
+
+Switching between dev and production requires one `proxy_pass` line change in `/etc/nginx/sites-available/steward`. See [Self-Management](self-management.md) for the exact steps.
 
 ---
 
 ## Program Interfaces
 
 ```
-Browser (client)
-  │
-  ├─ GET  /api/meta                       app metadata (no auth); { appRoot }
-  │
-  │  All requests below carry:  Authorization: Bearer <API_KEY>
-  │
-  ├─ GET/POST/DELETE /api/projects        project CRUD (DELETE blocked for APP_ROOT)
-  ├─ GET/POST/PATCH/DELETE /api/sessions  session CRUD (filterable by projectId)
-  ├─ GET  /api/sessions/:id/messages      history
-  ├─ POST /api/chat                       SSE stream (chat responses)
-  ├─ GET  /api/events                     SSE stream (app-level: reload, notifications)
-  ├─ GET  /api/admin/version
-  └─ POST /api/admin/reload               triggers live reload via PM2
-       │
-       ▼
-  Main server (:3001)
-       │  spawns
-       ▼
-  claude CLI subprocess
-       │  stdout NDJSON → server → SSE → browser
+Browser
+  │  HTTPS (TLS terminated by nginx)
+  ▼
+nginx
+  ├─ steward.jradoo.com      → :5173 (dev) or :3001 (prod)
+  └─ safe.steward.jradoo.com → :3003
 
-Browser (safe-mode tab)
-  │  Same API_KEY bearer token
-  └─ POST /chat  (SSE stream)
-  └─ GET  /ping
-       │
-       ▼
-  Safe-mode server (:3003)
-       │  spawns
-       ▼
-  claude CLI  (--dangerously-skip-permissions)
+  ┌─────────────────────────────────────────────────────────┐
+  │  steward.jradoo.com                                     │
+  │                                                         │
+  │  GET  /api/meta                 app metadata (no auth)  │
+  │                                                         │
+  │  All requests below carry:  Authorization: Bearer <API_KEY>
+  │                                                         │
+  │  GET/POST/DELETE /api/projects        project CRUD      │
+  │  GET/POST/PATCH/DELETE /api/sessions  session CRUD      │
+  │  GET  /api/sessions/:id/messages      history           │
+  │  POST /api/chat                       SSE chat stream   │
+  │  GET  /api/events                     SSE app events    │
+  │  GET  /api/admin/version                               │
+  │  POST /api/admin/reload               → PM2 restart    │
+  │       │                                                 │
+  │       ▼                                                 │
+  │  Main server (:3001)                                    │
+  │       │  spawns                                         │
+  │       ▼                                                 │
+  │  claude CLI subprocess                                  │
+  │       stdout NDJSON → server → SSE → browser           │
+  └─────────────────────────────────────────────────────────┘
+
+  ┌─────────────────────────────────────────────────────────┐
+  │  safe.steward.jradoo.com                                │
+  │                                                         │
+  │  POST /chat   SSE stream (--dangerously-skip-permissions)│
+  │  GET  /ping                                             │
+  │       │  Same API_KEY bearer token                      │
+  │       ▼                                                 │
+  │  Safe-mode server (:3003)                               │
+  │       │  spawns                                         │
+  │       ▼                                                 │
+  │  claude CLI  (--dangerously-skip-permissions)           │
+  └─────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -156,3 +179,5 @@ The two-ID session design separates concerns: `id` is a stable client-facing ide
 | Markdown | `marked` | Lightweight, synchronous parse |
 | Syntax highlight | `highlight.js` | Post-render, targets `pre code` blocks |
 | Dev runner | `tsx watch` | Hot-reload TypeScript without a separate compile step |
+| Reverse proxy | nginx | TLS termination, HTTP→HTTPS redirect, SSE-safe proxy config |
+| TLS certs | Let's Encrypt (certbot) | Auto-renewing; both domains covered |

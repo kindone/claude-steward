@@ -43,6 +43,9 @@ Built and working:
 - Safe-mode core on `:3003` (frozen)
 - Vitest integration tests (server + client), Playwright E2E smoke tests
 - `npm run status` — checks all three ports
+- PM2 daemon mode for both dev (`up:dev`) and prod (`up`); `npm run down/logs/restart`
+- Tailwind CSS v4 — fully mobile-responsive; sidebar drawer on mobile; touch targets fixed
+- nginx reverse proxy on EC2; HTTPS via Let's Encrypt for `steward.jradoo.com` and `safe.steward.jradoo.com`; currently proxying dev mode (`:5173`)
 
 See `TODO.md` for what's next. See `archived_tasks.md` for completed work.
 
