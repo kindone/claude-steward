@@ -47,13 +47,62 @@ The `subscribeToAppEvents()` helper in `client/src/lib/api.ts` handles connectio
 
 ---
 
-## PM2 Ecosystem
+## Process Management (PM2)
 
-Two independent processes defined in `ecosystem.config.cjs`:
+Both dev and production modes are managed through PM2 for stability — processes survive SSH disconnects and restart automatically on crash or clean exit.
+
+### Starting and stopping
+
+```
+npm run up        # start production  (conflict check → pm2 start ecosystem.config.cjs)
+npm run up:dev    # start dev mode    (conflict check → pm2 start ecosystem.dev.config.cjs)
+npm run down      # stop all steward processes
+npm run logs      # tail all PM2 logs
+npm run restart   # pm2 restart all
+npm run status    # check which ports are up
+```
+
+`npm run up` and `npm run up:dev` run `scripts/up.js` first, which checks each required port before handing off to PM2. If any port is already in use it prints the conflict and exits cleanly:
+
+```
+Port conflict — cannot start:
+
+  ✗  :3001  (main server)  is already in use
+
+Stop all steward processes first:  npm run down
+Then run  npm run up:dev  again.
+```
+
+`npm run down` targets process names explicitly so it won't affect unrelated PM2 processes on the same machine.
+
+### Ecosystem files
+
+**`ecosystem.config.cjs`** — production (two processes):
 
 ```
 steward-main  (node dist/index.js)   port 3001  ← upgraded via /api/admin/reload
 steward-safe  (node safe/server.js)  port 3003  ← frozen, see safe.md
 ```
 
-`steward-main` restarts automatically on `process.exit(0)` (clean exit), picking up the newly built `dist/`. `steward-safe` is a completely separate process and is unaffected by main app restarts.
+**`ecosystem.dev.config.cjs`** — development (three processes):
+
+```
+steward-server  (npm run dev --workspace=server)  port 3001  ← tsx watch, auto-reloads on file changes
+steward-client  (npm run dev --workspace=client)  port 5173  ← Vite HMR
+steward-safe    (node safe/server.js)             port 3003  ← frozen, same as production
+```
+
+### Upgrade flow in dev mode
+
+The self-upgrade path (`POST /api/admin/reload` → `process.exit(0)`) still works in dev:
+- PM2 restarts `steward-server` after the clean exit; `tsx watch` picks up any file changes.
+- Client changes are handled by Vite HMR and don't require a restart at all.
+- `steward-safe` is unaffected in both modes.
+
+### Surviving reboots
+
+```
+pm2 save && pm2 startup
+```
+
+Run once after the first `npm run up` or `npm run up:dev` to persist the process list across reboots.

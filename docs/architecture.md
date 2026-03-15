@@ -16,11 +16,13 @@ This document covers the overall system structure, how the three programs relate
 
 ```
 claude-steward/               ← npm workspace root
-├── package.json              ← workspace config, concurrently dev script
+├── package.json              ← workspace config, npm run up/up:dev/down/logs/status
 ├── ecosystem.config.cjs      ← PM2 process config (production)
+├── ecosystem.dev.config.cjs  ← PM2 process config (development)
 ├── .env                      ← secrets (gitignored)
 ├── .env.example              ← committed template
 ├── scripts/
+│   ├── up.js                 ← port conflict check → pm2 start (shared by up and up:dev)
 │   └── status.js             ← npm run status — checks all three ports
 │
 ├── server/                   ← Node.js 23 + TypeScript (ESM)  → :3001
