@@ -28,6 +28,7 @@ type ResultChunk = {
   result: string
   session_id: string
   is_error: boolean
+  errors?: string[]
 }
 
 type ClaudeChunk = SystemInitChunk | StreamEventChunk | AssistantChunk | ResultChunk
@@ -147,6 +148,28 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
     sendSseEvent(res, 'chunk', chunk)
 
     if (chunk.type === 'result') {
+      if (chunk.is_error) {
+        // Claude exited cleanly (code 0) but reported a logical error in the result.
+        // "No conversation found with session ID" is the canonical resume-failure message.
+        const errorText = chunk.errors?.join('; ') || chunk.result || `Claude error: ${chunk.subtype}`
+        const isSessionError = Boolean(claudeSessionId) ||
+          errorText.toLowerCase().includes('session') ||
+          errorText.toLowerCase().includes('conversation')
+        const claudeErr: ClaudeError = isSessionError
+          ? {
+              message: 'The previous Claude session could not be resumed. Your next message will start a fresh conversation.',
+              code: 'session_expired',
+              detail: errorText,
+            }
+          : {
+              message: errorText,
+              code: 'process_error',
+            }
+        onError?.(claudeErr)
+        sendSseEvent(res, 'error', claudeErr)
+        res.end()
+        return
+      }
       onComplete?.(accumulatedText)
       sendSseEvent(res, 'done', { session_id: chunk.session_id })
       res.end()
