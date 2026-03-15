@@ -106,3 +106,61 @@ pm2 save && pm2 startup
 ```
 
 Run once after the first `npm run up` or `npm run up:dev` to persist the process list across reboots.
+
+---
+
+## nginx Reverse Proxy
+
+nginx sits in front of both domains and handles TLS termination. Configs live in `/etc/nginx/sites-available/`.
+
+| Domain | nginx config | Upstream |
+|---|---|---|
+| `steward.jradoo.com` | `steward` | `:5173` (dev) or `:3001` (prod) |
+| `safe.steward.jradoo.com` | `steward-safe` | `:3003` (always) |
+
+Both domains have Let's Encrypt certs (auto-renewing via certbot systemd timer).
+
+### Switching between dev and production
+
+**Dev → production:**
+
+```bash
+# 1. Build the client into server/public/
+npm run build
+
+# 2. Switch PM2 to production processes
+npm run down
+npm run up           # starts steward-main (:3001) + steward-safe (:3003)
+
+# 3. Point nginx at :3001 instead of :5173
+sudo sed -i 's|proxy_pass http://127.0.0.1:5173|proxy_pass http://127.0.0.1:3001|' \
+  /etc/nginx/sites-available/steward
+sudo systemctl reload nginx
+
+# 4. Set NODE_ENV in .env
+# Change NODE_ENV=development → NODE_ENV=production
+```
+
+**Production → dev:**
+
+```bash
+# 1. Switch PM2 to dev processes
+npm run down
+npm run up:dev       # starts steward-server (:3001) + steward-client (:5173) + steward-safe (:3003)
+
+# 2. Point nginx back at :5173
+sudo sed -i 's|proxy_pass http://127.0.0.1:3001|proxy_pass http://127.0.0.1:5173|' \
+  /etc/nginx/sites-available/steward
+sudo systemctl reload nginx
+```
+
+### Verifying nginx config before reload
+
+```bash
+sudo nginx -t                  # syntax check
+sudo systemctl reload nginx    # graceful reload (zero downtime)
+```
+
+### Manual edits
+
+The steward config is at `/etc/nginx/sites-available/steward`. The only line that changes between modes is the `proxy_pass` upstream. Everything else (TLS, SSE settings, WebSocket upgrade) stays the same regardless of mode.
