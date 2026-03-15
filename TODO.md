@@ -19,6 +19,8 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 - [x] **Copy message button** — copy-to-clipboard on assistant bubbles
 - [x] **Keyboard shortcuts** — `Cmd+N` new session, `Cmd+[` / `Cmd+]` prev/next session
 - [ ] **File navigation prominence** — once a session is active, file management should be more prominent; discuss layout options (e.g. persistent file panel, top-level tab, or resizable split between files and sessions)
+- [ ] **Tool activity indicator shows tool name** — the streaming indicator currently always shows "bash" regardless of which tool Claude is using; should display the actual tool name from `content_block_start` (e.g. "Read", "Edit", "Bash", "WebSearch") so the user knows what's happening
+- [ ] **Preserve streaming response on navigation** — if the user switches sessions or closes the page mid-stream, the in-progress assistant response is lost; server should let the Claude subprocess finish and persist the completed response to the DB even after the SSE client disconnects, so it appears when the user returns to that session
 
 ### Scheduler
 - [ ] **Scheduled conversation resume** — `schedules` table (`id`, `session_id`, `cron`, `prompt_context`, `enabled`); `node-cron` runner injects context-aware wake messages ("would you like to resume the conversation about X?")
@@ -52,7 +54,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 ### Auth & Security
 - [x] **HTTPS** — nginx reverse proxy on the EC2 instance; Let's Encrypt cert via certbot for both `steward.jradoo.com` (→ `:5173` dev / `:3001` prod) and `safe.steward.jradoo.com` (→ `:3003`); `http → https` redirect; auto-renewing
 - [x] **Passkeys (WebAuthn)** — `@simplewebauthn/server` + `@simplewebauthn/browser`; `passkey_credentials` + `auth_sessions` tables; `/api/auth/register|login/start|finish`, `/api/auth/logout`, `/api/auth/status`; `HttpOnly` session cookie issued on success; `requireAuth` middleware accepts cookie first, API key as fallback; `LoginPage` / `RegisterPage` gate the entire app UI; safe-mode retains its own independent auth
-- [ ] **Remove `VITE_API_KEY` from build** — currently the API key is still accepted as fallback bearer token; once all devices have passkeys registered, remove `VITE_API_KEY` from `.env`, strip the `Authorization` header from `api.ts`, and delete the bearer fallback from `requireAuth`
+- [x] **Remove `VITE_API_KEY` from build** — bearer fallback removed from `requireAuth`; `VITE_API_KEY` stripped from client build and test config; all tests migrated to cookie auth
 
 ### Testing
 - [ ] **Migration unit tests** — cover the three startup scenarios in Vitest: (1) fresh DB → `seedStewardProject` creates the project with correct name/path; (2) existing DB with orphaned sessions → `migrateOrphanedSessions` reassigns them; (3) existing DB with steward project already present → both functions are true no-ops (no duplicates). Each test gets its own `DATABASE_PATH` temp file via the existing `setup.ts` pattern.
