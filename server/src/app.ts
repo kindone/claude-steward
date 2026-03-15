@@ -20,7 +20,9 @@ export function createApp() {
   app.use(express.json())
 
   if (NODE_ENV === 'development') {
-    app.use(cors({ origin: 'http://localhost:5173' }))
+    const allowedOrigins = ['http://localhost:5173']
+    if (process.env.APP_DOMAIN) allowedOrigins.push(`https://${process.env.APP_DOMAIN}`)
+    app.use(cors({ origin: allowedOrigins }))
   }
 
   // Public metadata endpoint (no auth required)
