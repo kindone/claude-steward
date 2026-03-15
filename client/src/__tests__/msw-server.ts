@@ -3,13 +3,13 @@ import { http, HttpResponse } from 'msw'
 import type { Project, Session, FileEntry } from '../lib/api'
 
 export const mockProjects: Project[] = [
-  { id: 'proj-1', name: 'my-project', path: '/home/user/my-project', created_at: 1000 },
-  { id: 'proj-2', name: 'other-project', path: '/home/user/other', created_at: 2000 },
+  { id: 'proj-1', name: 'my-project', path: '/home/user/my-project', allow_all_tools: 0, permission_mode: 'acceptEdits', created_at: 1000 },
+  { id: 'proj-2', name: 'other-project', path: '/home/user/other', allow_all_tools: 0, permission_mode: 'acceptEdits', created_at: 2000 },
 ]
 
 export const mockSessions: Session[] = [
-  { id: 'ses-1', title: 'First chat', claude_session_id: null, project_id: 'proj-1', created_at: 1000, updated_at: 1000 },
-  { id: 'ses-2', title: 'Second chat', claude_session_id: null, project_id: 'proj-1', created_at: 2000, updated_at: 2000 },
+  { id: 'ses-1', title: 'First chat', claude_session_id: null, project_id: 'proj-1', system_prompt: null, permission_mode: 'acceptEdits', created_at: 1000, updated_at: 1000 },
+  { id: 'ses-2', title: 'Second chat', claude_session_id: null, project_id: 'proj-1', system_prompt: null, permission_mode: 'acceptEdits', created_at: 2000, updated_at: 2000 },
 ]
 
 export const mockFiles: FileEntry[] = [
@@ -26,6 +26,8 @@ export const handlers = [
       id: 'new-proj-id',
       name: body.name,
       path: body.path,
+      allow_all_tools: 0,
+      permission_mode: 'acceptEdits',
       created_at: Date.now(),
     }
     return HttpResponse.json(project, { status: 201 })
@@ -42,6 +44,8 @@ export const handlers = [
       title: 'New Chat',
       claude_session_id: null,
       project_id: body.projectId ?? null,
+      system_prompt: null,
+      permission_mode: 'acceptEdits',
       created_at: Date.now(),
       updated_at: Date.now(),
     }

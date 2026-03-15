@@ -16,6 +16,8 @@ function renderSidebar(overrides: Partial<React.ComponentProps<typeof SessionSid
     onSelectSession: vi.fn(),
     onNewSession: vi.fn(),
     onDeleteSession: vi.fn(),
+    onDeleteAllSessions: vi.fn(),
+    onRenameSession: vi.fn().mockResolvedValue(undefined),
     loading: false,
   }
   render(<SessionSidebar {...handlers} {...overrides} />)

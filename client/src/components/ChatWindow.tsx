@@ -77,7 +77,6 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
 
   function generateId(): string {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
-    // Fallback for non-secure (HTTP) contexts — only used as local React keys
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = Math.random() * 16 | 0
       return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
@@ -130,22 +129,28 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   }
 
   return (
-    <div className="chat-window">
-      {/* Session header bar: system prompt toggle + permission mode selector */}
-      <div className="chat-window__prompt-bar">
-        <div className="chat-window__header-row">
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* Session header: system prompt toggle + permission mode selector */}
+      <div className="flex-shrink-0 border-b border-[#1a1a1a]">
+        <div className="flex items-center justify-between px-2">
           <button
-            className={`chat-window__prompt-toggle${systemPrompt ? ' chat-window__prompt-toggle--active' : ''}`}
+            className={`bg-transparent border-none cursor-pointer text-xs py-1.5 px-1.5 text-left transition-colors flex-shrink-0
+              ${systemPrompt ? 'text-blue-500 hover:text-blue-400' : 'text-[#444] hover:text-[#888]'}`}
             onClick={() => setPromptOpen((o) => !o)}
             title="System prompt"
           >
             {systemPrompt ? '⚙ Prompt set' : '⚙ Prompt'}
           </button>
-          <span className="chat-window__mode-seg">
+
+          {/* Permission mode segmented control */}
+          <span className="inline-flex border border-[#222] rounded overflow-hidden">
             {MODES.map((m) => (
               <button
                 key={m.value}
-                className={`chat-window__mode-btn${permissionMode === m.value ? ' chat-window__mode-btn--active' : ''}`}
+                className={`bg-transparent border-r border-[#222] last:border-r-0 cursor-pointer text-xs px-3 py-2 transition-colors
+                  ${permissionMode === m.value
+                    ? 'bg-[#1e3a5f] text-blue-400'
+                    : 'text-[#444] hover:bg-[#1a1a1a] hover:text-[#888]'}`}
                 onClick={() => handleModeChange(m.value)}
                 title={m.title}
               >
@@ -154,10 +159,11 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
             ))}
           </span>
         </div>
+
         {promptOpen && (
-          <div className="chat-window__prompt-editor">
+          <div className="px-3 pb-3 flex flex-col gap-2">
             <textarea
-              className="chat-window__prompt-textarea"
+              className="bg-[#0d0d0d] border border-[#2a2a2a] focus:border-blue-600 rounded-md text-[#e8e8e8] text-base font-[inherit] leading-relaxed px-2.5 py-2 resize-y outline-none w-full"
               value={promptDraft}
               onChange={(e) => setPromptDraft(e.target.value)}
               onKeyDown={handlePromptKeyDown}
@@ -165,20 +171,36 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
               rows={4}
               autoFocus
             />
-            <div className="chat-window__prompt-actions">
-              <button className="chat-window__prompt-save" onClick={handlePromptSave}>Save</button>
-              <button className="chat-window__prompt-cancel" onClick={() => { setPromptDraft(systemPrompt ?? ''); setPromptOpen(false) }}>Cancel</button>
+            <div className="flex gap-1.5">
+              <button
+                className="bg-blue-600 hover:bg-blue-500 border-none rounded text-white cursor-pointer text-xs px-3 py-1.5 transition-colors"
+                onClick={handlePromptSave}
+              >
+                Save
+              </button>
+              <button
+                className="bg-transparent border border-[#2a2a2a] hover:border-[#444] hover:text-[#aaa] rounded text-[#666] cursor-pointer text-xs px-2.5 py-1.5 transition-colors"
+                onClick={() => { setPromptDraft(systemPrompt ?? ''); setPromptOpen(false) }}
+              >
+                Cancel
+              </button>
               {systemPrompt && (
-                <button className="chat-window__prompt-clear" onClick={async () => { await updateSystemPrompt(sessionId, null); onSystemPromptChange?.(null); setPromptDraft(''); setPromptOpen(false) }}>Clear</button>
+                <button
+                  className="bg-transparent border border-[#2a2a2a] hover:text-red-500 hover:border-red-500/40 rounded text-[#555] cursor-pointer text-xs px-2.5 py-1.5 ml-auto transition-colors"
+                  onClick={async () => { await updateSystemPrompt(sessionId, null); onSystemPromptChange?.(null); setPromptDraft(''); setPromptOpen(false) }}
+                >
+                  Clear
+                </button>
               )}
             </div>
           </div>
         )}
       </div>
 
-      <div className="chat-window__messages">
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-6 md:py-8 flex flex-col gap-5">
         {messages.length === 0 && (
-          <div className="chat-window__empty">
+          <div className="flex items-center justify-center flex-1 text-[#444] text-sm">
             <p>Start a conversation with Claude.</p>
           </div>
         )}
@@ -192,17 +214,18 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
           />
         ))}
         {streaming && (
-          <div className="chat-window__tool-indicator">
-            <span className="chat-window__tool-indicator-dot" />
-            <span className="chat-window__tool-indicator-dot" />
-            <span className="chat-window__tool-indicator-dot" />
+          <div className="flex items-center gap-1 px-3 py-1.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse tool-pulse-2" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse tool-pulse-3" />
             {streamingTool && (
-              <span className="chat-window__tool-indicator-label">{streamingTool}</span>
+              <span className="ml-1.5 text-xs text-[#888] italic">{streamingTool}</span>
             )}
           </div>
         )}
         <div ref={bottomRef} />
       </div>
+
       <MessageInput
         onSend={handleSend}
         onStop={() => {

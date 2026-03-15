@@ -18,6 +18,7 @@ type Props = {
   onDeleteAllSessions: () => void
   onRenameSession: (id: string, title: string) => Promise<void>
   loading: boolean
+  onClose?: () => void
 }
 
 export function SessionSidebar({
@@ -35,6 +36,7 @@ export function SessionSidebar({
   onDeleteAllSessions,
   onRenameSession,
   loading,
+  onClose,
 }: Props) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -93,9 +95,20 @@ export function SessionSidebar({
   }
 
   return (
-    <aside className="sidebar">
+    <aside className="h-dvh w-64 flex flex-col bg-[#111] border-r border-[#1f1f1f] overflow-hidden">
+      {/* Mobile close button */}
+      <div className="flex items-center justify-end px-2 pt-2 md:hidden">
+        <button
+          onClick={onClose}
+          className="w-9 h-9 flex items-center justify-center text-[#555] hover:text-[#aaa] text-xl rounded"
+          aria-label="Close sidebar"
+        >
+          ✕
+        </button>
+      </div>
+
       {/* Project switcher */}
-      <div className="sidebar__project-bar">
+      <div className="border-b border-[#1f1f1f] relative">
         <ProjectPicker
           projects={projects}
           activeProjectId={activeProjectId}
@@ -106,38 +119,52 @@ export function SessionSidebar({
         />
       </div>
 
-      {/* Sessions */}
-      <div className="sidebar__section-header">
-        <span className="sidebar__section-label">
+      {/* Sessions header */}
+      <div className="flex items-center justify-between px-3 pt-2 pb-1">
+        <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#555] tracking-widest uppercase">
           Sessions
           {sessions.length > 0 && (
-            <span className="sidebar__count">{sessions.length}</span>
+            <span className="bg-[#2a2a2a] text-[#666] text-[10px] font-semibold px-1.5 py-px rounded-full">
+              {sessions.length}
+            </span>
           )}
         </span>
-        <div className="sidebar__header-actions">
+        <div className="flex items-center gap-1">
           {sessions.length > 1 && (
             <button
-              className="sidebar__clear-btn"
+              className="bg-transparent border-none text-[#444] text-[11px] cursor-pointer px-1.5 py-0.5 rounded hover:text-red-500 hover:bg-red-500/[0.08] transition-colors"
               onClick={handleClearAll}
               title="Delete all sessions"
             >
               Clear all
             </button>
           )}
-          <button className="sidebar__new-btn" onClick={onNewSession} title="New Chat">+</button>
+          <button
+            className="bg-[#1e3a5f] hover:bg-blue-600 text-white border-none w-8 h-8 rounded-md cursor-pointer text-lg leading-none flex items-center justify-center transition-colors"
+            onClick={onNewSession}
+            title="New Chat"
+          >
+            +
+          </button>
         </div>
       </div>
-      <ul className="sidebar__list">
+
+      {/* Session list */}
+      <ul className="list-none flex-1 overflow-y-auto px-2 py-1 flex flex-col gap-0.5">
         {sessions.map((s) => (
           <li
             key={s.id}
-            className={`sidebar__item${s.id === activeSessionId ? ' sidebar__item--active' : ''}${pendingDeleteId === s.id ? ' sidebar__item--confirming' : ''}`}
+            className={`group flex items-center gap-1 px-2.5 py-2 rounded-md cursor-pointer text-sm border transition-colors
+              ${s.id === activeSessionId
+                ? 'bg-[#1e3a5f] text-[#e8e8e8] border-transparent'
+                : 'text-[#bbb] border-transparent hover:bg-[#1a1a1a] hover:text-[#e8e8e8]'}
+              ${pendingDeleteId === s.id ? '!bg-red-500/[0.08] !border-red-500/20' : ''}`}
             onClick={() => handleSessionClick(s.id)}
           >
             {editingId === s.id ? (
               <input
                 ref={editInputRef}
-                className="sidebar__rename-input"
+                className="flex-1 bg-[#0d0d0d] border border-blue-600 rounded text-[#e8e8e8] text-[13px] px-1.5 py-0.5 outline-none min-w-0"
                 value={editValue}
                 onChange={(e) => setEditValue(e.target.value)}
                 onBlur={commitRename}
@@ -148,22 +175,34 @@ export function SessionSidebar({
                 onClick={(e) => e.stopPropagation()}
               />
             ) : pendingDeleteId === s.id ? (
-              <span className="sidebar__confirm">
-                <span className="sidebar__confirm-label">Delete?</span>
-                <button className="sidebar__confirm-yes" onClick={(e) => handleConfirmDelete(e, s.id)}>Yes</button>
-                <button className="sidebar__confirm-no" onClick={handleCancelDelete}>No</button>
+              <span className="flex items-center gap-1.5 w-full">
+                <span className="flex-1 text-[12px] text-red-300">Delete?</span>
+                <button
+                  className="bg-transparent border border-red-500/50 rounded text-red-500 text-[11px] px-2 py-1 cursor-pointer flex-shrink-0 hover:bg-red-500/15 min-h-[32px]"
+                  onClick={(e) => handleConfirmDelete(e, s.id)}
+                >
+                  Yes
+                </button>
+                <button
+                  className="bg-transparent border border-[#333] rounded text-[#666] text-[11px] px-2 py-1 cursor-pointer flex-shrink-0 hover:text-[#aaa] hover:border-[#555] min-h-[32px]"
+                  onClick={handleCancelDelete}
+                >
+                  No
+                </button>
               </span>
             ) : (
               <>
                 <span
-                  className="sidebar__item-title"
+                  className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap select-none"
                   onDoubleClick={(e) => startEditing(e, s)}
                   title="Double-click to rename"
                 >
                   {s.title}
                 </span>
                 <button
-                  className="sidebar__delete-btn"
+                  className="flex-shrink-0 bg-transparent border-none cursor-pointer text-[15px] leading-none px-1 py-0.5 rounded transition-colors
+                    text-transparent group-hover:text-[#444] [@media(hover:none)]:text-[#444]
+                    hover:!text-red-500 hover:bg-red-500/10"
                   onClick={(e) => handleDeleteClick(e, s.id)}
                   title="Delete session"
                 >
@@ -174,10 +213,11 @@ export function SessionSidebar({
           </li>
         ))}
         {!loading && sessions.length === 0 && (
-          <li className="sidebar__empty-hint">No sessions yet</li>
+          <li className="px-2.5 py-2 text-[12px] text-[#444] italic">No sessions yet</li>
         )}
       </ul>
-      {loading && <p className="sidebar__loading">Loading…</p>}
+
+      {loading && <p className="px-3 py-3 text-[12px] text-[#555] text-center">Loading…</p>}
 
       {/* File tree (only when a project is active) */}
       {activeProjectId && <FileTree projectId={activeProjectId} />}

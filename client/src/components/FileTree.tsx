@@ -57,7 +57,7 @@ export function FileTree({ projectId }: Props) {
         {entry.type === 'directory' ? (
           <>
             <button
-              className="file-tree__entry file-tree__entry--dir"
+              className="flex items-center gap-1 w-full bg-transparent border-none text-[#7aa2d4] hover:text-[#93bbf0] font-medium text-xs px-1.5 py-1.5 cursor-pointer text-left rounded hover:bg-[#1a1a1a] transition-colors min-h-[36px]"
               onClick={() => void toggleDir(entry.path)}
             >
               <span>{openDirs.has(entry.path) ? '▾' : '▸'}</span>
@@ -69,11 +69,11 @@ export function FileTree({ projectId }: Props) {
           </>
         ) : (
           <button
-            className="file-tree__entry file-tree__entry--file"
+            className="flex items-center gap-1 w-full bg-transparent border-none text-[#888] hover:text-[#ccc] text-xs px-1.5 py-1.5 cursor-pointer text-left rounded hover:bg-[#1a1a1a] transition-colors font-[inherit] min-h-[36px]"
             onClick={() => void openFile(entry.path)}
           >
-            <span className="file-tree__file-icon">·</span>
-            <span>{entry.name}</span>
+            <span className="text-[#444] flex-shrink-0">·</span>
+            <span className="truncate">{entry.name}</span>
           </button>
         )}
       </div>
@@ -82,20 +82,20 @@ export function FileTree({ projectId }: Props) {
 
   return (
     <>
-      <div className="file-tree">
+      <div className="border-t border-[#1f1f1f] flex-shrink-0">
         <button
-          className="file-tree__toggle"
+          className="w-full flex items-center gap-1.5 px-3 py-2 bg-transparent border-none text-[#555] hover:text-[#888] text-[11px] font-semibold tracking-widest uppercase cursor-pointer text-left transition-colors"
           onClick={() => setExpanded((e) => !e)}
         >
           <span>{expanded ? '▾' : '▸'}</span>
           <span>Files</span>
-          {loading && <span className="file-tree__spinner">…</span>}
+          {loading && <span className="text-[#444] text-[11px]">…</span>}
         </button>
 
         {expanded && (
-          <div className="file-tree__body">
+          <div className="max-h-[200px] overflow-y-auto px-1.5 pb-1.5">
             {tree.has('') && tree.get('')!.length === 0 && (
-              <p className="file-tree__empty">Empty directory</p>
+              <p className="text-xs text-[#444] px-2.5 py-1.5 italic">Empty directory</p>
             )}
             {tree.has('') && renderEntries(tree.get('')!, 0)}
           </div>
@@ -103,13 +103,28 @@ export function FileTree({ projectId }: Props) {
       </div>
 
       {viewer && (
-        <div className="file-viewer-overlay" onClick={() => setViewer(null)}>
-          <div className="file-viewer" onClick={(e) => e.stopPropagation()}>
-            <div className="file-viewer__header">
-              <span className="file-viewer__path">{viewer.path}</span>
-              <button className="file-viewer__close" onClick={() => setViewer(null)}>×</button>
+        <div
+          className="fixed inset-0 bg-black/60 z-[200] flex items-center justify-center p-4 md:p-8"
+          onClick={() => setViewer(null)}
+        >
+          <div
+            className="bg-[#131313] border border-[#2a2a2a] rounded-xl w-full max-w-[860px] max-h-[80dvh] flex flex-col overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-4 py-3 border-b border-[#1f1f1f] gap-3">
+              <span className="text-[13px] text-[#888] font-mono overflow-hidden text-ellipsis whitespace-nowrap">
+                {viewer.path}
+              </span>
+              <button
+                className="bg-transparent border-none text-[#666] hover:text-[#ccc] hover:bg-[#222] text-xl cursor-pointer flex-shrink-0 leading-none px-2 py-1 rounded transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                onClick={() => setViewer(null)}
+              >
+                ×
+              </button>
             </div>
-            <pre className="file-viewer__content"><code>{viewer.content}</code></pre>
+            <pre className="flex-1 overflow-auto p-4 text-[13px] leading-relaxed font-['SF_Mono','Fira_Code',monospace] text-[#ccc] whitespace-pre bg-transparent border-none m-0">
+              <code>{viewer.content}</code>
+            </pre>
           </div>
         </div>
       )}

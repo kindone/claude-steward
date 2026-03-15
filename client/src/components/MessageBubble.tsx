@@ -36,27 +36,39 @@ export function MessageBubble({ role, content, streaming = false, errorCode }: P
   if (errorCode) {
     const isSessionExpired = errorCode === 'session_expired'
     return (
-      <div className={`message message--error message--error--${isSessionExpired ? 'info' : 'fatal'}`}>
-        <span className="message__error-icon">{isSessionExpired ? '⚠' : '✕'}</span>
-        <p className="message__error-text">{content}</p>
+      <div className={`flex items-start gap-2 px-3.5 py-2.5 rounded-lg text-sm leading-relaxed
+        ${isSessionExpired
+          ? 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-300'
+          : 'bg-red-500/10 border border-red-500/30 text-red-300'}`}
+      >
+        <span className="flex-shrink-0 text-sm mt-px">{isSessionExpired ? '⚠' : '✕'}</span>
+        <p className="flex-1">{content}</p>
       </div>
     )
   }
 
   return (
-    <div className={`message message--${role}`}>
+    <div className={`max-w-[820px] w-full flex flex-col
+      ${role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}
+    >
       {role === 'user' ? (
-        <p className="message__content message__content--plain">{content}</p>
+        <p className="bg-[#1e3a5f] px-3.5 py-2.5 rounded-[14px_14px_2px_14px] whitespace-pre-wrap break-words text-sm leading-relaxed max-w-[600px]">
+          {content}
+        </p>
       ) : (
-        <div className="message__assistant-wrap">
+        <div className="group relative w-full">
           <div
             ref={contentRef}
-            className={`message__content message__content--markdown${streaming ? ' message__content--streaming' : ''}`}
+            className={`prose text-sm leading-[1.65] break-words w-full${streaming ? ' streaming-cursor' : ''}`}
             dangerouslySetInnerHTML={{ __html: marked.parse(content) as string }}
           />
           {!streaming && content && (
             <button
-              className={`message__copy-btn${copied ? ' message__copy-btn--copied' : ''}`}
+              className={`absolute top-1 right-1 bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]
+                rounded cursor-pointer text-[13px] leading-none px-1.5 py-0.5 transition-[opacity,color,border-color]
+                opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100
+                hover:text-[#ccc] hover:border-[#444]
+                ${copied ? '!text-green-400 !border-green-400/30 !opacity-100' : ''}`}
               onClick={handleCopy}
               title="Copy message"
             >

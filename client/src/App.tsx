@@ -16,6 +16,7 @@ export default function App() {
   const [appRoot, setAppRoot] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [restarting, setRestarting] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   useEffect(() => {
     return subscribeToAppEvents({
@@ -50,6 +51,7 @@ export default function App() {
 
   async function handleSelectProject(id: string | null) {
     setActiveProjectId(id)
+    setSidebarOpen(false)
   }
 
   async function handleCreateProject(name: string, path: string) {
@@ -80,6 +82,7 @@ export default function App() {
       const session = await createSession(activeProjectId)
       setSessions((prev) => [session, ...prev])
       setActiveSessionId(session.id)
+      setSidebarOpen(false)
     } catch (err) {
       console.error('Failed to create session:', err)
     }
@@ -158,30 +161,67 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, sessions])
 
+  const activeProject = projects.find((p) => p.id === activeProjectId)
+  const activeSession = sessions.find((s) => s.id === activeSessionId)
+  const mobileTitle = activeSession?.title ?? activeProject?.name ?? 'Claude Steward'
+
   return (
-    <div className="app">
+    <div className="flex h-dvh relative overflow-hidden bg-[#0d0d0d] text-[#e8e8e8]">
+      {/* Restart overlay */}
       {restarting && (
-        <div className="restart-overlay">
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] text-lg font-semibold text-[#e8e8e8] tracking-wide">
           <p>Restarting…</p>
         </div>
       )}
-      <SessionSidebar
-        projects={projects}
-        activeProjectId={activeProjectId}
-        onSelectProject={handleSelectProject}
-        onCreateProject={handleCreateProject}
-        onDeleteProject={handleDeleteProject}
-        protectedProjectPath={appRoot}
-        sessions={sessions}
-        activeSessionId={activeSessionId}
-        onSelectSession={setActiveSessionId}
-        onNewSession={handleNewSession}
-        onDeleteSession={handleDeleteSession}
-        onDeleteAllSessions={handleDeleteAllSessions}
-        onRenameSession={handleRenameSession}
-        loading={loading}
-      />
-      <main className="app__main">
+
+      {/* Mobile backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — fixed overlay on mobile, inline on desktop */}
+      <div className={`fixed inset-y-0 left-0 z-50 flex-shrink-0 transition-transform duration-200
+        md:relative md:z-auto md:translate-x-0
+        ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <SessionSidebar
+          projects={projects}
+          activeProjectId={activeProjectId}
+          onSelectProject={handleSelectProject}
+          onCreateProject={handleCreateProject}
+          onDeleteProject={handleDeleteProject}
+          protectedProjectPath={appRoot}
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          onSelectSession={(id) => { setActiveSessionId(id); setSidebarOpen(false) }}
+          onNewSession={handleNewSession}
+          onDeleteSession={handleDeleteSession}
+          onDeleteAllSessions={handleDeleteAllSessions}
+          onRenameSession={handleRenameSession}
+          loading={loading}
+          onClose={() => setSidebarOpen(false)}
+        />
+      </div>
+
+      {/* Main content */}
+      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Mobile header bar */}
+        <div className="flex items-center gap-2 h-11 px-2 border-b border-[#1f1f1f] md:hidden flex-shrink-0 bg-[#0d0d0d]">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="w-11 h-11 flex items-center justify-center text-[#666] hover:text-[#aaa] text-xl flex-shrink-0"
+            aria-label="Open sidebar"
+          >
+            ☰
+          </button>
+          <span className="flex-1 text-sm text-[#888] truncate text-center pr-11">
+            {mobileTitle}
+          </span>
+        </div>
+
         {activeSessionId ? (
           <ChatWindow
             key={activeSessionId}
@@ -198,11 +238,16 @@ export default function App() {
             onPermissionModeChange={(mode) => handlePermissionModeChange(activeSessionId, mode)}
           />
         ) : (
-          <div className="app__empty">
+          <div className="flex flex-col items-center justify-center h-full gap-4 text-[#666]">
             {activeProjectId ? (
               <>
                 <p>No sessions in this project yet.</p>
-                <button className="app__empty-btn" onClick={handleNewSession}>New Chat</button>
+                <button
+                  className="bg-blue-600 hover:bg-blue-700 text-white border-none px-6 py-2.5 rounded-lg cursor-pointer text-[15px] transition-colors"
+                  onClick={handleNewSession}
+                >
+                  New Chat
+                </button>
               </>
             ) : (
               <p>Create a project to start chatting.</p>

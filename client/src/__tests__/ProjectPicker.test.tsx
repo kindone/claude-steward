@@ -3,10 +3,6 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ProjectPicker } from '../components/ProjectPicker'
 import { mockProjects } from './msw-server'
-import { http, HttpResponse } from 'msw'
-import { server } from './msw-server'
-
-const noop = async () => {}
 
 function renderPicker(overrides: Partial<React.ComponentProps<typeof ProjectPicker>> = {}) {
   const onSelect = vi.fn()
