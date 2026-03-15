@@ -64,14 +64,49 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
 
   useEffect(() => {
     let cancelled = false
+    let pollTimer: ReturnType<typeof setTimeout> | null = null
+    let pollCount = 0
+    const MAX_POLLS = 60 // 2 minutes at 2s intervals
+
+    function clearPoll() {
+      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
+    }
+
+    async function pollForResponse() {
+      if (cancelled || pollCount >= MAX_POLLS) {
+        setStreaming(false)
+        return
+      }
+      pollCount++
+      try {
+        const loaded = await getMessages(sessionId)
+        if (cancelled) return
+        if (loaded[loaded.length - 1]?.role === 'assistant') {
+          setMessages(loaded.map((m) => ({ ...m, streaming: false })))
+          setStreaming(false)
+        } else {
+          pollTimer = setTimeout(pollForResponse, 2000)
+        }
+      } catch {
+        setStreaming(false)
+      }
+    }
+
     getMessages(sessionId).then((loaded) => {
-      if (!cancelled) {
-        setMessages(loaded.map((m) => ({ ...m, streaming: false })))
+      if (cancelled) return
+      setMessages(loaded.map((m) => ({ ...m, streaming: false })))
+      // If last message is a user message with no response yet, Claude may still be processing.
+      // Show streaming indicator and poll until the assistant message lands in the DB.
+      if (loaded.length > 0 && loaded[loaded.length - 1].role === 'user') {
+        setStreaming(true)
+        pollTimer = setTimeout(pollForResponse, 2000)
       }
     }).catch(() => {/* session may be new — ignore */})
+
     return () => {
       cancelled = true
       cancelRef.current?.()
+      clearPoll()
     }
   }, [sessionId])
 
