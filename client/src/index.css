@@ -803,6 +803,43 @@ body {
   font-size: 14px;
 }
 
+/* ── Tool activity indicator ── */
+.chat-window__tool-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  margin-bottom: 8px;
+}
+
+.chat-window__tool-indicator-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #555;
+  animation: tool-indicator-pulse 1.2s ease-in-out infinite;
+}
+
+.chat-window__tool-indicator-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.chat-window__tool-indicator-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.chat-window__tool-indicator-label {
+  margin-left: 6px;
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+}
+
+@keyframes tool-indicator-pulse {
+  0%, 60%, 100% { opacity: 0.2; transform: scale(0.8); }
+  30% { opacity: 1; transform: scale(1); }
+}
+
 /* ── Messages ── */
 .message {
   max-width: 820px;

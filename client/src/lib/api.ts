@@ -226,6 +226,7 @@ export type ChunkHandler = {
   onTitle?: (title: string) => void
   onDone: () => void
   onError: (message: string, code?: ClaudeErrorCode) => void
+  onToolActivity?: (toolName: string | null) => void
   onActivity?: () => void
 }
 
@@ -287,15 +288,20 @@ export function sendMessage(
               try {
                 const chunk = JSON.parse(raw) as {
                   type: string
-                  event?: { type: string; delta?: { type: string; text: string } }
-                  message?: { content?: Array<{ type: string; text: string }> }
+                  event?: {
+                    type: string
+                    delta?: { type: string; text: string }
+                    content_block?: { type: string; name?: string }
+                  }
                 }
-                if (
-                  chunk.type === 'stream_event' &&
-                  chunk.event?.type === 'content_block_delta' &&
-                  chunk.event.delta?.type === 'text_delta'
-                ) {
-                  handlers.onTextDelta(chunk.event.delta.text)
+                if (chunk.type === 'stream_event') {
+                  const evt = chunk.event
+                  if (evt?.type === 'content_block_start' && evt.content_block?.type === 'tool_use') {
+                    handlers.onToolActivity?.(evt.content_block.name ?? 'tool')
+                  } else if (evt?.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+                    handlers.onToolActivity?.(null)   // clear indicator when text arrives
+                    handlers.onTextDelta(evt.delta.text)
+                  }
                 }
               } catch {
                 // ignore malformed chunks

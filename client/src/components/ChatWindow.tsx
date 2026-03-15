@@ -30,6 +30,7 @@ type Props = {
 export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [streaming, setStreaming] = useState(false)
+  const [streamingTool, setStreamingTool] = useState<string | null>(null)
   const [promptOpen, setPromptOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState(systemPrompt ?? '')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -104,7 +105,9 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
           )
         )
       },
+      onToolActivity: (toolName) => setStreamingTool(toolName),
       onDone: () => {
+        setStreamingTool(null)
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId ? { ...m, streaming: false } : m
@@ -113,6 +116,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
         setStreaming(false)
       },
       onError: (errorMsg, code) => {
+        setStreamingTool(null)
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId
@@ -187,6 +191,16 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
             errorCode={m.errorCode}
           />
         ))}
+        {streaming && (
+          <div className="chat-window__tool-indicator">
+            <span className="chat-window__tool-indicator-dot" />
+            <span className="chat-window__tool-indicator-dot" />
+            <span className="chat-window__tool-indicator-dot" />
+            {streamingTool && (
+              <span className="chat-window__tool-indicator-label">{streamingTool}</span>
+            )}
+          </div>
+        )}
         <div ref={bottomRef} />
       </div>
       <MessageInput

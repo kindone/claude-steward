@@ -40,6 +40,7 @@ App
     ├── session header bar   (always visible: ⚙ Prompt toggle left, Plan/Edit/Full mode selector right)
     │   └── system prompt editor  (collapsible; textarea + Save/Cancel/Clear)
     ├── MessageBubble[]      (one per message; streaming + error states + copy button)
+    ├── tool activity indicator  (visible while streaming; shows pulsing dots + current tool name)
     └── MessageInput         (textarea + Send/Stop)
 ```
 
@@ -60,7 +61,7 @@ All global state lives in `App.tsx`. No external store.
 | `loading` | `boolean` | Session list loading indicator |
 | `restarting` | `boolean` | Overlay shown during app-level reload |
 
-`ChatWindow` manages its own local state (messages, streaming flag) and is fully reset on session switch via React's `key` prop.
+`ChatWindow` manages its own local state (messages, streaming flag, current tool name) and is fully reset on session switch via React's `key` prop.
 
 ### Session list behaviour
 
@@ -98,7 +99,8 @@ buffer accumulates chunks from ReadableStream
 → 'event: '  lines set pendingEvent
 → 'data: '   lines dispatch based on pendingEvent:
     title   → onTitle()
-    chunk   → extract content_block_delta text → onTextDelta()
+    chunk   → content_block_start (tool_use) → onToolActivity(toolName)
+            → content_block_delta (text_delta) → onToolActivity(null) + onTextDelta()
     done    → onDone()
     error   → onError(message, code?)
 ```
