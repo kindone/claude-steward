@@ -74,9 +74,18 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
     }
   }, [sessionId])
 
+  function generateId(): string {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+    // Fallback for non-secure (HTTP) contexts — only used as local React keys
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = Math.random() * 16 | 0
+      return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+    })
+  }
+
   function handleSend(text: string) {
-    const userMsgId = crypto.randomUUID()
-    const assistantMsgId = crypto.randomUUID()
+    const userMsgId = generateId()
+    const assistantMsgId = generateId()
 
     setMessages((prev) => [
       ...prev,
