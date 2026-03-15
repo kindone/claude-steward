@@ -167,12 +167,12 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
             }
         onError?.(claudeErr)
         sendSseEvent(res, 'error', claudeErr)
-        res.end()
+        if (!res.writableEnded) res.end()
         return
       }
       onComplete?.(accumulatedText)
       sendSseEvent(res, 'done', { session_id: chunk.session_id })
-      res.end()
+      if (!res.writableEnded) res.end()
     }
   })
 
@@ -180,7 +180,7 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
     const claudeErr: ClaudeError = { message: err.message, code: 'process_error' }
     onError?.(claudeErr)
     sendSseEvent(res, 'error', claudeErr)
-    res.end()
+    if (!res.writableEnded) res.end()
   })
 
   child.on('close', (code) => {
@@ -200,7 +200,7 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
           }
       onError?.(claudeErr)
       sendSseEvent(res, 'error', claudeErr)
-      res.end()
+      if (!res.writableEnded) res.end()
     }
   })
 }

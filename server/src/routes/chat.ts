@@ -59,7 +59,6 @@ router.post('/', (req, res) => {
   messageQueries.insert(uuidv4(), sessionId, 'user', message)
 
   const project = session.project_id ? projectQueries.findById(session.project_id) : undefined
-  const abortController = new AbortController()
 
   spawnClaude({
     message,
@@ -67,7 +66,6 @@ router.post('/', (req, res) => {
     systemPrompt: session.system_prompt,
     permissionMode: session.permission_mode,
     res,
-    signal: abortController.signal,
     cwd: project?.path,
     onSessionId: (claudeSessionId) => {
       if (!session.claude_session_id) {
@@ -92,8 +90,9 @@ router.post('/', (req, res) => {
 
   // res.on('close') fires when the client disconnects (socket closed).
   // Do NOT use req.on('close') — it fires when the request body is consumed, not on disconnect.
+  // We intentionally do NOT kill the Claude subprocess here — let it finish and persist to DB
+  // so the response is available when the user returns to the session.
   res.on('close', () => {
-    abortController.abort()
     if (!res.writableEnded) res.end()
   })
 })
