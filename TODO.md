@@ -42,7 +42,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 - [ ] **Fine-grained tool permissions per session** — the current Plan/Edit/Full triad is coarse. Explore `--allowedTools` / `--disallowedTools` CLI flags (support patterns like `Bash(npm:*)`) to allow command-level whitelists and blacklists. Possible UX: an "Advanced" mode in the session header that exposes an editable allowed-tools list, stored as `allowed_tools TEXT` on the sessions row and passed via `--allowedTools` at spawn time.
 
 ### Auth & Security
-- [ ] **HTTPS** — nginx reverse proxy on the EC2 instance; Let's Encrypt cert via certbot for both `steward.jradoo.com` (→ `:3001`) and `safe.steward.jradoo.com` (→ `:3003`); redirect `http → https`; set `NODE_ENV=production` in `.env` once live
+- [x] **HTTPS** — nginx reverse proxy on the EC2 instance; Let's Encrypt cert via certbot for both `steward.jradoo.com` (→ `:5173` dev / `:3001` prod) and `safe.steward.jradoo.com` (→ `:3003`); `http → https` redirect; auto-renewing
 - [ ] **Passkeys (WebAuthn)** — replace shared `API_KEY` with device-bound passkey auth; `@simplewebauthn/server` + `@simplewebauthn/browser`; server stores credential IDs + public keys in DB; issues a session cookie after successful assertion; safe-mode retains its own independent auth (separate from main app); prerequisite: HTTPS
 - [ ] **Remove `VITE_API_KEY` from build** — currently the API key is baked into the JS bundle at build time; once Passkeys land, client auth is cookie-based and no secrets live in the bundle
 
