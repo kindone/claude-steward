@@ -74,6 +74,7 @@ router.post('/register/finish', async (req, res) => {
       expectedChallenge: challenge,
       expectedOrigin: expectedOrigins,
       expectedRPID: rpID,
+      requireUserVerification: false,
     })
 
     if (!verified || !registrationInfo) {
@@ -152,6 +153,7 @@ router.post('/login/finish', async (req, res) => {
       expectedChallenge: challenge,
       expectedOrigin: expectedOrigins,
       expectedRPID: rpID,
+      requireUserVerification: false,
       credential: {
         id: stored.id,
         publicKey: new Uint8Array(stored.public_key),
