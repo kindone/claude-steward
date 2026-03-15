@@ -68,8 +68,14 @@ nginx
   │  steward.jradoo.com                                     │
   │                                                         │
   │  GET  /api/meta                 app metadata (no auth)  │
+  │  POST /api/auth/register/start  passkey registration    │
+  │  POST /api/auth/register/finish                         │
+  │  POST /api/auth/login/start     passkey login           │
+  │  POST /api/auth/login/finish    → sets sid cookie       │
+  │  POST /api/auth/logout          clears sid cookie       │
+  │  GET  /api/auth/status          { authenticated, hasCredentials } │
   │                                                         │
-  │  All requests below carry:  Authorization: Bearer <API_KEY>
+  │  All requests below require: sid cookie (or API_KEY fallback)
   │                                                         │
   │  GET/POST/DELETE /api/projects        project CRUD      │
   │  GET/POST/PATCH/DELETE /api/sessions  session CRUD      │
@@ -105,11 +111,26 @@ nginx
 
 ## Authentication
 
-A single shared secret (`API_KEY`) is used as a Bearer token for both servers. Both client apps send `Authorization: Bearer <API_KEY>` on every request.
+### Main app (`steward.jradoo.com`)
 
-The main server checks this in `server/src/auth/middleware.ts` applied to all `/api/*` routes. The safe-mode server checks it inline in `safe/server.js`.
+Uses **Passkeys (WebAuthn)**. The full flow:
 
-The client reads the key from `VITE_API_KEY` (build-time) via `client/.env.local`.
+1. Browser loads the React app → `GET /api/auth/status` (public, no auth required)
+2. If `authenticated: false` → show `AuthPage`
+   - **First visit** (`hasCredentials: false`): "Register this device" → calls `/api/auth/register/start` + `/api/auth/register/finish`
+   - **Returning device** (`hasCredentials: true`): "Sign in with Passkey" → calls `/api/auth/login/start` + `/api/auth/login/finish`
+3. On success the server issues a `sid` cookie (`HttpOnly; Secure; SameSite=Strict; Max-Age=30d`)
+4. All subsequent `/api/*` requests include `credentials: 'include'`; the server validates the cookie in `requireAuth`
+
+The server also accepts a `Authorization: Bearer <API_KEY>` header as a fallback — kept for the transition period until all devices are registered, after which `VITE_API_KEY` will be removed from the build.
+
+Auth-related routes (`/api/auth/*`) are mounted **before** the `requireAuth` middleware and are fully public.
+
+Credential storage: `passkey_credentials` table (credential ID + COSE public key + sign counter). Session storage: `auth_sessions` table (random 32-byte token + expiry). Challenges are kept in-memory with a 5-minute TTL (single-user, so one slot per operation type).
+
+### Safe-mode (`safe.steward.jradoo.com`)
+
+Independent auth: still uses `API_KEY` bearer token checked inline in `safe/server.js`. Safe-mode intentionally has no DB access and no dependency on the main auth system.
 
 ---
 
@@ -119,7 +140,7 @@ All config lives in `.env` at the monorepo root.
 
 | Variable | Default | Description |
 |---|---|---|
-| `API_KEY` | — | Bearer token; required. Also set in `client/.env.local` as `VITE_API_KEY` |
+| `API_KEY` | — | Bearer token; still accepted as auth fallback during passkey rollout. Remove once all devices have passkeys registered. |
 | `PORT` | `3001` | Main server port |
 | `SAFE_PORT` | `3003` | Safe-mode server port |
 | `DATABASE_PATH` | `server/steward.db` | Optional SQLite path override |
@@ -135,6 +156,22 @@ All config lives in `.env` at the monorepo root.
 `server/steward.db` (SQLite, WAL mode) is the single source of truth. The safe-mode server is stateless and has no DB access.
 
 ```sql
+CREATE TABLE passkey_credentials (
+  id           TEXT PRIMARY KEY,   -- base64url credential ID
+  public_key   BLOB NOT NULL,      -- COSE-encoded public key
+  counter      INTEGER NOT NULL,   -- sign counter (replay protection)
+  transports   TEXT,               -- JSON array: ['internal','usb',…]
+  created_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+  last_used_at INTEGER
+)
+
+CREATE TABLE auth_sessions (
+  id           TEXT PRIMARY KEY,   -- 32-byte random token (base64url), stored in sid cookie
+  created_at   INTEGER NOT NULL DEFAULT (unixepoch()),
+  expires_at   INTEGER NOT NULL,   -- created_at + 30 days
+  last_seen_at INTEGER
+)
+
 CREATE TABLE projects (
   id         TEXT PRIMARY KEY,
   name       TEXT NOT NULL,
@@ -180,4 +217,5 @@ The two-ID session design separates concerns: `id` is a stable client-facing ide
 | Syntax highlight | `highlight.js` | Post-render, targets `pre code` blocks |
 | Dev runner | `tsx watch` | Hot-reload TypeScript without a separate compile step |
 | Reverse proxy | nginx | TLS termination, HTTP→HTTPS redirect, SSE-safe proxy config |
+| Auth | `@simplewebauthn/server` + `@simplewebauthn/browser` | Passkeys (WebAuthn); device-bound; no password |
 | TLS certs | Let's Encrypt (certbot) | Auto-renewing; both domains covered |

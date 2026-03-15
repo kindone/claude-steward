@@ -45,7 +45,8 @@ Built and working:
 - `npm run status` — checks all three ports
 - PM2 daemon mode for both dev (`up:dev`) and prod (`up`); `npm run down/logs/restart`
 - Tailwind CSS v4 — fully mobile-responsive; sidebar drawer on mobile; touch targets fixed
-- nginx reverse proxy on EC2; HTTPS via Let's Encrypt for `steward.jradoo.com` and `safe.steward.jradoo.com`; currently proxying dev mode (`:5173`)
+- nginx reverse proxy on EC2; HTTPS via Let's Encrypt for `steward.jradoo.com` and `safe.steward.jradoo.com`; currently proxying production (`:3001`)
+- Passkeys (WebAuthn) auth — `AuthPage` gates the UI; session cookie issued on successful assertion; API key still accepted as fallback during rollout
 
 See `TODO.md` for what's next. See `archived_tasks.md` for completed work.
 
