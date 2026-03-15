@@ -14,8 +14,4 @@ export default defineConfig({
       exclude: ['src/__tests__/**', 'src/main.tsx'],
     },
   },
-  define: {
-    // Provide VITE_API_KEY at test-time since import.meta.env is Vite-specific
-    'import.meta.env.VITE_API_KEY': JSON.stringify('test-key'),
-  },
 })

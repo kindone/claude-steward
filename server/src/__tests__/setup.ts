@@ -10,7 +10,6 @@ const workerId = process.env.VITEST_WORKER_ID ?? '0'
 const tmpDb = path.join(os.tmpdir(), `steward-test-${workerId}-${Date.now()}.db`)
 
 process.env.DATABASE_PATH = tmpDb
-process.env.API_KEY = 'test-key'
 process.env.NODE_ENV = 'test'
 process.env.CLAUDE_PATH = '/usr/bin/false'   // prevent any accidental real claude spawns
 

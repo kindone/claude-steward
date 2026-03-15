@@ -1,13 +1,6 @@
-const API_KEY = import.meta.env.VITE_API_KEY as string | undefined
+const JSON_HEADERS: HeadersInit = { 'Content-Type': 'application/json' }
 
 // Include credentials (session cookie) in every request.
-// Fall back to Bearer token if VITE_API_KEY is still set (transitional).
-const authHeaders = (): HeadersInit => {
-  const h: HeadersInit = { 'Content-Type': 'application/json' }
-  if (API_KEY) h['Authorization'] = `Bearer ${API_KEY}`
-  return h
-}
-
 const credentialsOpt = { credentials: 'include' } as const
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
@@ -118,7 +111,7 @@ export type Message = {
 // ── Projects ──────────────────────────────────────────────────────────────────
 
 export async function listProjects(): Promise<Project[]> {
-  const res = await fetch('/api/projects', { headers: authHeaders(), ...credentialsOpt })
+  const res = await fetch('/api/projects', { headers: JSON_HEADERS, ...credentialsOpt })
   if (!res.ok) throw new Error('Failed to list projects')
   return res.json() as Promise<Project[]>
 }
@@ -126,7 +119,7 @@ export async function listProjects(): Promise<Project[]> {
 export async function createProject(name: string, path: string): Promise<Project> {
   const res = await fetch('/api/projects', {
     method: 'POST',
-    headers: authHeaders(),
+    headers: JSON_HEADERS,
     body: JSON.stringify({ name, path }),
     ...credentialsOpt,
   })
@@ -146,7 +139,7 @@ export async function fetchMeta(): Promise<{ appRoot: string }> {
 export async function updateProject(projectId: string, patch: { permissionMode?: PermissionMode }): Promise<Project> {
   const res = await fetch(`/api/projects/${projectId}`, {
     method: 'PATCH',
-    headers: authHeaders(),
+    headers: JSON_HEADERS,
     body: JSON.stringify(patch),
     ...credentialsOpt,
   })
@@ -157,7 +150,7 @@ export async function updateProject(projectId: string, patch: { permissionMode?:
 export async function deleteProject(projectId: string): Promise<void> {
   const res = await fetch(`/api/projects/${projectId}`, {
     method: 'DELETE',
-    headers: authHeaders(),
+    headers: JSON_HEADERS,
     ...credentialsOpt,
   })
   if (!res.ok) throw new Error('Failed to delete project')
@@ -165,7 +158,7 @@ export async function deleteProject(projectId: string): Promise<void> {
 
 export async function listFiles(projectId: string, filePath = ''): Promise<FileEntry[]> {
   const url = `/api/projects/${projectId}/files${filePath ? `?path=${encodeURIComponent(filePath)}` : ''}`
-  const res = await fetch(url, { headers: authHeaders(), ...credentialsOpt })
+  const res = await fetch(url, { headers: JSON_HEADERS, ...credentialsOpt })
   if (!res.ok) throw new Error('Failed to list files')
   return res.json() as Promise<FileEntry[]>
 }
@@ -173,7 +166,7 @@ export async function listFiles(projectId: string, filePath = ''): Promise<FileE
 export async function getFileContent(projectId: string, filePath: string): Promise<string> {
   const res = await fetch(
     `/api/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`,
-    { headers: authHeaders(), ...credentialsOpt }
+    { headers: JSON_HEADERS, ...credentialsOpt }
   )
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: 'Unknown error' })) as { error: string }
@@ -188,7 +181,7 @@ export async function getFileContent(projectId: string, filePath: string): Promi
 export async function createSession(projectId: string): Promise<Session> {
   const res = await fetch('/api/sessions', {
     method: 'POST',
-    headers: authHeaders(),
+    headers: JSON_HEADERS,
     body: JSON.stringify({ projectId }),
     ...credentialsOpt,
   })
@@ -198,13 +191,13 @@ export async function createSession(projectId: string): Promise<Session> {
 
 export async function listSessions(projectId?: string | null): Promise<Session[]> {
   const url = projectId ? `/api/sessions?projectId=${projectId}` : '/api/sessions'
-  const res = await fetch(url, { headers: authHeaders(), ...credentialsOpt })
+  const res = await fetch(url, { headers: JSON_HEADERS, ...credentialsOpt })
   if (!res.ok) throw new Error('Failed to list sessions')
   return res.json() as Promise<Session[]>
 }
 
 export async function getMessages(sessionId: string): Promise<Message[]> {
-  const res = await fetch(`/api/sessions/${sessionId}/messages`, { headers: authHeaders(), ...credentialsOpt })
+  const res = await fetch(`/api/sessions/${sessionId}/messages`, { headers: JSON_HEADERS, ...credentialsOpt })
   if (!res.ok) throw new Error('Failed to load messages')
   return res.json() as Promise<Message[]>
 }
@@ -212,7 +205,7 @@ export async function getMessages(sessionId: string): Promise<Message[]> {
 export async function renameSession(sessionId: string, title: string): Promise<Session> {
   const res = await fetch(`/api/sessions/${sessionId}`, {
     method: 'PATCH',
-    headers: authHeaders(),
+    headers: JSON_HEADERS,
     body: JSON.stringify({ title }),
     ...credentialsOpt,
   })
@@ -223,7 +216,7 @@ export async function renameSession(sessionId: string, title: string): Promise<S
 export async function updateSystemPrompt(sessionId: string, systemPrompt: string | null): Promise<Session> {
   const res = await fetch(`/api/sessions/${sessionId}`, {
     method: 'PATCH',
-    headers: authHeaders(),
+    headers: JSON_HEADERS,
     body: JSON.stringify({ systemPrompt }),
     ...credentialsOpt,
   })
@@ -234,7 +227,7 @@ export async function updateSystemPrompt(sessionId: string, systemPrompt: string
 export async function updatePermissionMode(sessionId: string, permissionMode: PermissionMode): Promise<Session> {
   const res = await fetch(`/api/sessions/${sessionId}`, {
     method: 'PATCH',
-    headers: authHeaders(),
+    headers: JSON_HEADERS,
     body: JSON.stringify({ permissionMode }),
     ...credentialsOpt,
   })
@@ -245,7 +238,7 @@ export async function updatePermissionMode(sessionId: string, permissionMode: Pe
 export async function deleteSession(sessionId: string): Promise<void> {
   const res = await fetch(`/api/sessions/${sessionId}`, {
     method: 'DELETE',
-    headers: authHeaders(),
+    headers: JSON_HEADERS,
     ...credentialsOpt,
   })
   if (!res.ok) throw new Error('Failed to delete session')
@@ -266,7 +259,7 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
     controller = new AbortController()
     try {
       const res = await fetch('/api/events', {
-        headers: authHeaders(),
+        headers: JSON_HEADERS,
         signal: controller.signal,
         ...credentialsOpt,
       })
@@ -322,7 +315,7 @@ export function sendMessage(
 
   fetch('/api/chat', {
     method: 'POST',
-    headers: authHeaders(),
+    headers: JSON_HEADERS,
     body: JSON.stringify({ sessionId, message }),
     signal: controller.signal,
     ...credentialsOpt,

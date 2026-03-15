@@ -1,33 +1,31 @@
 import { describe, it, expect } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../app.js'
+import { authSessionQueries } from '../db/index.js'
 
 const app = createApp()
 
+const TEST_TOKEN = 'auth-test-session-token'
+authSessionQueries.create(TEST_TOKEN)
+const authCookie = `sid=${TEST_TOKEN}`
+
 describe('auth middleware', () => {
-  it('rejects requests with no Authorization header', async () => {
+  it('rejects unauthenticated requests', async () => {
     const res = await request(app).get('/api/sessions')
     expect(res.status).toBe(401)
   })
 
-  it('rejects requests with wrong Bearer token', async () => {
+  it('rejects invalid session cookie', async () => {
     const res = await request(app)
       .get('/api/sessions')
-      .set('Authorization', 'Bearer wrong-key')
-    expect(res.status).toBe(403)
-  })
-
-  it('rejects malformed Authorization header', async () => {
-    const res = await request(app)
-      .get('/api/sessions')
-      .set('Authorization', 'test-key')  // missing "Bearer " prefix
+      .set('Cookie', 'sid=invalid-token')
     expect(res.status).toBe(401)
   })
 
-  it('passes through with correct Bearer token', async () => {
+  it('passes through with valid session cookie', async () => {
     const res = await request(app)
       .get('/api/sessions')
-      .set('Authorization', 'Bearer test-key')
+      .set('Cookie', authCookie)
     expect(res.status).toBe(200)
   })
 })
