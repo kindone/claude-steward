@@ -46,7 +46,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 - [x] **Per-environment last-state persistence** — `{ projectId, sessionId }` written to `localStorage` on every selection; restored on app mount (validates IDs still exist before applying); origins are naturally isolated so prod and dev each remember their own context
 
 ### Self-management
-- [ ] **Steward-as-project** — add the steward repo itself as a project in the UI once the projects milestone is done
+- [x] **Steward-as-project** — server auto-seeds a `claude-steward` project pointing at `APP_ROOT` on first run (idempotent); delete is protected; orphaned sessions migrated to it on startup
 
 ### Safe Core
 - [ ] **Extending safe core** — discuss splitting into multiple focused safe-cores: current one stays as the Claude Code emergency interface; a second could expose read-only DB queries (session/project browser); further cores could cover other admin tasks. Consider shared port-allocation convention and a lightweight process registry.
