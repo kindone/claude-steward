@@ -14,9 +14,10 @@ client/src/
 ├── lib/
 │   └── api.ts            ← fetch wrappers, SSE client, type definitions
 └── components/
-    ├── SessionSidebar.tsx ← project switcher + session list + file tree
+    ├── SessionSidebar.tsx ← project switcher + 3-tab bar (Sessions/Files/Term)
     ├── ProjectPicker.tsx  ← dropdown: select/create/delete projects
-    ├── FileTree.tsx       ← collapsible file browser + inline file viewer
+    ├── FileTree.tsx       ← collapsible file browser; openFile() → FileViewer portal
+    ├── TerminalPanel.tsx  ← xterm.js terminal; runs commands via POST /exec SSE
     ├── ChatWindow.tsx     ← message history, streaming deltas, stop button
     ├── MessageBubble.tsx  ← markdown (marked) + syntax highlight (hljs) + error states
     └── MessageInput.tsx   ← textarea, Send / Stop button
@@ -29,16 +30,29 @@ client/src/
 ```
 App
 ├── SessionSidebar
-│   ├── ProjectPicker        (dropdown for project select/create/delete; no "No project" option; delete hidden for protected project)
-│   ├── session list
-│   │   ├── inline rename    (double-click title → input field)
-│   │   ├── inline delete confirmation
-│   │   └── clear-all button (header; 2+ sessions only)
-│   └── FileTree             (shown when a project is active)
-│       └── file viewer      (inline, opens on file click)
+│   ├── ProjectPicker        (dropdown for project select/create/delete; delete hidden for protected project)
+│   ├── tab bar              (Sessions / Files / Term)
+│   │
+│   ├── [Sessions tab]
+│   │   ├── session list
+│   │   │   ├── inline rename    (double-click title → input field)
+│   │   │   ├── inline delete confirmation
+│   │   │   └── clear-all button (header; 2+ sessions only)
+│   │   └── FileTree collapsed   (toggle at bottom; quick reference)
+│   │
+│   ├── [Files tab]
+│   │   └── FileTree alwaysExpanded  (fills sidebar height; lazy directory loading)
+│   │       └── FileViewer portal    (createPortal → document.body; escapes transform containing block)
+│   │           ├── view mode  (hljs syntax + line numbers | marked markdown | <img> for images)
+│   │           └── edit mode  (monospace textarea; Save/Cancel; ● dirty; Cmd+S; conflict banner)
+│   │
+│   └── [Term tab]  ← always mounted (CSS hidden), xterm.js instance persists
+│       └── TerminalPanel    (xterm.js viewport + input bar + history)
+│
 └── ChatWindow  (keyed on sessionId — remounts on session switch)
     ├── session header bar   (always visible: ⚙ Prompt toggle left, Plan/Edit/Full mode selector right)
     │   └── system prompt editor  (collapsible; textarea + Save/Cancel/Clear)
+    ├── "↑ Load older messages" button  (shown when hasMore=true; fetches cursor page)
     ├── MessageBubble[]      (one per message; streaming + error states + copy button)
     │   └── tool history strip   (collapsed by default; ▶ Bash · Read · Edit; click to expand with full command detail)
     ├── streaming indicator  (pulsing dots; assembled calls shown as "Bash: git log …"; active tool shown in blue)
@@ -117,7 +131,9 @@ Two separate signals per tool invocation:
 - `onToolActivity(name)` fires from `stream_event → content_block_start` — name only, fires immediately as the tool input starts streaming; used for the live blue indicator
 - `onToolCall({ name, detail })` fires from `assistant` chunks — fires when the full input is assembled; accumulated into the persistent `toolUses[]` list attached to the message
 
-The same pattern is used in `subscribeToAppEvents()` for the `/api/events` connection, which auto-reconnects after a 3-second backoff on unexpected drops.
+The same pattern is used in `subscribeToAppEvents()` for the `/api/events` connection, which auto-reconnects after a 3-second backoff on unexpected drops, and in `execCommand()` for the terminal exec stream.
+
+**`watchSession()`** is the exception: it uses native `EventSource` (with `withCredentials: true`) because it is a simple GET stream that only needs to receive a single `event: done`. No custom request headers or body are needed, so the simpler built-in API suffices.
 
 ---
 
@@ -168,16 +184,19 @@ All functions accept/return typed objects and throw on non-OK responses.
 | `listProjects()` | `GET /api/projects` |
 | `createProject(name, path)` | `POST /api/projects` |
 | `deleteProject(id)` | `DELETE /api/projects/:id` |
-| `listFiles(projectId, path?)` | Directory listing |
-| `getFileContent(projectId, path)` | File content (string) |
+| `listFiles(projectId, path?)` | Directory listing → `FileEntry[]` |
+| `getFileContent(projectId, path)` | Returns `{ content: string, lastModified: number }` |
+| `patchFile(projectId, path, content, lastModified?, force?)` | Atomic write; throws `FileConflictError` on 409 |
+| `execCommand(projectId, command, handlers)` | Streams exec output; returns cancel fn |
 | `listSessions(projectId?)` | `GET /api/sessions?projectId=` |
 | `createSession(projectId)` | `POST /api/sessions` — `projectId` required |
 | `renameSession(id, title)` | `PATCH /api/sessions/:id` with `{ title }` |
 | `updateSystemPrompt(id, prompt)` | `PATCH /api/sessions/:id` with `{ systemPrompt }` |
 | `updatePermissionMode(id, mode)` | `PATCH /api/sessions/:id` with `{ permissionMode }` |
 | `deleteSession(id)` | `DELETE /api/sessions/:id` |
-| `getMessages(sessionId)` | `GET /api/sessions/:id/messages` |
-| `sendMessage(sessionId, text, handlers)` | Starts chat SSE; returns cancel fn. `ChunkHandler` callbacks: `onTextDelta`, `onTitle`, `onDone`, `onError`, `onToolActivity(name\|null)`, `onToolCall({ name, detail? })`, `onActivity` |
+| `getMessages(sessionId, opts?)` | Paginated: `{ limit?, before? }` → `{ messages, hasMore }` (default limit 50) |
+| `watchSession(sessionId, onDone, onError?)` | `EventSource` on `GET /watch`; returns cancel fn |
+| `sendMessage(sessionId, text, handlers)` | Starts chat SSE; returns cancel fn. See `ChunkHandler` below |
 | `subscribeToAppEvents(handlers)` | Starts events SSE; returns cancel fn |
 
 **Key exported types**
@@ -185,8 +204,12 @@ All functions accept/return typed objects and throw on non-OK responses.
 | Type | Fields |
 |---|---|
 | `ToolCall` | `name: string`, `detail?: string` — one assembled tool invocation |
-| `ChunkHandler` | All SSE callback handlers for `sendMessage` |
+| `ChunkHandler` | All SSE callbacks for `sendMessage`: `onTextDelta`, `onTitle`, `onDone`, `onError`, `onToolActivity`, `onToolCall`, `onActivity` |
 | `ClaudeErrorCode` | `'session_expired' \| 'process_error' \| 'http_error'` |
+| `FileContent` | `{ content: string, lastModified: number }` — returned by `getFileContent` |
+| `FileConflictError` | `Error` subclass; thrown by `patchFile` on 409 Conflict |
+| `MessagesPage` | `{ messages: Message[], hasMore: boolean }` — returned by `getMessages` |
+| `ExecHandlers` | `{ onOutput, onDone, onError? }` — callbacks for `execCommand` |
 
 ---
 

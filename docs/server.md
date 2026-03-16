@@ -17,11 +17,12 @@ server/src/
 ├── db/
 │   └── index.ts      ← schema, migrations, projectQueries/sessionQueries/messageQueries
 ├── lib/
-│   └── connections.ts ← global Set<Response> for app-level SSE fan-out
+│   ├── connections.ts     ← global Set<Response> for app-level SSE fan-out
+│   └── sessionWatchers.ts ← Map<sessionId, Set<Response>> for session completion watch
 └── routes/
     ├── chat.ts        ← POST /api/chat
-    ├── sessions.ts    ← GET/POST/DELETE /api/sessions, GET /:id/messages
-    ├── projects.ts    ← GET/POST/DELETE /api/projects, file listing + content
+    ├── sessions.ts    ← CRUD + GET /:id/messages (paginated) + GET /:id/watch (SSE)
+    ├── projects.ts    ← CRUD + file listing/content/raw/write + POST /:id/exec
     ├── events.ts      ← GET /api/events (app-level SSE)
     └── admin.ts       ← GET /api/admin/version, POST /api/admin/reload
 ```
@@ -40,18 +41,62 @@ The `createApp()` / `listen` split exists so tests can import `createApp()` with
 | `POST` | `/api/sessions` | ✓ | Create session; `projectId` required in body |
 | `PATCH` | `/api/sessions/:id` | ✓ | Update session fields: `{ title?, systemPrompt?, permissionMode? }` |
 | `DELETE` | `/api/sessions/:id` | ✓ | Delete session and its messages |
-| `GET` | `/api/sessions/:id/messages` | ✓ | Full message history |
+| `GET` | `/api/sessions/:id/messages` | ✓ | Paginated message history (see below) |
+| `GET` | `/api/sessions/:id/watch` | ✓ | SSE; fires `event: done` when Claude's response lands in DB (see below) |
 | `GET` | `/api/projects` | ✓ | List projects |
 | `POST` | `/api/projects` | ✓ | Create project (validates path exists and is a directory) |
-| `PATCH` | `/api/projects/:id` | ✓ | Update project fields (legacy `permissionMode`; use session-level instead) |
+| `PATCH` | `/api/projects/:id` | ✓ | Update project fields |
 | `DELETE` | `/api/projects/:id` | ✓ | Delete project; returns 403 if path matches `APP_ROOT` |
-| `GET` | `/api/projects/:id/files` | ✓ | List directory contents; `?path=` subpath |
-| `GET` | `/api/projects/:id/files/content` | ✓ | Return file content (1 MB cap) |
+| `GET` | `/api/projects/:id/files` | ✓ | List directory contents; `?path=` subpath (see [File Browser](file-browser.md)) |
+| `GET` | `/api/projects/:id/files/content` | ✓ | UTF-8 file content + `lastModified` mtime (1 MB cap) |
+| `GET` | `/api/projects/:id/files/raw` | ✓ | Binary file with detected MIME type (images, pdf) |
+| `PATCH` | `/api/projects/:id/files` | ✓ | Atomic file write with optimistic locking |
+| `POST` | `/api/projects/:id/exec` | ✓ | SSE; streams shell command output (see [Terminal](terminal.md)) |
 | `GET` | `/api/events` | ✓ | App-level SSE (reload, future notifications) |
 | `GET` | `/api/admin/version` | ✓ | Package version |
 | `POST` | `/api/admin/reload` | ✓ | Broadcast reload event then `process.exit(0)` |
 
-File routes use `safeResolvePath()` to prevent path traversal; dotfiles are filtered from directory listings.
+File routes use `safeResolvePath()` to prevent path traversal; dotfiles are filtered from directory listings. For file browser and editor details see [File Browser](file-browser.md). For the exec endpoint see [Terminal](terminal.md).
+
+### Message Pagination
+
+`GET /api/sessions/:id/messages` supports cursor-based pagination via query parameters:
+
+| Param | Default | Description |
+|---|---|---|
+| `limit` | (returns all) | Max messages to return; values 1–200 |
+| `before` | — | Message `id`; returns messages older than this cursor |
+
+When `limit` is supplied the response changes from a plain `Message[]` array to:
+
+```json
+{ "messages": [...], "hasMore": true }
+```
+
+The query uses `rowid DESC LIMIT limit+1` (or adds a `rowid < cursor_rowid` clause when `before` is set). The extra +1 row detects whether more pages exist without a separate `COUNT` query. Results are reversed to ascending display order before returning.
+
+Legacy callers that omit both params still receive a plain `Message[]` array.
+
+### Session Watch Endpoint
+
+`GET /api/sessions/:id/watch` is a lightweight SSE connection that parks until the session's Claude response is persisted, then fires `event: done` and closes.
+
+This replaces client-side polling (previously: up to 60 ticks × 2 s = 2-minute cap). The server fires `event: done` the instant `onComplete` writes the assistant message to the DB, regardless of how long Claude takes.
+
+```
+Client navigates to session with pending user message
+  → GET /api/sessions/:id/watch
+  → server checks last message role:
+      assistant → sends event: done immediately, closes
+      user      → registers res in sessionWatchers Map
+                  → sends ": ping" every 30s (nginx keepalive)
+  → chat route onComplete fires
+      → messageQueries.insert(assistantText)
+      → notifyWatchers(sessionId) → sends event: done to all watchers
+  → client receives done, fetches latest messages, clears spinner
+```
+
+Implementation: `server/src/lib/sessionWatchers.ts` holds a `Map<sessionId, Set<Response>>`. `addWatcher` / `removeWatcher` manage the set; `notifyWatchers` sends `event: done` and clears.
 
 ---
 

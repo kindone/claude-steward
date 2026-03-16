@@ -6,6 +6,8 @@ This document covers the overall system structure, how the three programs relate
 |---|---|
 | [Server](server.md) | Express routes, session lifecycle, SSE protocol, Claude subprocess |
 | [Client](client.md) | React components, state, SSE client, Vite config |
+| [File Browser](file-browser.md) | File listing, viewer, editor, optimistic locking, binary/raw endpoint |
+| [Terminal Panel](terminal.md) | Exec endpoint, xterm.js rendering, SSE streaming, node-pty rationale |
 | [Safe-Mode Core](safe.md) | Emergency terminal internals and freeze policy |
 | [Self-Management](self-management.md) | In-app upgrade flow, PM2 process management, nginx dev/prod switching |
 | [Roadmap](roadmap.md) | Planned features |
@@ -24,6 +26,9 @@ claude-steward/               ← npm workspace root
 ├── scripts/
 │   ├── up.js                 ← port conflict check → pm2 start (shared by up and up:dev)
 │   └── status.js             ← npm run status — checks all three ports
+├── config/
+│   └── nginx-dev.steward.conf ← nginx template for dev.steward subdomain (copy to /etc/nginx/sites-available/)
+├── docs/                     ← architecture, server, client, file-browser, terminal, safe, self-management, roadmap
 │
 ├── server/                   ← Node.js 23 + TypeScript (ESM)  → :3001
 ├── client/                   ← Vite 6 + React 19              → :5173 (dev)
@@ -77,13 +82,19 @@ nginx
   │                                                         │
   │  All requests below require: sid cookie (or API_KEY fallback)
   │                                                         │
-  │  GET/POST/DELETE /api/projects        project CRUD      │
-  │  GET/POST/PATCH/DELETE /api/sessions  session CRUD      │
-  │  GET  /api/sessions/:id/messages      history           │
-  │  POST /api/chat                       SSE chat stream   │
-  │  GET  /api/events                     SSE app events    │
-  │  GET  /api/admin/version                               │
-  │  POST /api/admin/reload               → PM2 restart    │
+  │  GET/POST/DELETE /api/projects            project CRUD      │
+  │  GET/POST/PATCH/DELETE /api/sessions      session CRUD      │
+  │  GET  /api/sessions/:id/messages          paginated history │
+  │  GET  /api/sessions/:id/watch             SSE completion ping│
+  │  POST /api/chat                           SSE chat stream   │
+  │  GET  /api/events                         SSE app events    │
+  │  GET  /api/projects/:id/files             directory listing │
+  │  GET  /api/projects/:id/files/content     file content      │
+  │  GET  /api/projects/:id/files/raw         binary file       │
+  │  PATCH /api/projects/:id/files            atomic file write │
+  │  POST /api/projects/:id/exec              SSE exec stream   │
+  │  GET  /api/admin/version                                    │
+  │  POST /api/admin/reload                   → PM2 restart    │
   │       │                                                 │
   │       ▼                                                 │
   │  Main server (:3001)                                    │
@@ -213,8 +224,9 @@ The two-ID session design separates concerns: `id` is a stable client-facing ide
 | AI engine | `claude` CLI subprocess | Full Claude Code capabilities without SDK limitations |
 | Client bundler | Vite 6 | Fast HMR, straightforward proxy config |
 | UI framework | React 19 | Future path to React Native/Capacitor packaging |
-| Markdown | `marked` | Lightweight, synchronous parse |
-| Syntax highlight | `highlight.js` | Post-render, targets `pre code` blocks |
+| Markdown | `marked` | Lightweight, synchronous parse (chat messages + file viewer) |
+| Syntax highlight | `highlight.js` | Post-render; chat messages and file viewer |
+| Terminal rendering | `@xterm/xterm` + `@xterm/addon-fit` | ANSI/VT100 in the browser; no native pty |
 | Dev runner | `tsx watch` | Hot-reload TypeScript without a separate compile step |
 | Reverse proxy | nginx | TLS termination, HTTP→HTTPS redirect, SSE-safe proxy config |
 | Auth | `@simplewebauthn/server` + `@simplewebauthn/browser` | Passkeys (WebAuthn); device-bound; no password |

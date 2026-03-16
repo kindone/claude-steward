@@ -4,9 +4,15 @@ Read this first. For details, see `docs/` — start with `docs/architecture.md`.
 
 ---
 
+## Working Conventions
+
+- **Do not commit autonomously.** Never run `git add + git commit` without the user explicitly asking. Build and lint checks after changes are fine; committing is not.
+- **Update docs and `MEMORY.md` alongside code changes.** When a feature lands, update the relevant `docs/` file and this file in the same working set, before asking the user to commit.
+- **Dedicated doc per significant idea.** Each new subsystem, feature area, or cross-cutting concept gets its own `docs/<name>.md` file when it grows beyond a single section. New doc files must link back to their parent doc (usually `docs/architecture.md` or the relevant program doc) and forward to any child docs.
+
 ## Documentation Rules
 
-- **Keep docs current.** When code changes, update the relevant doc in the same commit. Stale docs are worse than no docs.
+- **Keep docs current.** When code changes, update the relevant doc in the same working set. Stale docs are worse than no docs.
 - **Parent doc owns the interface; child doc owns the internals.** If a subsystem grows large enough for its own file, the parent doc keeps a section describing what it is, how other parts connect to it, and what it exposes. The child doc covers how it works inside. An agent reading only the parent should understand the system well enough to reason about it.
 - **One doc per program or major subsystem.** `docs/server.md`, `docs/client.md`, `docs/safe.md` each cover one deployable unit. New features that have their own lifecycle, config, or deployment concern (scheduler, mini-app platform, MCP) get their own doc when they outgrow a section.
 - **`docs/architecture.md` is the map, not the territory.** It covers only: repo layout, port map, cross-program interfaces, auth boundary, shared config, and the DB schema. No internal implementation details belong there.

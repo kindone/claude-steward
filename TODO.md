@@ -44,7 +44,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 
 ### Dev / Production Workflow
 - [x] **Dual-mode setup** — dev server on `:3002`, prod on `:3001`; `PORT=3002` + `VITE_API_PORT=3002` in `ecosystem.dev.config.cjs`; `scripts/up.js` and `scripts/status.js` updated; both modes can run simultaneously without port conflict
-- [x] **Dev subdomain** — `dev.steward.jradoo.com` → nginx (`:5173`); A record + Let's Encrypt cert via certbot; `docs/nginx-dev.steward.conf` template included
+- [x] **Dev subdomain** — `dev.steward.jradoo.com` → nginx (`:5173`); A record + Let's Encrypt cert via certbot; `config/nginx-dev.steward.conf` template included
 - [x] **Separate dev database** — `DATABASE_PATH` uses `path.join(__dirname, 'server/steward-dev.db')` in dev config and `steward.db` in prod config; isolates dev from production data
 - [ ] **Production deploy workflow** — develop + test on `dev.steward.jradoo.com` → `npm run build` → `POST /api/admin/reload` hot-reloads `steward.jradoo.com`; document and wire up the build step so deploying is a single command
 - [ ] **Environment switcher UI** — floating toggle (authenticated users only) to navigate between `steward.jradoo.com` (prod) and `dev.steward.jradoo.com` (dev); consider long-press on header to avoid accidental switches; works in Capacitor WebView too

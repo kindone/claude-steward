@@ -139,8 +139,8 @@ To run dev and production at the same time (prod at `steward.jradoo.com`, dev at
 
 2. **Install the dev nginx config:**
    ```bash
-   sudo cp docs/nginx-dev.steward.conf /etc/nginx/sites-available/steward-dev
-   # If the repo path differs, use the path to docs/nginx-dev.steward.conf from repo root.
+   sudo cp config/nginx-dev.steward.conf /etc/nginx/sites-available/steward-dev
+   # If the repo path differs, use the path to config/nginx-dev.steward.conf from repo root.
    sudo ln -sf /etc/nginx/sites-available/steward-dev /etc/nginx/sites-enabled/
    ```
 
@@ -156,7 +156,7 @@ To run dev and production at the same time (prod at `steward.jradoo.com`, dev at
 
 5. **Start dev:** `npm run up:dev` (Vite on :5173). Prod can stay on `npm run up` (main on :3001). Then open `https://dev.steward.jradoo.com` for dev and `https://steward.jradoo.com` for prod.
 
-The config file is in the repo at `docs/nginx-dev.steward.conf`; it proxies to `127.0.0.1:5173` and includes WebSocket upgrade for Vite HMR.
+The config file is in the repo at `config/nginx-dev.steward.conf`; it proxies to `127.0.0.1:5173` and includes WebSocket upgrade for Vite HMR.
 
 ### Switching between dev and production
 
