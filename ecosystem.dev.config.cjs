@@ -31,10 +31,8 @@ module.exports = {
         NODE_ENV: 'development',
         PORT: '3002',
         DATABASE_PATH: path.join(__dirname, 'server/steward-dev.db'),
-        APP_DOMAIN: 'steward.jradoo.com',
-        VAPID_PUBLIC_KEY: 'BExVkNt_MaCsC7E5D2WBcSg8JVx9feXilw8Wc6oIzotdXhWRZQrD4DYn4-aqVxUaWTCwACCl7_ZM9UMFJzHG8pk',
-        VAPID_PRIVATE_KEY: 'UqfStAGaENDLzpeSR-nRbgiiQfstEseEntpOQ0TTec0',
-        VAPID_SUBJECT: 'mailto:admin@steward.jradoo.com',
+        APP_DOMAIN: 'steward.example.com',
+        // VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT — loaded from .env by dotenv at startup
       },
     },
     {

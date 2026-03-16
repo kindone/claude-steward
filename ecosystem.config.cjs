@@ -29,7 +29,8 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         DATABASE_PATH: path.join(__dirname, 'server/steward.db'),
-        APP_DOMAIN: 'steward.jradoo.com',
+        APP_DOMAIN: 'steward.example.com',
+        // VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT — loaded from .env by dotenv at startup
       },
     },
     {
