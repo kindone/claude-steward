@@ -3,12 +3,14 @@ import { listFiles, getFileContent, type FileEntry } from '../lib/api'
 
 type Props = {
   projectId: string
+  /** When true the tree is always shown without a toggle button and fills available height. */
+  alwaysExpanded?: boolean
 }
 
 type ViewerState = { path: string; content: string } | null
 
-export function FileTree({ projectId }: Props) {
-  const [expanded, setExpanded] = useState(false)
+export function FileTree({ projectId, alwaysExpanded = false }: Props) {
+  const [expanded, setExpanded] = useState(alwaysExpanded)
   const [tree, setTree] = useState<Map<string, FileEntry[]>>(new Map())
   const [openDirs, setOpenDirs] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
@@ -82,25 +84,38 @@ export function FileTree({ projectId }: Props) {
 
   return (
     <>
-      <div className="border-t border-[#1f1f1f] flex-shrink-0">
-        <button
-          className="w-full flex items-center gap-1.5 px-3 py-2 bg-transparent border-none text-[#555] hover:text-[#888] text-[11px] font-semibold tracking-widest uppercase cursor-pointer text-left transition-colors"
-          onClick={() => setExpanded((e) => !e)}
-        >
-          <span>{expanded ? '▾' : '▸'}</span>
-          <span>Files</span>
-          {loading && <span className="text-[#444] text-[11px]">…</span>}
-        </button>
-
-        {expanded && (
-          <div className="max-h-[200px] overflow-y-auto px-1.5 pb-1.5">
-            {tree.has('') && tree.get('')!.length === 0 && (
-              <p className="text-xs text-[#444] px-2.5 py-1.5 italic">Empty directory</p>
-            )}
-            {tree.has('') && renderEntries(tree.get('')!, 0)}
-          </div>
-        )}
-      </div>
+      {alwaysExpanded ? (
+        /* Full-height mode used when embedded in the Files tab */
+        <div className="flex-1 overflow-y-auto px-1.5 py-1.5 min-h-0">
+          {loading && !tree.has('') && (
+            <p className="text-xs text-[#444] px-2.5 py-1.5">Loading…</p>
+          )}
+          {tree.has('') && tree.get('')!.length === 0 && (
+            <p className="text-xs text-[#444] px-2.5 py-1.5 italic">Empty directory</p>
+          )}
+          {tree.has('') && renderEntries(tree.get('')!, 0)}
+        </div>
+      ) : (
+        /* Collapsed-by-default mode used at the bottom of the Sessions tab */
+        <div className="border-t border-[#1f1f1f] flex-shrink-0">
+          <button
+            className="w-full flex items-center gap-1.5 px-3 py-2 bg-transparent border-none text-[#555] hover:text-[#888] text-[11px] font-semibold tracking-widest uppercase cursor-pointer text-left transition-colors"
+            onClick={() => setExpanded((e) => !e)}
+          >
+            <span>{expanded ? '▾' : '▸'}</span>
+            <span>Files</span>
+            {loading && <span className="text-[#444] text-[11px]">…</span>}
+          </button>
+          {expanded && (
+            <div className="max-h-[200px] overflow-y-auto px-1.5 pb-1.5">
+              {tree.has('') && tree.get('')!.length === 0 && (
+                <p className="text-xs text-[#444] px-2.5 py-1.5 italic">Empty directory</p>
+              )}
+              {tree.has('') && renderEntries(tree.get('')!, 0)}
+            </div>
+          )}
+        </div>
+      )}
 
       {viewer && (
         <div
