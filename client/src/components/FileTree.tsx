@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { listFiles, getFileContent, type FileEntry } from '../lib/api'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
@@ -327,8 +328,9 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
         </div>
       )}
 
-      {viewer && (
-        <FileViewer viewer={viewer} projectId={projectId} onClose={closeViewer} />
+      {viewer && createPortal(
+        <FileViewer viewer={viewer} projectId={projectId} onClose={closeViewer} />,
+        document.body
       )}
     </>
   )
