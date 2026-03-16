@@ -13,6 +13,9 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 - [ ] **Project templates** — starters for `docs` (MkDocs-style), `notebook` (live code cells + output), `webapp` (Vite + React + Leaflet for travel-type apps)
 - [ ] **Claude as app maker** — scaffold new mini-apps via chat, modify files, trigger live-reload via sidecar manager
 
+### Performance
+- [ ] **Message pagination** — `GET /api/sessions/:id/messages` currently returns the full history in one shot; for long sessions this bloats the initial load; add `?limit=N&before=<messageId>` cursor pagination on the server; client loads the most recent N messages on mount and shows a "Load older messages" button at the top that fetches the previous page
+
 ### Core UX
 - [x] **Session reordering** — move active session to top on new message
 - [x] **Edit session title** — inline rename (double-click); `PATCH /api/sessions/:id`
