@@ -20,9 +20,9 @@ const DIM    = '\x1b[2m'
 
 const PORTS = {
   dev: [
-    { port: 3001, name: 'main server'    },
+    { port: 3002, name: 'dev server'      },
     { port: 3003, name: 'safe-mode core' },
-    { port: 5173, name: 'client (dev)'   },
+    { port: 5173, name: 'client (Vite)'  },
   ],
   prod: [
     { port: 3001, name: 'main server'    },

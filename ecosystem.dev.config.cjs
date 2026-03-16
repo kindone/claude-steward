@@ -17,6 +17,8 @@
  * FROZEN — do not modify the steward-safe entry or the safe/ directory.
  */
 
+const path = require('path')
+
 module.exports = {
   apps: [
     {
@@ -27,6 +29,9 @@ module.exports = {
       watch: false,
       env: {
         NODE_ENV: 'development',
+        PORT: '3002',
+        DATABASE_PATH: path.join(__dirname, 'server/steward-dev.db'),
+        APP_DOMAIN: 'steward.jradoo.com',
       },
     },
     {
@@ -35,6 +40,9 @@ module.exports = {
       args: 'run dev --workspace=client',
       autorestart: true,
       watch: false,
+      env: {
+        VITE_API_PORT: '3002',
+      },
     },
     {
       // FROZEN — do not modify this process config or the safe/ directory.

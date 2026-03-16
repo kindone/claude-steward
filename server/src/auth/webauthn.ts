@@ -22,7 +22,7 @@ export function getWebAuthnConfig() {
 
   const expectedOrigins = isLocalhost
     ? ['http://localhost:5173', 'http://localhost:3001', 'http://localhost:3002']
-    : [`https://${domain}`]
+    : [`https://${domain}`, `https://dev.${domain}`]
 
   return { rpID, rpName: 'Claude Steward', expectedOrigins }
 }

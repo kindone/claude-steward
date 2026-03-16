@@ -15,6 +15,8 @@
  *      as part of the upgrade cycle
  */
 
+const path = require('path')
+
 module.exports = {
   apps: [
     {
@@ -26,6 +28,8 @@ module.exports = {
       watch: false,
       env: {
         NODE_ENV: 'production',
+        DATABASE_PATH: path.join(__dirname, 'server/steward.db'),
+        APP_DOMAIN: 'steward.jradoo.com',
       },
     },
     {

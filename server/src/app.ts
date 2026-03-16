@@ -23,8 +23,11 @@ export function createApp() {
   app.use(cookieParser())
 
   if (NODE_ENV === 'development') {
-    const allowedOrigins = ['http://localhost:5173']
-    if (process.env.APP_DOMAIN) allowedOrigins.push(`https://${process.env.APP_DOMAIN}`)
+    const allowedOrigins = ['http://localhost:5173', 'http://localhost:3001', 'http://localhost:3002']
+    if (process.env.APP_DOMAIN) {
+      allowedOrigins.push(`https://${process.env.APP_DOMAIN}`)
+      allowedOrigins.push(`https://dev.${process.env.APP_DOMAIN}`)
+    }
     app.use(cors({ origin: allowedOrigins, credentials: true }))
   }
 

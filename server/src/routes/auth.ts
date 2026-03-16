@@ -23,26 +23,27 @@ router.get('/status', (req, res) => {
 // ── Registration ──────────────────────────────────────────────────────────────
 
 router.post('/register/start', async (req, res) => {
-  const { rpID, rpName } = getWebAuthnConfig()
-  const existing = credentialQueries.list()
+  try {
+    const { rpID, rpName } = getWebAuthnConfig()
+    const existing = credentialQueries.list()
 
-  // If credentials already exist, only allow registration from an authenticated session.
-  if (existing.length > 0) {
-    const token = getValidSessionToken(req.cookies ?? {})
-    if (!token) {
-      res.status(401).json({ error: 'Already registered — authenticate first to add another device' })
-      return
+    // If credentials already exist, only allow registration from an authenticated session.
+    if (existing.length > 0) {
+      const token = getValidSessionToken(req.cookies ?? {})
+      if (!token) {
+        res.status(401).json({ error: 'Already registered — authenticate first to add another device' })
+        return
+      }
     }
-  }
 
-  const excludeCredentials = existing.map((c) => ({
-    id: c.id,
-    transports: c.transports
-      ? (JSON.parse(c.transports) as AuthenticatorTransportFuture[])
-      : undefined,
-  }))
+    const excludeCredentials = existing.map((c) => ({
+      id: c.id,
+      transports: c.transports
+        ? (JSON.parse(c.transports) as AuthenticatorTransportFuture[])
+        : undefined,
+    }))
 
-  const options = await generateRegistrationOptions({
+    const options = await generateRegistrationOptions({
     rpName,
     rpID,
     userName: 'owner',
@@ -55,8 +56,14 @@ router.post('/register/start', async (req, res) => {
     },
   })
 
-  storeChallenge('registration', options.challenge)
-  res.json(options)
+    storeChallenge('registration', options.challenge)
+    res.json(options)
+  } catch (err) {
+    console.error('[auth] register/start error:', err)
+    res.status(500).json({
+      error: err instanceof Error ? err.message : 'Failed to start registration',
+    })
+  }
 })
 
 router.post('/register/finish', async (req, res) => {

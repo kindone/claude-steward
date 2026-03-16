@@ -12,7 +12,7 @@
     "start": "npm run start --workspace=server",
     "up": "node scripts/up.js prod",
     "up:dev": "node scripts/up.js dev",
-    "down": "pm2 delete steward-main steward-server steward-client steward-safe 2>/dev/null || true",
+    "down": "pm2 delete steward-main 2>/dev/null; pm2 delete steward-server 2>/dev/null; pm2 delete steward-client 2>/dev/null; pm2 delete steward-safe 2>/dev/null; true",
     "logs": "pm2 logs",
     "restart": "pm2 restart all",
     "test": "npm test --workspace=server && npm test --workspace=client",

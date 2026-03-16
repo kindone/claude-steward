@@ -1,11 +1,22 @@
 import { DatabaseSync } from 'node:sqlite'
 import path from 'node:path'
+import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 
 const DB_PATH = process.env.DATABASE_PATH ?? path.join(
   path.dirname(fileURLToPath(import.meta.url)),
   '../../steward.db'   // server/src/db/ → server/steward.db
 )
+
+// Ensure the parent directory exists before opening. Gives a clear error
+// instead of a cryptic ERR_SQLITE_ERROR when DATABASE_PATH points somewhere invalid.
+const DB_DIR = path.dirname(DB_PATH)
+if (!fs.existsSync(DB_DIR)) {
+  console.error(`[db] ERROR: database directory does not exist: ${DB_DIR}`)
+  console.error(`[db]   DATABASE_PATH=${DB_PATH}`)
+  console.error(`[db]   Fix: create the directory, or correct DATABASE_PATH in your ecosystem config / .env`)
+  process.exit(1)
+}
 
 const db = new DatabaseSync(DB_PATH)
 
