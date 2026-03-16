@@ -62,6 +62,16 @@ npm run restart   # pm2 restart all
 npm run status    # check which ports are up
 ```
 
+**Applying ecosystem config changes** — PM2 caches process env in its internal store; `pm2 restart` reads from that cache, not from the ecosystem file. When you edit an ecosystem file (e.g. changing `DATABASE_PATH`, `PORT`, `APP_DOMAIN`), do a full cycle to force PM2 to re-read it:
+
+```bash
+npm run down
+pm2 cleardump    # wipes ~/.pm2/dump.pm2 so old env doesn't survive the restart
+npm run up       # or npm run up:dev
+```
+
+A plain `npm run down && npm run up` is usually sufficient. Only add `pm2 cleardump` if the old env is still showing up in `pm2 env <id>` after the restart.
+
 `npm run up` and `npm run up:dev` run `scripts/up.js` first, which checks each required port before handing off to PM2. If any port is already in use it prints the conflict and exits cleanly:
 
 ```
@@ -115,10 +125,38 @@ nginx sits in front of both domains and handles TLS termination. Configs live in
 
 | Domain | nginx config | Upstream |
 |---|---|---|
-| `steward.jradoo.com` | `steward` | `:5173` (dev) or `:3001` (prod) |
+| `steward.jradoo.com` | `steward` | `:3001` (prod) or `:5173` (dev if not using dev subdomain) |
+| `dev.steward.jradoo.com` | `steward-dev` | `:5173` (Vite dev server; optional, for dual-mode) |
 | `safe.steward.jradoo.com` | `steward-safe` | `:3003` (always) |
 
-Both domains have Let's Encrypt certs (auto-renewing via certbot systemd timer).
+Both main and safe domains have Let's Encrypt certs (auto-renewing via certbot systemd timer).
+
+### Enabling the dev subdomain (optional)
+
+To run dev and production at the same time (prod at `steward.jradoo.com`, dev at `dev.steward.jradoo.com`):
+
+1. **DNS:** Add an A record for `dev.steward.jradoo.com` pointing at your server IP.
+
+2. **Install the dev nginx config:**
+   ```bash
+   sudo cp docs/nginx-dev.steward.conf /etc/nginx/sites-available/steward-dev
+   # If the repo path differs, use the path to docs/nginx-dev.steward.conf from repo root.
+   sudo ln -sf /etc/nginx/sites-available/steward-dev /etc/nginx/sites-enabled/
+   ```
+
+3. **Get a TLS cert:**
+   ```bash
+   sudo certbot --nginx -d dev.steward.jradoo.com
+   ```
+
+4. **Reload nginx:**
+   ```bash
+   sudo nginx -t && sudo systemctl reload nginx
+   ```
+
+5. **Start dev:** `npm run up:dev` (Vite on :5173). Prod can stay on `npm run up` (main on :3001). Then open `https://dev.steward.jradoo.com` for dev and `https://steward.jradoo.com` for prod.
+
+The config file is in the repo at `docs/nginx-dev.steward.conf`; it proxies to `127.0.0.1:5173` and includes WebSocket upgrade for Vite HMR.
 
 ### Switching between dev and production
 
