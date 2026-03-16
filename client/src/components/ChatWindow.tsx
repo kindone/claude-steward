@@ -132,6 +132,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
     const assistantMsgId = generateId()
 
     streamingFromSendRef.current = true
+    setStreamingTool(null)
     setMessages((prev) => [
       ...prev,
       { id: userMsgId, role: 'user', content: text, streaming: false },
@@ -281,6 +282,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
           setMessages((prev) =>
             prev.map((m) => (m.streaming ? { ...m, streaming: false } : m))
           )
+          setStreamingTool(null)
           setStreaming(false)
         }}
         disabled={streaming}
