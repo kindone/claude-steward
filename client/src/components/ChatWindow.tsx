@@ -15,6 +15,8 @@ type Message = {
   content: string
   streaming: boolean
   errorCode?: ClaudeErrorCode
+  /** Tool names used while generating this message, in order of first appearance. */
+  toolUses?: string[]
 }
 
 type Props = {
@@ -37,6 +39,10 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   const cancelRef = useRef<(() => void) | null>(null)
   /** True while we have an active sendMessage() — poll must not overwrite the optimistic assistant bubble. */
   const streamingFromSendRef = useRef(false)
+  /** Accumulates unique tool names fired during the current send, in order of first appearance. */
+  const toolUsesRef = useRef<string[]>([])
+  /** Live copy of toolUsesRef for rendering the streaming indicator. */
+  const [streamingToolUses, setStreamingToolUses] = useState<string[]>([])
 
   // Sync draft when switching sessions
   useEffect(() => {
@@ -132,7 +138,9 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
     const assistantMsgId = generateId()
 
     streamingFromSendRef.current = true
+    toolUsesRef.current = []
     setStreamingTool(null)
+    setStreamingToolUses([])
     setMessages((prev) => [
       ...prev,
       { id: userMsgId, role: 'user', content: text, streaming: false },
@@ -150,13 +158,21 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
           )
         )
       },
-      onToolActivity: (toolName) => setStreamingTool(toolName),
+      onToolActivity: (toolName) => {
+        setStreamingTool(toolName)
+        if (toolName && !toolUsesRef.current.includes(toolName)) {
+          toolUsesRef.current = [...toolUsesRef.current, toolName]
+          setStreamingToolUses([...toolUsesRef.current])
+        }
+      },
       onDone: () => {
         streamingFromSendRef.current = false
         setStreamingTool(null)
+        const capturedToolUses = toolUsesRef.current.length > 0 ? [...toolUsesRef.current] : undefined
+        setStreamingToolUses([])
         setMessages((prev) =>
           prev.map((m) =>
-            m.id === assistantMsgId ? { ...m, streaming: false } : m
+            m.id === assistantMsgId ? { ...m, streaming: false, toolUses: capturedToolUses } : m
           )
         )
         setStreaming(false)
@@ -164,6 +180,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       onError: (errorMsg, code) => {
         streamingFromSendRef.current = false
         setStreamingTool(null)
+        setStreamingToolUses([])
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId
@@ -259,16 +276,25 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
             content={m.content}
             streaming={m.streaming}
             errorCode={m.errorCode}
+            toolUses={m.toolUses}
           />
         ))}
         {streaming && (
-          <div className="flex items-center gap-1 px-3 py-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse" />
-            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse tool-pulse-2" />
-            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse tool-pulse-3" />
-            {streamingTool && (
-              <span className="ml-1.5 text-xs text-[#888] italic">{streamingTool}</span>
-            )}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 flex-wrap">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse flex-shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse tool-pulse-2 flex-shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse tool-pulse-3 flex-shrink-0" />
+            {streamingToolUses.map((name, i) => (
+              <span
+                key={i}
+                className={`text-xs px-1.5 py-0.5 rounded border transition-colors
+                  ${name === streamingTool
+                    ? 'text-blue-400 border-blue-500/40 bg-blue-500/10'
+                    : 'text-[#666] border-[#2a2a2a]'}`}
+              >
+                {name}
+              </span>
+            ))}
           </div>
         )}
         <div ref={bottomRef} />
@@ -283,6 +309,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
             prev.map((m) => (m.streaming ? { ...m, streaming: false } : m))
           )
           setStreamingTool(null)
+          setStreamingToolUses([])
           setStreaming(false)
         }}
         disabled={streaming}

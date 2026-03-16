@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
@@ -13,11 +13,14 @@ type Props = {
   content: string
   streaming?: boolean
   errorCode?: ClaudeErrorCode
+  toolUses?: string[]
 }
 
-export function MessageBubble({ role, content, streaming = false, errorCode }: Props) {
+export function MessageBubble({ role, content, streaming = false, errorCode, toolUses }: Props) {
   const contentRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const toggleTools = useCallback(() => setToolsOpen((o) => !o), [])
 
   useEffect(() => {
     if (contentRef.current && role === 'assistant' && !errorCode) {
@@ -56,26 +59,51 @@ export function MessageBubble({ role, content, streaming = false, errorCode }: P
           {content}
         </p>
       ) : (
-        <div className="group relative w-full">
-          <div
-            ref={contentRef}
-            className={`prose text-sm leading-[1.65] break-words w-full${streaming ? ' streaming-cursor' : ''}`}
-            dangerouslySetInnerHTML={{ __html: marked.parse(content) as string }}
-          />
-          {!streaming && content && (
-            <button
-              className={`absolute top-1 right-1 bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]
-                rounded cursor-pointer text-[13px] leading-none px-1.5 py-0.5 transition-[opacity,color,border-color]
-                opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100
-                hover:text-[#ccc] hover:border-[#444]
-                ${copied ? '!text-green-400 !border-green-400/30 !opacity-100' : ''}`}
-              onClick={handleCopy}
-              title="Copy message"
-            >
-              {copied ? '✓' : '⎘'}
-            </button>
+        <>
+          <div className="group relative w-full">
+            <div
+              ref={contentRef}
+              className={`prose text-sm leading-[1.65] break-words w-full${streaming ? ' streaming-cursor' : ''}`}
+              dangerouslySetInnerHTML={{ __html: marked.parse(content) as string }}
+            />
+            {!streaming && content && (
+              <button
+                className={`absolute top-1 right-1 bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]
+                  rounded cursor-pointer text-[13px] leading-none px-1.5 py-0.5 transition-[opacity,color,border-color]
+                  opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100
+                  hover:text-[#ccc] hover:border-[#444]
+                  ${copied ? '!text-green-400 !border-green-400/30 !opacity-100' : ''}`}
+                onClick={handleCopy}
+                title="Copy message"
+              >
+                {copied ? '✓' : '⎘'}
+              </button>
+            )}
+          </div>
+          {!streaming && toolUses && toolUses.length > 0 && (
+            <div className="mt-1.5 w-full">
+              <button
+                onClick={toggleTools}
+                className="flex items-center gap-1.5 text-[11px] text-[#555] hover:text-[#888] transition-colors cursor-pointer bg-transparent border-none p-0"
+              >
+                <span className={`inline-block transition-transform duration-150 ${toolsOpen ? 'rotate-90' : ''}`}>▶</span>
+                <span>{toolUses.join(' · ')}</span>
+              </button>
+              {toolsOpen && (
+                <div className="mt-1.5 flex flex-wrap gap-1.5 pl-3.5">
+                  {toolUses.map((name, i) => (
+                    <span
+                      key={i}
+                      className="text-[11px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#666]"
+                    >
+                      {name}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
-        </div>
+        </>
       )}
     </div>
   )
