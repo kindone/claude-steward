@@ -196,10 +196,17 @@ export async function listSessions(projectId?: string | null): Promise<Session[]
   return res.json() as Promise<Session[]>
 }
 
-export async function getMessages(sessionId: string): Promise<Message[]> {
-  const res = await fetch(`/api/sessions/${sessionId}/messages`, { headers: JSON_HEADERS, ...credentialsOpt })
+export type MessagesPage = { messages: Message[]; hasMore: boolean }
+
+export async function getMessages(
+  sessionId: string,
+  opts: { limit?: number; before?: string } = {}
+): Promise<MessagesPage> {
+  const params = new URLSearchParams({ limit: String(opts.limit ?? 50) })
+  if (opts.before) params.set('before', opts.before)
+  const res = await fetch(`/api/sessions/${sessionId}/messages?${params}`, { headers: JSON_HEADERS, ...credentialsOpt })
   if (!res.ok) throw new Error('Failed to load messages')
-  return res.json() as Promise<Message[]>
+  return res.json() as Promise<MessagesPage>
 }
 
 export async function renameSession(sessionId: string, title: string): Promise<Session> {

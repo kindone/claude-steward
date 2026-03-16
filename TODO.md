@@ -14,7 +14,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 - [ ] **Claude as app maker** — scaffold new mini-apps via chat, modify files, trigger live-reload via sidecar manager
 
 ### Performance
-- [ ] **Message pagination** — `GET /api/sessions/:id/messages` currently returns the full history in one shot; for long sessions this bloats the initial load; add `?limit=N&before=<messageId>` cursor pagination on the server; client loads the most recent N messages on mount and shows a "Load older messages" button at the top that fetches the previous page
+- [x] **Message pagination** — `GET /api/sessions/:id/messages?limit=N&before=<messageId>` rowid-cursor pagination; default 50 messages; `{ messages, hasMore }` response; `loadOlder()` in `ChatWindow` prepends older pages; "↑ Load older messages" button at top; legacy no-params path kept for tests
 
 ### Core UX
 - [x] **Session reordering** — move active session to top on new message

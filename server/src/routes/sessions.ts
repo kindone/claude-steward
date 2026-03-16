@@ -31,6 +31,19 @@ router.get('/:id/messages', (req, res) => {
     res.status(404).json({ error: 'Session not found' })
     return
   }
+
+  const { limit: limitStr, before } = req.query as { limit?: string; before?: string }
+
+  // Paginated path: ?limit=N (and optionally ?before=<messageId>)
+  if (limitStr !== undefined) {
+    const limit = Math.max(1, Math.min(parseInt(limitStr, 10) || 50, 200))
+    const rows = messageQueries.listPaged(req.params.id, limit + 1, before)
+    const hasMore = rows.length > limit
+    res.json({ messages: hasMore ? rows.slice(1) : rows, hasMore })
+    return
+  }
+
+  // Legacy path (no params): return full array — used internally and by tests
   res.json(messageQueries.listBySessionId(req.params.id))
 })
 

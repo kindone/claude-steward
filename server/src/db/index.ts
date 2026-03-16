@@ -207,6 +207,17 @@ const insertMessageStmt = db.prepare(
 const listMessagesBySessionStmt = db.prepare(
   `SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC`
 )
+// Fetch the N most recent messages (newest-first); caller should reverse for display.
+const listPagedDescStmt = db.prepare(
+  `SELECT * FROM messages WHERE session_id = ? ORDER BY rowid DESC LIMIT ?`
+)
+// Fetch N messages older than the message with the given id (newest-first within that slice).
+const listBeforeDescStmt = db.prepare(
+  `SELECT m.* FROM messages m
+   WHERE m.session_id = ?
+     AND m.rowid < (SELECT rowid FROM messages WHERE id = ?)
+   ORDER BY m.rowid DESC LIMIT ?`
+)
 const deleteMessagesBySessionStmt = db.prepare(
   `DELETE FROM messages WHERE session_id = ?`
 )
@@ -216,6 +227,17 @@ export const messageQueries = {
     insertMessageStmt.run(id, sessionId, role, content),
   listBySessionId: (sessionId: string) =>
     listMessagesBySessionStmt.all(sessionId) as Message[],
+  /**
+   * Returns up to `limit` messages in ascending (display) order.
+   * If `beforeId` is given, only messages older than that message are returned.
+   * The extra +1 fetch trick: pass `limit + 1` to detect whether more pages exist.
+   */
+  listPaged: (sessionId: string, limit: number, beforeId?: string): Message[] => {
+    const rows = beforeId
+      ? (listBeforeDescStmt.all(sessionId, beforeId, limit) as Message[])
+      : (listPagedDescStmt.all(sessionId, limit) as Message[])
+    return rows.reverse()
+  },
   deleteBySessionId: (sessionId: string) =>
     deleteMessagesBySessionStmt.run(sessionId),
 }

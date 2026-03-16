@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { sendMessage, getMessages, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode, type ToolCall } from '../lib/api'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
@@ -31,6 +31,8 @@ type Props = {
 
 export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [streamingTool, setStreamingTool] = useState<string | null>(null)
   const [promptOpen, setPromptOpen] = useState(false)
@@ -88,10 +90,11 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       }
       pollCount++
       try {
-        const loaded = await getMessages(sessionId)
+        const page = await getMessages(sessionId)
         if (cancelled) return
-        if (loaded[loaded.length - 1]?.role === 'assistant') {
-          setMessages(loaded.map((m) => ({ ...m, streaming: false })))
+        if (page.messages[page.messages.length - 1]?.role === 'assistant') {
+          setMessages(page.messages.map((m) => ({ ...m, streaming: false })))
+          setHasMore(page.hasMore)
           setStreaming(false)
           return
         }
@@ -100,19 +103,21 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
           pollTimer = setTimeout(pollForResponse, 2000)
           return
         }
-        setMessages(loaded.map((m) => ({ ...m, streaming: false })))
+        setMessages(page.messages.map((m) => ({ ...m, streaming: false })))
+        setHasMore(page.hasMore)
         pollTimer = setTimeout(pollForResponse, 2000)
       } catch {
         setStreaming(false)
       }
     }
 
-    getMessages(sessionId).then((loaded) => {
+    getMessages(sessionId).then((page) => {
       if (cancelled) return
-      setMessages(loaded.map((m) => ({ ...m, streaming: false })))
+      setMessages(page.messages.map((m) => ({ ...m, streaming: false })))
+      setHasMore(page.hasMore)
       // If last message is a user message with no response yet, Claude may still be processing.
       // Show streaming indicator and poll until the assistant message lands in the DB.
-      if (loaded.length > 0 && loaded[loaded.length - 1].role === 'user') {
+      if (page.messages.length > 0 && page.messages[page.messages.length - 1].role === 'user') {
         setStreaming(true)
         pollTimer = setTimeout(pollForResponse, 2000)
       }
@@ -124,6 +129,21 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       clearPoll()
     }
   }, [sessionId])
+
+  const loadOlder = useCallback(async () => {
+    if (loadingOlder || !hasMore || messages.length === 0) return
+    const oldestId = messages[0].id
+    setLoadingOlder(true)
+    try {
+      const page = await getMessages(sessionId, { before: oldestId })
+      setMessages((prev) => [...page.messages.map((m) => ({ ...m, streaming: false })), ...prev])
+      setHasMore(page.hasMore)
+    } catch (err) {
+      console.error('Failed to load older messages', err)
+    } finally {
+      setLoadingOlder(false)
+    }
+  }, [sessionId, hasMore, loadingOlder, messages])
 
   function generateId(): string {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
@@ -264,7 +284,18 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-6 md:px-6 md:py-8 flex flex-col gap-5">
-        {messages.length === 0 && (
+        {hasMore && (
+          <div className="flex justify-center flex-shrink-0">
+            <button
+              onClick={loadOlder}
+              disabled={loadingOlder}
+              className="text-xs text-[#555] hover:text-[#888] border border-[#2a2a2a] hover:border-[#444] rounded-full px-3 py-1.5 bg-transparent cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-default"
+            >
+              {loadingOlder ? 'Loading…' : '↑ Load older messages'}
+            </button>
+          </div>
+        )}
+        {messages.length === 0 && !hasMore && (
           <div className="flex items-center justify-center flex-1 text-[#444] text-sm">
             <p>Start a conversation with Claude.</p>
           </div>
