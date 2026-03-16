@@ -35,6 +35,8 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 
 ### Workspace / Files
 - [x] **System prompt per session** — optional text injected before every message; stored in `sessions` table; UI to set it (⚙ Prompt toggle in chat header)
+- [x] **Enhanced file viewer** — `min(92vw, 1200px)` × `min(88dvh, 900px)` modal; syntax highlighting via `hljs` with language badge and line-number gutter; Markdown rendering via `marked`; image preview (`png/jpg/gif/svg/webp/avif`) via new `GET /api/projects/:id/files/raw` binary endpoint; copy-to-clipboard button; Escape key to close; file-type badge in header
+- [ ] **File editor** — inline editing for text/code/markdown files: textarea or CodeMirror-based editor, `PATCH /api/projects/:id/files` endpoint that writes atomically (write to `.tmp` then `rename`); **concurrent-edit safety**: include the file's last-modified timestamp (or a content hash) in the save request; server rejects the write with `409 Conflict` if the file changed since the client last fetched it; UI shows a diff/merge prompt so the user can decide whether to overwrite or discard their changes
 - [ ] **MCP support** — pass `--mcp-config <path>` to spawn args; `mcp_configs` table per project; UI to manage JSON configs
 
 ### Integrations

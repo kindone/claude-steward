@@ -154,6 +154,55 @@ router.get('/:id/files/content', (req, res) => {
   res.json({ content, path: relPath })
 })
 
+// GET /api/projects/:id/files/raw?path=relative/image.png
+// Serves the raw file bytes with the detected MIME type — used for image preview.
+router.get('/:id/files/raw', (req, res) => {
+  const project = projectQueries.findById(req.params.id)
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' })
+    return
+  }
+
+  const relPath = (req.query.path as string | undefined) ?? ''
+  if (!relPath) {
+    res.status(400).json({ error: 'path is required' })
+    return
+  }
+
+  const safePath = safeResolvePath(project.path, relPath)
+  if (!safePath) {
+    res.status(400).json({ error: 'Invalid path' })
+    return
+  }
+
+  const MIME: Record<string, string> = {
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp',
+    ico: 'image/x-icon', bmp: 'image/bmp', avif: 'image/avif',
+    pdf: 'application/pdf',
+  }
+  const fileExt = relPath.split('.').pop()?.toLowerCase() ?? ''
+  const mime = MIME[fileExt] ?? 'application/octet-stream'
+
+  try {
+    const stat = fs.statSync(safePath)
+    if (stat.isDirectory()) {
+      res.status(400).json({ error: 'Path is a directory' })
+      return
+    }
+    if (stat.size > 10_000_000) {
+      res.status(413).json({ error: 'File too large' })
+      return
+    }
+    const buf = fs.readFileSync(safePath)
+    res.setHeader('Content-Type', mime)
+    res.setHeader('Cache-Control', 'private, max-age=60')
+    res.send(buf)
+  } catch {
+    res.status(404).json({ error: 'File not found' })
+  }
+})
+
 /** Resolve a user-supplied relative path against the project root, preventing traversal. */
 function safeResolvePath(root: string, rel: string): string | null {
   const resolved = path.resolve(root, rel)
