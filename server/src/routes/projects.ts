@@ -134,6 +134,7 @@ router.get('/:id/files/content', (req, res) => {
   }
 
   let content: string
+  let lastModified: number
   try {
     const stat = fs.statSync(safePath)
     if (stat.isDirectory()) {
@@ -146,12 +147,74 @@ router.get('/:id/files/content', (req, res) => {
       return
     }
     content = fs.readFileSync(safePath, 'utf8')
+    lastModified = Math.floor(stat.mtimeMs)
   } catch {
     res.status(404).json({ error: 'File not found' })
     return
   }
 
-  res.json({ content, path: relPath })
+  res.json({ content, path: relPath, lastModified })
+})
+
+// PATCH /api/projects/:id/files
+// Body: { path, content, lastModified?, force? }
+// Atomically writes content. Uses optimistic locking: if lastModified doesn't match the
+// file's current mtime, returns 409 Conflict (unless force=true).
+router.patch('/:id/files', (req, res) => {
+  const project = projectQueries.findById(req.params.id)
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' })
+    return
+  }
+
+  const { path: relPath, content, lastModified, force } = req.body as {
+    path?: string
+    content?: string
+    lastModified?: number
+    force?: boolean
+  }
+
+  if (!relPath || typeof relPath !== 'string') {
+    res.status(400).json({ error: 'path is required' })
+    return
+  }
+  if (typeof content !== 'string') {
+    res.status(400).json({ error: 'content is required' })
+    return
+  }
+
+  const safePath = safeResolvePath(project.path, relPath)
+  if (!safePath) {
+    res.status(400).json({ error: 'Invalid path' })
+    return
+  }
+
+  try {
+    // Optimistic locking: reject if the file was modified since the client last fetched it.
+    if (!force && lastModified !== undefined) {
+      let serverMtime: number
+      try {
+        serverMtime = Math.floor(fs.statSync(safePath).mtimeMs)
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== 'ENOENT') throw e
+        serverMtime = 0 // file doesn't exist yet — allow creation
+      }
+      if (serverMtime !== 0 && serverMtime !== Math.floor(lastModified)) {
+        res.status(409).json({ error: 'conflict', serverModified: serverMtime })
+        return
+      }
+    }
+
+    // Atomic write: write to a temp file then rename into place.
+    const tmpPath = `${safePath}.steward-tmp`
+    fs.writeFileSync(tmpPath, content, 'utf8')
+    fs.renameSync(tmpPath, safePath)
+
+    const newMtime = Math.floor(fs.statSync(safePath).mtimeMs)
+    res.json({ lastModified: newMtime })
+  } catch {
+    res.status(500).json({ error: 'Failed to write file' })
+  }
 })
 
 // GET /api/projects/:id/files/raw?path=relative/image.png

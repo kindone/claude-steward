@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { listFiles, getFileContent, type FileEntry } from '../lib/api'
+import { listFiles, getFileContent, patchFile, FileConflictError, type FileEntry } from '../lib/api'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
@@ -54,9 +54,14 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-// ── FileViewer modal ─────────────────────────────────────────────────────────
+// ── FileViewer / FileEditor modal ────────────────────────────────────────────
 
-type ViewerState = { path: string; content: string; type: 'text' | 'image' } | null
+type ViewerState = {
+  path: string
+  content: string
+  lastModified: number
+  type: 'text' | 'image'
+} | null
 
 function FileViewer({
   viewer,
@@ -67,42 +72,130 @@ function FileViewer({
   projectId: string
   onClose: () => void
 }) {
+  // Displayed (saved) content — updated after a successful save
+  const [displayContent, setDisplayContent] = useState(viewer.content)
+  const [lastModified, setLastModified] = useState(viewer.lastModified)
+
+  // Edit mode state
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [conflict, setConflict] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  const isDirty = editing && draft !== displayContent
+  const canEdit = viewer.type !== 'image'
+
+  function startEdit() {
+    setDraft(displayContent)
+    setConflict(false)
+    setSaveError(null)
+    setEditing(true)
+    // Focus textarea after render
+    setTimeout(() => textareaRef.current?.focus(), 0)
+  }
+
+  function cancelEdit() {
+    if (isDirty && !window.confirm('Discard unsaved changes?')) return
+    setEditing(false)
+    setConflict(false)
+    setSaveError(null)
+  }
+
+  const save = useCallback(async (force = false) => {
+    setSaving(true)
+    setSaveError(null)
+    setConflict(false)
+    try {
+      const result = await patchFile(
+        projectId,
+        viewer.path,
+        draft,
+        force ? undefined : lastModified,
+        force,
+      )
+      setDisplayContent(draft)
+      setLastModified(result.lastModified)
+      setEditing(false)
+    } catch (err) {
+      if (err instanceof FileConflictError) {
+        setConflict(true)
+      } else {
+        setSaveError((err as Error).message)
+      }
+    } finally {
+      setSaving(false)
+    }
+  }, [projectId, viewer.path, draft, lastModified])
+
+  const reloadFile = useCallback(async () => {
+    try {
+      const fresh = await getFileContent(projectId, viewer.path)
+      setDisplayContent(fresh.content)
+      setLastModified(fresh.lastModified)
+      setDraft(fresh.content)
+      setConflict(false)
+    } catch (err) {
+      setSaveError((err as Error).message)
+    }
+  }, [projectId, viewer.path])
+
+  // Keyboard shortcuts
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') {
+        if (editing) {
+          // Only auto-cancel if no unsaved changes
+          if (!isDirty) { setEditing(false); setConflict(false); setSaveError(null) }
+        } else {
+          onClose()
+        }
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === 's' && editing) {
+        e.preventDefault()
+        void save()
+      }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [editing, isDirty, onClose, save])
 
   function handleCopy() {
-    navigator.clipboard.writeText(viewer.content).then(() => {
+    navigator.clipboard.writeText(displayContent).then(() => {
       setCopied(true)
       setTimeout(() => setCopied(false), 2000)
     }).catch(() => {/* ignore */})
   }
 
   const lang = getLang(viewer.path)
-  const filename = viewer.path.split('/').pop() ?? viewer.path
   const rawSrc = `/api/projects/${projectId}/files/raw?path=${encodeURIComponent(viewer.path)}`
 
-  // ── Content area ────────────────────────────────────────────────────────
+  // ── Content area ─────────────────────────────────────────────────────────
+
   let body: React.ReactNode
 
-  if (viewer.type === 'image') {
+  if (editing) {
+    body = (
+      <textarea
+        ref={textareaRef}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        spellCheck={false}
+        className="flex-1 min-h-0 w-full resize-none bg-[#0d0d0d] text-[#ccc] font-mono text-[13px] leading-relaxed p-5 border-none outline-none"
+        style={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}
+      />
+    )
+  } else if (viewer.type === 'image') {
     body = (
       <div className="flex-1 overflow-auto flex items-center justify-center p-6 bg-[#0d0d0d] min-h-0">
-        <img
-          src={rawSrc}
-          alt={filename}
-          className="max-w-full max-h-full object-contain rounded"
-        />
+        <img src={rawSrc} alt={viewer.path.split('/').pop()} className="max-w-full max-h-full object-contain rounded" />
       </div>
     )
   } else if (isMarkdown(viewer.path)) {
-    const html = marked.parse(viewer.content) as string
+    const html = marked.parse(displayContent) as string
     body = (
       <div
         className="flex-1 overflow-auto p-6 prose text-sm leading-relaxed min-h-0"
@@ -110,37 +203,24 @@ function FileViewer({
       />
     )
   } else {
-    // Code / plain text
     let highlighted: string
     if (lang) {
-      try {
-        highlighted = hljs.highlight(viewer.content, { language: lang, ignoreIllegals: true }).value
-      } catch {
-        highlighted = escapeHtml(viewer.content)
-      }
+      try { highlighted = hljs.highlight(displayContent, { language: lang, ignoreIllegals: true }).value }
+      catch { highlighted = escapeHtml(displayContent) }
     } else {
-      try {
-        const result = hljs.highlightAuto(viewer.content)
-        highlighted = result.value
-      } catch {
-        highlighted = escapeHtml(viewer.content)
-      }
+      try { highlighted = hljs.highlightAuto(displayContent).value }
+      catch { highlighted = escapeHtml(displayContent) }
     }
 
-    const lineCount = viewer.content.split('\n').length
-
+    const lineCount = displayContent.split('\n').length
     body = (
       <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Gutter */}
         <div
           className="select-none text-right text-[#3a3a3a] font-mono text-[13px] leading-relaxed flex-shrink-0 px-3 py-5 border-r border-[#1f1f1f] bg-[#0d0d0d] overflow-hidden"
           aria-hidden="true"
         >
-          {Array.from({ length: lineCount }, (_, i) => (
-            <div key={i}>{i + 1}</div>
-          ))}
+          {Array.from({ length: lineCount }, (_, i) => <div key={i}>{i + 1}</div>)}
         </div>
-        {/* Code */}
         <pre className="flex-1 overflow-auto p-5 m-0 bg-transparent text-[13px] leading-relaxed font-['SF_Mono','Fira_Code',monospace]">
           <code dangerouslySetInnerHTML={{ __html: highlighted }} />
         </pre>
@@ -148,10 +228,14 @@ function FileViewer({
     )
   }
 
+  // ── Type badge ────────────────────────────────────────────────────────────
+
+  const badge = lang ?? (isMarkdown(viewer.path) ? 'md' : isImage(viewer.path) ? fileExt(viewer.path) : null)
+
   return (
     <div
       className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-2 md:p-6"
-      onClick={onClose}
+      onClick={editing ? undefined : onClose}
     >
       <div
         className="bg-[#131313] border border-[#2a2a2a] rounded-xl flex flex-col overflow-hidden shadow-2xl"
@@ -161,46 +245,103 @@ function FileViewer({
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#1f1f1f] gap-3 flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
-            {lang && (
+            {badge && (
               <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#555] uppercase tracking-wider font-semibold">
-                {lang}
-              </span>
-            )}
-            {isImage(viewer.path) && (
-              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#555] uppercase tracking-wider font-semibold">
-                {fileExt(viewer.path)}
-              </span>
-            )}
-            {isMarkdown(viewer.path) && (
-              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#555] uppercase tracking-wider font-semibold">
-                md
+                {badge}
               </span>
             )}
             <span className="text-[13px] text-[#888] font-mono truncate" title={viewer.path}>
               {viewer.path}
             </span>
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            {viewer.type !== 'image' && (
-              <button
-                onClick={handleCopy}
-                className="text-xs text-[#666] hover:text-[#ccc] hover:bg-[#222] px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent"
-              >
-                {copied ? '✓ Copied' : 'Copy'}
-              </button>
+            {isDirty && (
+              <span className="text-[#555] text-[11px] flex-shrink-0" title="Unsaved changes">●</span>
             )}
-            <button
-              className="bg-transparent border-none text-[#666] hover:text-[#ccc] hover:bg-[#222] text-xl cursor-pointer leading-none px-2 py-1 rounded transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
-              onClick={onClose}
-              aria-label="Close"
-            >
-              ×
-            </button>
+          </div>
+
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {editing ? (
+              <>
+                <button
+                  onClick={() => void save()}
+                  disabled={saving}
+                  className="text-xs text-white bg-blue-600 hover:bg-blue-500 disabled:opacity-50 px-3 py-1.5 rounded transition-colors cursor-pointer border-none font-medium"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  onClick={cancelEdit}
+                  className="text-xs text-[#666] hover:text-[#ccc] hover:bg-[#222] px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent"
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                {canEdit && (
+                  <button
+                    onClick={startEdit}
+                    className="text-xs text-[#666] hover:text-[#ccc] hover:bg-[#222] px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent"
+                  >
+                    Edit
+                  </button>
+                )}
+                {viewer.type !== 'image' && (
+                  <button
+                    onClick={handleCopy}
+                    className="text-xs text-[#666] hover:text-[#ccc] hover:bg-[#222] px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent"
+                  >
+                    {copied ? '✓ Copied' : 'Copy'}
+                  </button>
+                )}
+                <button
+                  className="bg-transparent border-none text-[#666] hover:text-[#ccc] hover:bg-[#222] text-xl cursor-pointer leading-none px-2 py-1 rounded transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  onClick={onClose}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
+              </>
+            )}
           </div>
         </div>
 
+        {/* Conflict banner */}
+        {conflict && (
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-yellow-500/10 border-b border-yellow-500/20 text-yellow-300 text-[12px] flex-shrink-0">
+            <span className="flex-1">File was modified externally since you opened it.</span>
+            <button
+              onClick={() => void save(true)}
+              className="px-2.5 py-1 rounded bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 cursor-pointer text-yellow-200 transition-colors"
+            >
+              Overwrite
+            </button>
+            <button
+              onClick={reloadFile}
+              className="px-2.5 py-1 rounded hover:bg-[#222] border border-[#2a2a2a] cursor-pointer text-[#aaa] transition-colors"
+            >
+              Reload file
+            </button>
+            <button onClick={() => setConflict(false)} className="text-[#555] hover:text-[#888] cursor-pointer bg-transparent border-none text-base leading-none">×</button>
+          </div>
+        )}
+
+        {/* Error banner */}
+        {saveError && (
+          <div className="flex items-center gap-3 px-4 py-2.5 bg-red-500/10 border-b border-red-500/20 text-red-300 text-[12px] flex-shrink-0">
+            <span className="flex-1">{saveError}</span>
+            <button onClick={() => setSaveError(null)} className="text-[#555] hover:text-[#888] cursor-pointer bg-transparent border-none text-base leading-none">×</button>
+          </div>
+        )}
+
         {/* Body */}
         {body}
+
+        {/* Edit mode footer hint */}
+        {editing && (
+          <div className="flex-shrink-0 px-4 py-1.5 border-t border-[#1f1f1f] text-[11px] text-[#3a3a3a]">
+            ⌘S / Ctrl+S to save · Escape to cancel (if no changes)
+          </div>
+        )}
       </div>
     </div>
   )
@@ -251,12 +392,12 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
 
   async function openFile(path: string) {
     if (isImage(path)) {
-      setViewer({ path, content: '', type: 'image' })
+      setViewer({ path, content: '', lastModified: 0, type: 'image' })
       return
     }
     try {
-      const content = await getFileContent(projectId, path)
-      setViewer({ path, content, type: 'text' })
+      const { content, lastModified } = await getFileContent(projectId, path)
+      setViewer({ path, content, lastModified, type: 'text' })
     } catch (err) {
       alert((err as Error).message)
     }
@@ -296,7 +437,6 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
   return (
     <>
       {alwaysExpanded ? (
-        /* Full-height mode used when embedded in the Files tab */
         <div className="flex-1 overflow-y-auto px-1.5 py-1.5 min-h-0">
           {loading && !tree.has('') && (
             <p className="text-xs text-[#444] px-2.5 py-1.5">Loading…</p>
@@ -307,7 +447,6 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
           {tree.has('') && renderEntries(tree.get('')!, 0)}
         </div>
       ) : (
-        /* Collapsed-by-default mode used at the bottom of the Sessions tab */
         <div className="border-t border-[#1f1f1f] flex-shrink-0">
           <button
             className="w-full flex items-center gap-1.5 px-3 py-2 bg-transparent border-none text-[#555] hover:text-[#888] text-[11px] font-semibold tracking-widest uppercase cursor-pointer text-left transition-colors"

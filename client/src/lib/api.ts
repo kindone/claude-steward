@@ -163,7 +163,9 @@ export async function listFiles(projectId: string, filePath = ''): Promise<FileE
   return res.json() as Promise<FileEntry[]>
 }
 
-export async function getFileContent(projectId: string, filePath: string): Promise<string> {
+export type FileContent = { content: string; lastModified: number }
+
+export async function getFileContent(projectId: string, filePath: string): Promise<FileContent> {
   const res = await fetch(
     `/api/projects/${projectId}/files/content?path=${encodeURIComponent(filePath)}`,
     { headers: JSON_HEADERS, ...credentialsOpt }
@@ -172,8 +174,38 @@ export async function getFileContent(projectId: string, filePath: string): Promi
     const body = await res.json().catch(() => ({ error: 'Unknown error' })) as { error: string }
     throw new Error(body.error ?? 'Failed to load file')
   }
-  const data = await res.json() as { content: string }
-  return data.content
+  return res.json() as Promise<FileContent>
+}
+
+/** Thrown by patchFile when the server detects a concurrent modification. */
+export class FileConflictError extends Error {
+  constructor() { super('File was modified externally'); this.name = 'FileConflictError' }
+}
+
+/**
+ * Atomically write new content to a project file.
+ * Pass `lastModified` for optimistic locking (server returns 409 if mtime changed).
+ * Pass `force: true` to overwrite regardless.
+ */
+export async function patchFile(
+  projectId: string,
+  filePath: string,
+  content: string,
+  lastModified?: number,
+  force = false,
+): Promise<{ lastModified: number }> {
+  const res = await fetch(`/api/projects/${projectId}/files`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ path: filePath, content, lastModified, force }),
+    ...credentialsOpt,
+  })
+  if (res.status === 409) throw new FileConflictError()
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ error: 'Unknown error' })) as { error: string }
+    throw new Error(body.error ?? 'Failed to save file')
+  }
+  return res.json() as Promise<{ lastModified: number }>
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
