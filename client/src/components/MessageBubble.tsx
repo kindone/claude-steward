@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
-import type { ClaudeErrorCode } from '../lib/api'
+import type { ClaudeErrorCode, ToolCall } from '../lib/api'
 
 marked.use({
   breaks: true,
@@ -13,14 +13,13 @@ type Props = {
   content: string
   streaming?: boolean
   errorCode?: ClaudeErrorCode
-  toolUses?: string[]
+  toolUses?: ToolCall[]
 }
 
 export function MessageBubble({ role, content, streaming = false, errorCode, toolUses }: Props) {
   const contentRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
-  const toggleTools = useCallback(() => setToolsOpen((o) => !o), [])
 
   useEffect(() => {
     if (contentRef.current && role === 'assistant' && !errorCode) {
@@ -83,21 +82,25 @@ export function MessageBubble({ role, content, streaming = false, errorCode, too
           {!streaming && toolUses && toolUses.length > 0 && (
             <div className="mt-1.5 w-full">
               <button
-                onClick={toggleTools}
+                onClick={() => setToolsOpen((o) => !o)}
                 className="flex items-center gap-1.5 text-[11px] text-[#555] hover:text-[#888] transition-colors cursor-pointer bg-transparent border-none p-0"
               >
                 <span className={`inline-block transition-transform duration-150 ${toolsOpen ? 'rotate-90' : ''}`}>▶</span>
-                <span>{toolUses.join(' · ')}</span>
+                <span>{toolUses.map((c) => c.name).join(' · ')}</span>
               </button>
               {toolsOpen && (
-                <div className="mt-1.5 flex flex-wrap gap-1.5 pl-3.5">
-                  {toolUses.map((name, i) => (
-                    <span
-                      key={i}
-                      className="text-[11px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#666]"
-                    >
-                      {name}
-                    </span>
+                <div className="mt-1.5 flex flex-col gap-1 pl-3.5">
+                  {toolUses.map((call, i) => (
+                    <div key={i} className="flex items-baseline gap-1.5 min-w-0">
+                      <span className="text-[11px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#666] flex-shrink-0">
+                        {call.name}
+                      </span>
+                      {call.detail && (
+                        <span className="text-[11px] text-[#444] truncate" title={call.detail}>
+                          {call.detail}
+                        </span>
+                      )}
+                    </div>
                   ))}
                 </div>
               )}

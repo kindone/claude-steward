@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { sendMessage, getMessages, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode } from '../lib/api'
+import { sendMessage, getMessages, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode, type ToolCall } from '../lib/api'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
@@ -15,8 +15,8 @@ type Message = {
   content: string
   streaming: boolean
   errorCode?: ClaudeErrorCode
-  /** Tool names used while generating this message, in order of first appearance. */
-  toolUses?: string[]
+  /** Tool calls made while generating this message, in invocation order. */
+  toolUses?: ToolCall[]
 }
 
 type Props = {
@@ -39,10 +39,10 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   const cancelRef = useRef<(() => void) | null>(null)
   /** True while we have an active sendMessage() — poll must not overwrite the optimistic assistant bubble. */
   const streamingFromSendRef = useRef(false)
-  /** Accumulates unique tool names fired during the current send, in order of first appearance. */
-  const toolUsesRef = useRef<string[]>([])
+  /** Accumulates tool calls (with detail) as assistant chunks arrive during the current send. */
+  const toolUsesRef = useRef<ToolCall[]>([])
   /** Live copy of toolUsesRef for rendering the streaming indicator. */
-  const [streamingToolUses, setStreamingToolUses] = useState<string[]>([])
+  const [streamingToolUses, setStreamingToolUses] = useState<ToolCall[]>([])
 
   // Sync draft when switching sessions
   useEffect(() => {
@@ -160,10 +160,10 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       },
       onToolActivity: (toolName) => {
         setStreamingTool(toolName)
-        if (toolName && !toolUsesRef.current.includes(toolName)) {
-          toolUsesRef.current = [...toolUsesRef.current, toolName]
-          setStreamingToolUses([...toolUsesRef.current])
-        }
+      },
+      onToolCall: (call) => {
+        toolUsesRef.current = [...toolUsesRef.current, call]
+        setStreamingToolUses([...toolUsesRef.current])
       },
       onDone: () => {
         streamingFromSendRef.current = false
@@ -284,17 +284,19 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
             <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse flex-shrink-0" />
             <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse tool-pulse-2 flex-shrink-0" />
             <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse tool-pulse-3 flex-shrink-0" />
-            {streamingToolUses.map((name, i) => (
-              <span
-                key={i}
-                className={`text-xs px-1.5 py-0.5 rounded border transition-colors
-                  ${name === streamingTool
-                    ? 'text-blue-400 border-blue-500/40 bg-blue-500/10'
-                    : 'text-[#666] border-[#2a2a2a]'}`}
-              >
-                {name}
+            {/* Assembled tool calls with detail (muted, completed) */}
+            {streamingToolUses.map((call, i) => (
+              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#555] max-w-[280px] truncate">
+                <span className="text-[#777]">{call.name}</span>
+                {call.detail && <span className="text-[#444]">: {call.detail}</span>}
               </span>
             ))}
+            {/* Currently streaming tool input (blue, active) */}
+            {streamingTool && (
+              <span className="text-[11px] px-1.5 py-0.5 rounded border border-blue-500/40 bg-blue-500/10 text-blue-400">
+                {streamingTool}
+              </span>
+            )}
           </div>
         )}
         <div ref={bottomRef} />

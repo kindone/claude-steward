@@ -297,12 +297,37 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
 
 export type ClaudeErrorCode = 'session_expired' | 'process_error' | 'http_error'
 
+/** A single tool invocation with the key detail extracted from its input. */
+export type ToolCall = {
+  name: string
+  /** Human-readable summary of what the tool is doing (command, file path, query…). */
+  detail?: string
+}
+
+/** Pull the most useful field out of a tool's input object. */
+function extractToolDetail(name: string, input: Record<string, unknown>): string | undefined {
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : undefined)
+  switch (name) {
+    case 'Bash':      return str(input.command)?.replace(/\s+/g, ' ').slice(0, 100)
+    case 'Read':      return str(input.file_path)
+    case 'Edit':
+    case 'Write':
+    case 'MultiEdit': return str(input.file_path)
+    case 'WebSearch': return str(input.query)?.slice(0, 80)
+    case 'WebFetch':  return str(input.url)?.slice(0, 80)
+    default:          return undefined
+  }
+}
+
 export type ChunkHandler = {
   onTextDelta: (text: string) => void
   onTitle?: (title: string) => void
   onDone: () => void
   onError: (message: string, code?: ClaudeErrorCode) => void
+  /** Fired when a tool starts streaming its input (name only, no detail yet). Pass null to clear. */
   onToolActivity?: (toolName: string | null) => void
+  /** Fired when a complete tool call is assembled (name + detail from input). */
+  onToolCall?: (call: ToolCall) => void
   onActivity?: () => void
 }
 
@@ -364,14 +389,33 @@ export function sendMessage(
                     delta?: { type: string; text: string }
                     content_block?: { type: string; name?: string }
                   }
+                  // assistant chunks carry the assembled message with full tool inputs
+                  message?: {
+                    content?: Array<{
+                      type: string
+                      name?: string
+                      input?: Record<string, unknown>
+                    }>
+                  }
                 }
                 if (chunk.type === 'stream_event') {
                   const evt = chunk.event
                   if (evt?.type === 'content_block_start' && evt.content_block?.type === 'tool_use') {
+                    // Tool is starting to stream its input — show name immediately as live indicator
                     handlers.onToolActivity?.(evt.content_block.name ?? 'tool')
                   } else if (evt?.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
                     handlers.onToolActivity?.(null)   // clear indicator when text arrives
                     handlers.onTextDelta(evt.delta.text)
+                  }
+                } else if (chunk.type === 'assistant') {
+                  // Full tool call assembled (--include-partial-messages) — extract name + detail
+                  for (const block of chunk.message?.content ?? []) {
+                    if (block.type === 'tool_use' && block.name) {
+                      handlers.onToolCall?.({
+                        name: block.name,
+                        detail: extractToolDetail(block.name, block.input ?? {}),
+                      })
+                    }
                   }
                 }
               } catch {
