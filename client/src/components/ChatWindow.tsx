@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, getMessages, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode, type ToolCall } from '../lib/api'
+import { sendMessage, getMessages, watchSession, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode, type ToolCall } from '../lib/api'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
@@ -75,58 +75,37 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   useEffect(() => {
     streamingFromSendRef.current = false
     let cancelled = false
-    let pollTimer: ReturnType<typeof setTimeout> | null = null
-    let pollCount = 0
-    const MAX_POLLS = 60 // 2 minutes at 2s intervals
-
-    function clearPoll() {
-      if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
-    }
-
-    async function pollForResponse() {
-      if (cancelled || pollCount >= MAX_POLLS) {
-        setStreaming(false)
-        return
-      }
-      pollCount++
-      try {
-        const page = await getMessages(sessionId)
-        if (cancelled) return
-        if (page.messages[page.messages.length - 1]?.role === 'assistant') {
-          setMessages(page.messages.map((m) => ({ ...m, streaming: false })))
-          setHasMore(page.hasMore)
-          setStreaming(false)
-          return
-        }
-        // Don't overwrite messages with DB state while we're streaming from sendMessage() — that would remove the assistant placeholder.
-        if (streamingFromSendRef.current) {
-          pollTimer = setTimeout(pollForResponse, 2000)
-          return
-        }
-        setMessages(page.messages.map((m) => ({ ...m, streaming: false })))
-        setHasMore(page.hasMore)
-        pollTimer = setTimeout(pollForResponse, 2000)
-      } catch {
-        setStreaming(false)
-      }
-    }
+    let cancelWatch: (() => void) | null = null
 
     getMessages(sessionId).then((page) => {
       if (cancelled) return
       setMessages(page.messages.map((m) => ({ ...m, streaming: false })))
       setHasMore(page.hasMore)
-      // If last message is a user message with no response yet, Claude may still be processing.
-      // Show streaming indicator and poll until the assistant message lands in the DB.
+      // If the last message is from the user, Claude is still (or was) processing.
+      // Subscribe via SSE so the UI updates the instant the response lands — no poll ceiling.
       if (page.messages.length > 0 && page.messages[page.messages.length - 1].role === 'user') {
         setStreaming(true)
-        pollTimer = setTimeout(pollForResponse, 2000)
+        cancelWatch = watchSession(
+          sessionId,
+          async () => {
+            if (cancelled) return
+            try {
+              const fresh = await getMessages(sessionId)
+              setMessages(fresh.messages.map((m) => ({ ...m, streaming: false })))
+              setHasMore(fresh.hasMore)
+            } finally {
+              setStreaming(false)
+            }
+          },
+          () => { if (!cancelled) setStreaming(false) },
+        )
       }
     }).catch(() => {/* session may be new — ignore */})
 
     return () => {
       cancelled = true
       cancelRef.current?.()
-      clearPoll()
+      cancelWatch?.()
     }
   }, [sessionId])
 

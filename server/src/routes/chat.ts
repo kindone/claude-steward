@@ -3,6 +3,7 @@ import type { Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { sessionQueries, messageQueries, projectQueries } from '../db/index.js'
 import { spawnClaude } from '../claude/process.js'
+import { notifyWatchers } from '../lib/sessionWatchers.js'
 
 function sendSseEvent(res: Response, event: string, data: unknown): void {
   if (res.writableEnded) return
@@ -77,6 +78,8 @@ router.post('/', (req, res) => {
       if (assistantText) {
         messageQueries.insert(uuidv4(), sessionId, 'assistant', assistantText)
       }
+      // Notify any clients watching this session (returned after navigating away mid-stream).
+      notifyWatchers(sessionId)
     },
     onError: () => {
       // Clear the stale claude_session_id so the next message starts fresh

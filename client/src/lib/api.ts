@@ -241,6 +241,22 @@ export async function getMessages(
   return res.json() as Promise<MessagesPage>
 }
 
+/**
+ * Subscribe to session completion via SSE.
+ * The server sends `event: done` the moment the assistant message is persisted.
+ * Returns a cancel function; call it to close the connection.
+ */
+export function watchSession(
+  sessionId: string,
+  onDone: () => void,
+  onError?: () => void,
+): () => void {
+  const es = new EventSource(`/api/sessions/${sessionId}/watch`, { withCredentials: true })
+  es.addEventListener('done', () => { es.close(); onDone() })
+  es.onerror = () => { es.close(); onError?.() }
+  return () => es.close()
+}
+
 export async function renameSession(sessionId: string, title: string): Promise<Session> {
   const res = await fetch(`/api/sessions/${sessionId}`, {
     method: 'PATCH',

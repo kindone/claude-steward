@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { sessionQueries, messageQueries, type PermissionMode } from '../db/index.js'
+import { addWatcher, removeWatcher } from '../lib/sessionWatchers.js'
 
 const VALID_MODES = new Set<PermissionMode>(['default', 'plan', 'acceptEdits', 'bypassPermissions'])
 
@@ -23,6 +24,50 @@ router.post('/', (req, res) => {
   const id = uuidv4()
   const session = sessionQueries.create(id, 'New Chat', projectId)
   res.status(201).json(session)
+})
+
+// GET /api/sessions/:id/watch
+// SSE endpoint: fires `event: done` the moment the Claude response lands in the DB.
+// If the response is already there, replies immediately. Otherwise parks until
+// notifyWatchers() is called from the chat route's onComplete handler.
+// Sends `: ping` comments every 30 s to keep the connection alive through nginx.
+router.get('/:id/watch', (req, res) => {
+  const session = sessionQueries.findById(req.params.id)
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' })
+    return
+  }
+
+  // If the last message is already from the assistant, we're done — reply immediately.
+  const messages = messageQueries.listPaged(req.params.id, 1)
+  if (messages.length > 0 && messages[messages.length - 1].role === 'assistant') {
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('X-Accel-Buffering', 'no')
+    res.flushHeaders()
+    res.write('event: done\ndata: {}\n\n')
+    res.end()
+    return
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders()
+
+  addWatcher(req.params.id, res)
+
+  // Keep the connection alive through nginx's idle timeout (default 60 s).
+  const keepalive = setInterval(() => {
+    if (!res.writableEnded) res.write(': ping\n\n')
+  }, 30_000)
+
+  res.on('close', () => {
+    clearInterval(keepalive)
+    removeWatcher(req.params.id, res)
+    if (!res.writableEnded) res.end()
+  })
 })
 
 router.get('/:id/messages', (req, res) => {
