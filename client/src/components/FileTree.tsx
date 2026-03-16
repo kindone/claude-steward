@@ -150,12 +150,12 @@ function FileViewer({
 
   return (
     <div
-      className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-4 md:p-6"
+      className="fixed inset-0 bg-black/70 z-[200] flex items-center justify-center p-2 md:p-6"
       onClick={onClose}
     >
       <div
         className="bg-[#131313] border border-[#2a2a2a] rounded-xl flex flex-col overflow-hidden shadow-2xl"
-        style={{ width: 'min(92vw, 1200px)', height: 'min(88dvh, 900px)' }}
+        style={{ width: 'min(96vw, 1200px)', height: 'min(92dvh, 900px)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
