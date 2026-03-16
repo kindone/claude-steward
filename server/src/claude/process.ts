@@ -201,6 +201,14 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
       onError?.(claudeErr)
       sendSseEvent(res, 'error', claudeErr)
       if (!res.writableEnded) res.end()
+      return
+    }
+    // Code 0: ensure response always ends so the client stream completes (and can run onDone fallback).
+    // The normal path sends "event: done" + res.end() from the result chunk; this handles races where
+    // the process exits before the last line is processed.
+    if (!res.writableEnded) {
+      sendSseEvent(res, 'done', { session_id: '' })
+      res.end()
     }
   })
 }

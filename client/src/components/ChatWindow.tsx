@@ -35,6 +35,8 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   const [promptDraft, setPromptDraft] = useState(systemPrompt ?? '')
   const bottomRef = useRef<HTMLDivElement>(null)
   const cancelRef = useRef<(() => void) | null>(null)
+  /** True while we have an active sendMessage() — poll must not overwrite the optimistic assistant bubble. */
+  const streamingFromSendRef = useRef(false)
 
   // Sync draft when switching sessions
   useEffect(() => {
@@ -63,6 +65,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   }, [messages])
 
   useEffect(() => {
+    streamingFromSendRef.current = false
     let cancelled = false
     let pollTimer: ReturnType<typeof setTimeout> | null = null
     let pollCount = 0
@@ -84,9 +87,15 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
         if (loaded[loaded.length - 1]?.role === 'assistant') {
           setMessages(loaded.map((m) => ({ ...m, streaming: false })))
           setStreaming(false)
-        } else {
-          pollTimer = setTimeout(pollForResponse, 2000)
+          return
         }
+        // Don't overwrite messages with DB state while we're streaming from sendMessage() — that would remove the assistant placeholder.
+        if (streamingFromSendRef.current) {
+          pollTimer = setTimeout(pollForResponse, 2000)
+          return
+        }
+        setMessages(loaded.map((m) => ({ ...m, streaming: false })))
+        pollTimer = setTimeout(pollForResponse, 2000)
       } catch {
         setStreaming(false)
       }
@@ -122,6 +131,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
     const userMsgId = generateId()
     const assistantMsgId = generateId()
 
+    streamingFromSendRef.current = true
     setMessages((prev) => [
       ...prev,
       { id: userMsgId, role: 'user', content: text, streaming: false },
@@ -141,6 +151,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       },
       onToolActivity: (toolName) => setStreamingTool(toolName),
       onDone: () => {
+        streamingFromSendRef.current = false
         setStreamingTool(null)
         setMessages((prev) =>
           prev.map((m) =>
@@ -150,6 +161,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
         setStreaming(false)
       },
       onError: (errorMsg, code) => {
+        streamingFromSendRef.current = false
         setStreamingTool(null)
         setMessages((prev) =>
           prev.map((m) =>
@@ -264,6 +276,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       <MessageInput
         onSend={handleSend}
         onStop={() => {
+          streamingFromSendRef.current = false
           cancelRef.current?.()
           setMessages((prev) =>
             prev.map((m) => (m.streaming ? { ...m, streaming: false } : m))

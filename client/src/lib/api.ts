@@ -24,7 +24,7 @@ export async function startRegistration(): Promise<unknown> {
   })
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as { error?: string }
-    throw new Error(body.error ?? 'Failed to start registration')
+    throw new Error(body.error ?? `Failed to start registration (${res.status})`)
   }
   return res.json()
 }
@@ -331,23 +331,17 @@ export function sendMessage(
       const decoder = new TextDecoder()
       let buffer = ''
       let activityFired = false
+      let pendingEvent = ''
+      let doneFired = false
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-
-        if (!activityFired) { activityFired = true; handlers.onActivity?.() }
-        buffer += decoder.decode(value, { stream: true })
-        const lines = buffer.split('\n')
-        buffer = lines.pop() ?? ''
-
-        let pendingEvent = ''
+      function processLines(lines: string[]): void {
         for (const line of lines) {
           if (line.startsWith('event: ')) {
             pendingEvent = line.slice(7).trim()
           } else if (line.startsWith('data: ')) {
             const raw = line.slice(6)
             if (pendingEvent === 'done') {
+              doneFired = true
               handlers.onDone()
             } else if (pendingEvent === 'title') {
               try {
@@ -388,6 +382,23 @@ export function sendMessage(
           }
         }
       }
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        if (!activityFired) { activityFired = true; handlers.onActivity?.() }
+        buffer += decoder.decode(value, { stream: true })
+        const lines = buffer.split('\n')
+        buffer = lines.pop() ?? ''
+        processLines(lines)
+      }
+      // Process any remaining buffer (final "event: done\ndata: ..." or "data: ..." when event was in previous chunk)
+      if (buffer.trim()) processLines(buffer.split('\n'))
+      // If we had "event: done" at end of previous chunk and no data in last chunk, stream ended without data — still stop spinner
+      if (pendingEvent === 'done') { doneFired = true; handlers.onDone() }
+      // Fallback: stream ended without explicit done event (e.g. nginx closed connection, server never sent done) — stop spinner anyway
+      if (!doneFired) handlers.onDone()
     })
     .catch((err: Error) => {
       if (err.name !== 'AbortError') {
