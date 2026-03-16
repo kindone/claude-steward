@@ -10,6 +10,7 @@ import sessionsRouter from './routes/sessions.js'
 import projectsRouter from './routes/projects.js'
 import eventsRouter from './routes/events.js'
 import adminRouter from './routes/admin.js'
+import pushRouter from './routes/push.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Monorepo root — two levels up from server/src/
@@ -43,6 +44,7 @@ export function createApp() {
   app.use('/api/projects', projectsRouter)
   app.use('/api/events', eventsRouter)
   app.use('/api/admin', adminRouter)
+  app.use('/api/push', pushRouter)
 
   if (NODE_ENV === 'production') {
     const publicDir = path.join(__dirname, '../public')

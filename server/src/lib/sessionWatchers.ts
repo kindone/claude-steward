@@ -19,15 +19,21 @@ export function removeWatcher(sessionId: string, res: Response): void {
   if (set.size === 0) watchers.delete(sessionId)
 }
 
-/** Send `event: done` to every client watching this session, then clear the set. */
-export function notifyWatchers(sessionId: string): void {
+/**
+ * Send `event: done` to every client watching this session, then clear the set.
+ * Returns the number of clients that were notified (0 means no tab was open).
+ */
+export function notifyWatchers(sessionId: string): number {
   const set = watchers.get(sessionId)
-  if (!set) return
+  if (!set) return 0
+  let count = 0
   for (const res of set) {
     if (!res.writableEnded) {
       res.write('event: done\ndata: {}\n\n')
       res.end()
+      count++
     }
   }
   watchers.delete(sessionId)
+  return count
 }

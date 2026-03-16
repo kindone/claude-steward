@@ -9,6 +9,8 @@ Read this first. For details, see `docs/` — start with `docs/architecture.md`.
 - **Do not commit autonomously.** Never run `git add + git commit` without the user explicitly asking. Build and lint checks after changes are fine; committing is not.
 - **Update docs and `MEMORY.md` alongside code changes.** When a feature lands, update the relevant `docs/` file and this file in the same working set, before asking the user to commit.
 - **Dedicated doc per significant idea.** Each new subsystem, feature area, or cross-cutting concept gets its own `docs/<name>.md` file when it grows beyond a single section. New doc files must link back to their parent doc (usually `docs/architecture.md` or the relevant program doc) and forward to any child docs.
+- **ESM + dotenv ordering gotcha**: In ESM, `import` statements are fully evaluated before the importing module's body runs. `dotenv.config()` is called in `index.ts`'s body, so any module that reads `process.env.*` at its top level will see undefined values. Always read env vars **inside functions** (lazy), never at module initialisation time. Also: PM2's plain `pm2 restart` does not apply new ecosystem config env vars — use `pm2 restart ecosystem.dev.config.cjs --only <name> --update-env`.
+- **Run `tsc` after every client change.** `ReadLints` uses the language server and misses some TypeScript errors that only surface at compile time. Always run `npm run build --workspace=client` (or `cd client && npx tsc --noEmit`) after making client-side TypeScript changes to catch type errors before the user sees them.
 
 ## Documentation Rules
 

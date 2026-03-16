@@ -18,9 +18,12 @@ client/src/
     ├── ProjectPicker.tsx  ← dropdown: select/create/delete projects
     ├── FileTree.tsx       ← collapsible file browser; openFile() → FileViewer portal
     ├── TerminalPanel.tsx  ← xterm.js terminal; runs commands via POST /exec SSE
-    ├── ChatWindow.tsx     ← message history, streaming deltas, stop button
+    ├── ChatWindow.tsx     ← message history, streaming deltas, stop button, 🔔 push toggle
     ├── MessageBubble.tsx  ← markdown (marked) + syntax highlight (hljs) + error states
     └── MessageInput.tsx   ← textarea, Send / Stop button
+
+hooks/
+└── usePushNotifications.ts ← SW registration, subscribe/unsubscribe, PushState machine
 ```
 
 ---
@@ -77,6 +80,11 @@ All global state lives in `App.tsx`. No external store.
 | `restarting` | `boolean` | Overlay shown during app-level reload |
 
 `ChatWindow` manages its own local state (messages, streaming flag, active tool name, accumulated tool calls) and is fully reset on session switch via React's `key` prop.
+
+**Scroll behaviour** — a `scrollBehaviorRef` controls when and how the view scrolls to the bottom:
+- `'instant'` on initial message load (avoids iOS smooth-scroll interruption when tab becomes active)
+- `'smooth'` for streaming deltas and new messages
+- `'none'` when `loadOlder` prepends messages — instead, `scrollTop` is adjusted by the new content height so the viewport stays anchored to the previously-top message
 
 `App.tsx` persists `{ projectId, sessionId }` to `localStorage` under `steward:lastState` on every selection change and restores it on mount (validating IDs still exist). Since prod and dev run on separate origins, each environment independently tracks its own context.
 
@@ -198,6 +206,9 @@ All functions accept/return typed objects and throw on non-OK responses.
 | `watchSession(sessionId, onDone, onError?)` | `EventSource` on `GET /watch`; returns cancel fn |
 | `sendMessage(sessionId, text, handlers)` | Starts chat SSE; returns cancel fn. See `ChunkHandler` below |
 | `stopChat(sessionId)` | `DELETE /api/chat/:id` — kills the subprocess; fire-and-forget |
+| `getVapidPublicKey()` | `GET /api/push/vapid-public-key` → `string` |
+| `savePushSubscription(sub)` | `POST /api/push/subscribe` with `PushSubscription` object |
+| `deletePushSubscription(endpoint)` | `DELETE /api/push/subscribe` |
 | `subscribeToAppEvents(handlers)` | Starts events SSE; returns cancel fn |
 
 **Key exported types**

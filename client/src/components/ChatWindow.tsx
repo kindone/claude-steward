@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { sendMessage, stopChat, getMessages, watchSession, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode, type ToolCall } from '../lib/api'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
@@ -38,6 +39,9 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   const [promptOpen, setPromptOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState(systemPrompt ?? '')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  /** 'instant' on first load, 'smooth' during streaming, 'none' when prepending older messages. */
+  const scrollBehaviorRef = useRef<'instant' | 'smooth' | 'none'>('instant')
   const cancelRef = useRef<(() => void) | null>(null)
   /** True while we have an active sendMessage() — poll must not overwrite the optimistic assistant bubble. */
   const streamingFromSendRef = useRef(false)
@@ -45,6 +49,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   const toolUsesRef = useRef<ToolCall[]>([])
   /** Live copy of toolUsesRef for rendering the streaming indicator. */
   const [streamingToolUses, setStreamingToolUses] = useState<ToolCall[]>([])
+  const { state: pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
 
   // Sync draft when switching sessions
   useEffect(() => {
@@ -69,7 +74,15 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   }
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const behavior = scrollBehaviorRef.current
+    if (behavior === 'none') {
+      // loadOlder prepended messages — don't scroll, position already restored by loadOlder
+      scrollBehaviorRef.current = 'smooth'
+      return
+    }
+    bottomRef.current?.scrollIntoView({ behavior })
+    // After initial snap, switch to smooth for streaming deltas
+    if (behavior === 'instant') scrollBehaviorRef.current = 'smooth'
   }, [messages])
 
   useEffect(() => {
@@ -115,8 +128,19 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
     setLoadingOlder(true)
     try {
       const page = await getMessages(sessionId, { before: oldestId })
+      if (page.messages.length === 0) { setHasMore(false); return }
+      // Save scroll anchor so prepending doesn't jump to bottom
+      const container = scrollContainerRef.current
+      const prevScrollHeight = container?.scrollHeight ?? 0
+      scrollBehaviorRef.current = 'none'
       setMessages((prev) => [...page.messages.map((m) => ({ ...m, streaming: false })), ...prev])
       setHasMore(page.hasMore)
+      // Restore position: shift scrollTop by the new content height added above
+      requestAnimationFrame(() => {
+        if (container) {
+          container.scrollTop += container.scrollHeight - prevScrollHeight
+        }
+      })
     } catch (err) {
       console.error('Failed to load older messages', err)
     } finally {
@@ -206,21 +230,47 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
             {systemPrompt ? '⚙ Prompt set' : '⚙ Prompt'}
           </button>
 
-          {/* Permission mode segmented control */}
-          <span className="inline-flex border border-[#222] rounded overflow-hidden">
-            {MODES.map((m) => (
+          <span className="flex items-center gap-2">
+            {/* Permission mode segmented control */}
+            <span className="inline-flex border border-[#222] rounded overflow-hidden">
+              {MODES.map((m) => (
+                <button
+                  key={m.value}
+                  className={`bg-transparent border-r border-[#222] last:border-r-0 cursor-pointer text-xs px-3 py-2 transition-colors
+                    ${permissionMode === m.value
+                      ? 'bg-[#1e3a5f] text-blue-400'
+                      : 'text-[#444] hover:bg-[#1a1a1a] hover:text-[#888]'}`}
+                  onClick={() => handleModeChange(m.value)}
+                  title={m.title}
+                >
+                  {m.label}
+                </button>
+              ))}
+            </span>
+
+            {/* Push notification bell */}
+            {pushState !== 'unsupported' && (
               <button
-                key={m.value}
-                className={`bg-transparent border-r border-[#222] last:border-r-0 cursor-pointer text-xs px-3 py-2 transition-colors
-                  ${permissionMode === m.value
-                    ? 'bg-[#1e3a5f] text-blue-400'
-                    : 'text-[#444] hover:bg-[#1a1a1a] hover:text-[#888]'}`}
-                onClick={() => handleModeChange(m.value)}
-                title={m.title}
+                className={`bg-transparent border-none cursor-pointer text-base leading-none transition-colors px-1
+                  ${pushState === 'granted' ? 'text-blue-400 hover:text-blue-300'
+                    : pushState === 'denied'  ? 'text-[#444] cursor-not-allowed'
+                    : pushState === 'loading' ? 'text-[#444]'
+                    : 'text-[#444] hover:text-[#888]'}`}
+                onClick={() => {
+                  if (pushState === 'granted') pushUnsubscribe()
+                  else if (pushState === 'default') pushSubscribe()
+                }}
+                title={
+                  pushState === 'granted' ? 'Notifications on — click to disable'
+                    : pushState === 'denied'  ? 'Notifications blocked in browser settings'
+                    : pushState === 'loading' ? 'Loading…'
+                    : 'Enable push notifications'
+                }
+                disabled={pushState === 'loading' || pushState === 'denied'}
               >
-                {m.label}
+                {pushState === 'granted' ? '🔔' : '🔕'}
               </button>
-            ))}
+            )}
           </span>
         </div>
 
@@ -262,7 +312,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 md:px-6 md:py-8 flex flex-col gap-5">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 md:px-6 md:py-8 flex flex-col gap-5">
         {hasMore && (
           <div className="flex justify-center flex-shrink-0">
             <button

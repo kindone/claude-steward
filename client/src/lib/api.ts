@@ -208,6 +208,39 @@ export async function patchFile(
   return res.json() as Promise<{ lastModified: number }>
 }
 
+// ── Push notifications ────────────────────────────────────────────────────────
+
+/** Fetch the server's VAPID public key (avoids needing a build-time env var). */
+export async function getVapidPublicKey(): Promise<string> {
+  const res = await fetch('/api/push/vapid-public-key', credentialsOpt)
+  if (!res.ok) throw new Error('Push not configured on server')
+  const data = await res.json() as { key: string }
+  return data.key
+}
+
+export async function savePushSubscription(sub: PushSubscription): Promise<void> {
+  const json = sub.toJSON()
+  const res = await fetch('/api/push/subscribe', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({
+      endpoint: sub.endpoint,
+      keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth },
+    }),
+    ...credentialsOpt,
+  })
+  if (!res.ok) throw new Error('Failed to save push subscription')
+}
+
+export async function deletePushSubscription(endpoint: string): Promise<void> {
+  await fetch('/api/push/subscribe', {
+    method: 'DELETE',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ endpoint }),
+    ...credentialsOpt,
+  })
+}
+
 // ── Exec ──────────────────────────────────────────────────────────────────────
 
 export type ExecHandlers = {

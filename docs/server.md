@@ -18,8 +18,9 @@ server/src/
 │   └── index.ts      ← schema, migrations, projectQueries/sessionQueries/messageQueries
 ├── lib/
 │   ├── connections.ts     ← global Set<Response> for app-level SSE fan-out
-│   ├── sessionWatchers.ts ← Map<sessionId, Set<Response>> for session completion watch
-│   └── activeChats.ts     ← Map<sessionId, AbortController> for in-flight Claude spawns
+│   ├── sessionWatchers.ts    ← Map<sessionId, Set<Response>> for session completion watch
+│   ├── activeChats.ts        ← Map<sessionId, AbortController> for in-flight Claude spawns
+│   └── pushNotifications.ts  ← web-push VAPID init, notifyAll(), isPushEnabled()
 └── routes/
     ├── chat.ts        ← POST /api/chat
     ├── sessions.ts    ← CRUD + GET /:id/messages (paginated) + GET /:id/watch (SSE)
@@ -55,6 +56,9 @@ The `createApp()` / `listen` split exists so tests can import `createApp()` with
 | `PATCH` | `/api/projects/:id/files` | ✓ | Atomic file write with optimistic locking |
 | `POST` | `/api/projects/:id/exec` | ✓ | SSE; streams shell command output (see [Terminal](terminal.md)) |
 | `GET` | `/api/events` | ✓ | App-level SSE (reload, future notifications) |
+| `GET` | `/api/push/vapid-public-key` | ✓ | Returns `{ key }` for client subscription setup |
+| `POST` | `/api/push/subscribe` | ✓ | Upsert push subscription `{ endpoint, keys: { p256dh, auth } }` |
+| `DELETE` | `/api/push/subscribe` | ✓ | Remove subscription by `{ endpoint }` |
 | `GET` | `/api/admin/version` | ✓ | Package version |
 | `POST` | `/api/admin/reload` | ✓ | Broadcast reload event then `process.exit(0)` |
 
@@ -208,6 +212,38 @@ process.env.DATABASE_PATH = `/tmp/steward-test-${workerId}-${Date.now()}.db`
 npm test --workspace=server    # run server tests only
 npm run test:coverage          # with coverage report
 ```
+
+---
+
+## Push Notifications
+
+Uses the **Web Push API** with VAPID authentication (`web-push` npm package).
+
+### Setup
+
+Generate a VAPID key pair once and store in `.env` **and** in `ecosystem.dev.config.cjs` (PM2 env section):
+
+```bash
+npx web-push generate-vapid-keys
+```
+
+Required env vars:
+```
+VAPID_PUBLIC_KEY=<base64url>
+VAPID_PRIVATE_KEY=<base64url>
+VAPID_SUBJECT=mailto:admin@example.com
+```
+
+> **Important — ESM module evaluation order**: In ESM, all `import` statements are evaluated before the importing module's body runs. This means `dotenv.config()` in `index.ts` fires *after* all imported modules have already evaluated their top-level code. Any module that reads `process.env.*` at the top level (outside a function) will see undefined values. `pushNotifications.ts` avoids this by reading env vars **lazily inside functions** (`isPushEnabled()`, `notifyAll()`).
+>
+> Additionally, PM2 only applies new ecosystem config env vars when started with `--update-env`. Plain `pm2 restart` keeps the old env snapshot. To apply new vars: `pm2 restart ecosystem.dev.config.cjs --only steward-server --update-env`.
+
+### Flow
+
+1. Client registers `sw.js` on app load; `usePushNotifications` hook calls `POST /api/push/subscribe` with `{ endpoint, keys }` → stored in `push_subscriptions` table
+2. On `onComplete` in `chat.ts`: if `notifyWatchers()` returns 0 (no browser tab open), `notifyAll()` fans out a push to all stored subscriptions
+3. `sw.js` `push` event fires → `showNotification()`; `notificationclick` → focuses existing tab or `openWindow('/?session=...')`
+4. Stale subscriptions (HTTP 410/404 from push service) are auto-deleted
 
 ---
 

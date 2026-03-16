@@ -18,7 +18,8 @@
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^5.1.0",
-    "uuid": "^11.0.5"
+    "uuid": "^11.0.5",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.10",
@@ -27,6 +28,7 @@
     "@types/node": "^22.0.0",
     "@types/supertest": "^7.2.0",
     "@types/uuid": "^10.0.0",
+    "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^4.1.0",
     "supertest": "^7.2.2",
     "tsx": "^4.19.2",

@@ -91,6 +91,16 @@ db.exec(`
   )
 `)
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id         TEXT PRIMARY KEY,
+    endpoint   TEXT NOT NULL UNIQUE,
+    p256dh     TEXT NOT NULL,
+    auth       TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )
+`)
+
 // ── Types ────────────────────────────────────────────────────────────────────
 
 export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'bypassPermissions'
@@ -317,6 +327,36 @@ export const authSessionQueries = {
   touch: (id: string) => touchAuthSessionStmt.run(id),
   delete: (id: string) => deleteAuthSessionStmt.run(id),
   purgeExpired: () => purgeExpiredSessionsStmt.run(),
+}
+
+// ── Push subscription types & queries ────────────────────────────────────────
+
+export type PushSubscription = {
+  id: string
+  endpoint: string
+  p256dh: string
+  auth: string
+  created_at: number
+}
+
+const insertPushSubStmt = db.prepare(
+  `INSERT INTO push_subscriptions (id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)
+   ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh, auth=excluded.auth`
+)
+const listPushSubsStmt = db.prepare(`SELECT * FROM push_subscriptions`)
+const deletePushSubByEndpointStmt = db.prepare(
+  `DELETE FROM push_subscriptions WHERE endpoint = ?`
+)
+const deletePushSubByIdStmt = db.prepare(
+  `DELETE FROM push_subscriptions WHERE id = ?`
+)
+
+export const pushSubscriptionQueries = {
+  upsert: (id: string, endpoint: string, p256dh: string, auth: string) =>
+    insertPushSubStmt.run(id, endpoint, p256dh, auth),
+  list: () => listPushSubsStmt.all() as PushSubscription[],
+  deleteByEndpoint: (endpoint: string) => deletePushSubByEndpointStmt.run(endpoint),
+  deleteById: (id: string) => deletePushSubByIdStmt.run(id),
 }
 
 /**

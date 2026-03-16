@@ -5,6 +5,7 @@ import { sessionQueries, messageQueries, projectQueries } from '../db/index.js'
 import { spawnClaude } from '../claude/process.js'
 import { notifyWatchers } from '../lib/sessionWatchers.js'
 import { registerChat, unregisterChat, abortChat } from '../lib/activeChats.js'
+import { notifyAll } from '../lib/pushNotifications.js'
 
 function sendSseEvent(res: Response, event: string, data: unknown): void {
   if (res.writableEnded) return
@@ -85,7 +86,16 @@ router.post('/', (req, res) => {
         messageQueries.insert(uuidv4(), sessionId, 'assistant', assistantText)
       }
       // Notify any clients watching this session (returned after navigating away mid-stream).
-      notifyWatchers(sessionId)
+      const notified = notifyWatchers(sessionId)
+      // If no browser tab was watching, send a push notification instead.
+      if (notified === 0 && assistantText) {
+        const preview = assistantText.replace(/\s+/g, ' ').trim().slice(0, 80)
+        void notifyAll({
+          title: session.title === 'New Chat' ? 'Claude replied' : session.title,
+          body: preview + (assistantText.length > 80 ? '…' : ''),
+          url: `/?session=${sessionId}`,
+        })
+      }
     },
     onError: () => {
       unregisterChat(sessionId)

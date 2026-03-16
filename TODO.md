@@ -15,8 +15,11 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 
 ### Scheduler
 - [ ] **Scheduled conversation resume** — `schedules` table (`id`, `session_id`, `cron`, `prompt_context`, `enabled`); `node-cron` runner injects context-aware wake messages ("would you like to resume the conversation about X?")
-- [ ] **Push notifications** — FCM / web push to registered devices; fires when scheduler produces output while browser is closed
+- [ ] **Push notifications (scheduler)** — extend the existing push infrastructure to fire when a scheduled session produces output; also consider a per-session opt-in so Claude reply notifications can be toggled per session rather than globally
 - [ ] **Scheduler UI** — list/create/toggle schedules; associate with a session; set reminder text
+
+### Core UX
+- [ ] **Favicon** — add a favicon for the client app
 
 ### Workspace / Files
 - [ ] **MCP support** — pass `--mcp-config <path>` to spawn args; `mcp_configs` table per project; UI to manage JSON configs

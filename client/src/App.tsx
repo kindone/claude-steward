@@ -40,6 +40,14 @@ export default function App() {
   const [restarting, setRestarting] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
+  // Register service worker on mount so it's always available for push notifications,
+  // regardless of whether a session/ChatWindow is open.
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {})
+    }
+  }, [])
+
   // Check auth on mount
   useEffect(() => {
     getAuthStatus()
