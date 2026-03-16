@@ -11,6 +11,23 @@ import AuthPage from './components/AuthPage'
 
 type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
 
+const LAST_STATE_KEY = 'steward:lastState'
+
+function readLastState(): { projectId: string | null; sessionId: string | null } {
+  try {
+    const raw = localStorage.getItem(LAST_STATE_KEY)
+    return raw ? JSON.parse(raw) : { projectId: null, sessionId: null }
+  } catch {
+    return { projectId: null, sessionId: null }
+  }
+}
+
+function saveLastState(projectId: string | null, sessionId: string | null): void {
+  try {
+    localStorage.setItem(LAST_STATE_KEY, JSON.stringify({ projectId, sessionId }))
+  } catch { /* quota exceeded or private mode — ignore */ }
+}
+
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>('loading')
   const [hasCredentials, setHasCredentials] = useState(false)
@@ -57,24 +74,32 @@ export default function App() {
     })
   }, [])
 
-  // Load projects and meta once authenticated
+  // Load projects and meta once authenticated; restore last-used project if it still exists
   useEffect(() => {
     if (authState !== 'authenticated') return
     listProjects().then((loaded) => {
       setProjects(loaded)
-      if (loaded.length > 0) setActiveProjectId(loaded[0].id)
+      if (loaded.length > 0) {
+        const { projectId } = readLastState()
+        const restored = loaded.find((p) => p.id === projectId)
+        setActiveProjectId(restored ? restored.id : loaded[0].id)
+      }
     }).catch(console.error)
     fetchMeta().then((m) => setAppRoot(m.appRoot)).catch(console.error)
   }, [authState])
 
-  // Load sessions whenever the active project changes
+  // Load sessions whenever the active project changes; restore last-used session if it still exists
   useEffect(() => {
     setLoading(true)
     setActiveSessionId(null)
     listSessions(activeProjectId)
       .then((data) => {
         setSessions(data)
-        if (data.length > 0) setActiveSessionId(data[0].id)
+        if (data.length > 0) {
+          const { sessionId } = readLastState()
+          const restored = data.find((s) => s.id === sessionId)
+          setActiveSessionId(restored ? restored.id : data[0].id)
+        }
       })
       .catch(console.error)
       .finally(() => setLoading(false))
@@ -191,6 +216,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKeyDown)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, sessions])
+
+  // Persist last-used project + session so we can restore them on next load.
+  // Only save when we have a real project (skip the null state during loading transitions).
+  useEffect(() => {
+    if (activeProjectId) saveLastState(activeProjectId, activeSessionId)
+  }, [activeProjectId, activeSessionId])
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const activeSession = sessions.find((s) => s.id === activeSessionId)
