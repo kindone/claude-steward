@@ -208,6 +208,67 @@ export async function patchFile(
   return res.json() as Promise<{ lastModified: number }>
 }
 
+// ── Exec ──────────────────────────────────────────────────────────────────────
+
+export type ExecHandlers = {
+  onOutput: (text: string) => void
+  onDone: (exitCode: number) => void
+  onError?: (message: string) => void
+}
+
+/**
+ * Run a shell command in the project directory and stream output via SSE.
+ * Returns a cancel function that aborts the request and kills the process.
+ */
+export function execCommand(projectId: string, command: string, handlers: ExecHandlers): () => void {
+  const controller = new AbortController()
+
+  fetch(`/api/projects/${projectId}/exec`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ command }),
+    signal: controller.signal,
+    ...credentialsOpt,
+  }).then(async (res) => {
+    if (!res.ok || !res.body) {
+      const body = await res.json().catch(() => ({ error: 'Failed to run command' })) as { error: string }
+      handlers.onError?.(body.error ?? 'Failed to run command')
+      return
+    }
+
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let buf = ''
+    let pendingEvent = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buf += decoder.decode(value, { stream: true })
+      const lines = buf.split('\n')
+      buf = lines.pop() ?? ''
+      for (const line of lines) {
+        const t = line.trimEnd()
+        if (t.startsWith('event: ')) {
+          pendingEvent = t.slice(7)
+        } else if (t.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(t.slice(6)) as { text?: string; exitCode?: number; message?: string }
+            if (pendingEvent === 'output' && data.text !== undefined) handlers.onOutput(data.text)
+            else if (pendingEvent === 'done' && data.exitCode !== undefined) handlers.onDone(data.exitCode)
+            else if (pendingEvent === 'error') handlers.onError?.(data.message ?? 'Error')
+          } catch { /* ignore malformed */ }
+          pendingEvent = ''
+        }
+      }
+    }
+  }).catch((err: unknown) => {
+    if ((err as Error).name !== 'AbortError') handlers.onError?.((err as Error).message ?? 'Connection failed')
+  })
+
+  return () => controller.abort()
+}
+
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
 export async function createSession(projectId: string): Promise<Session> {

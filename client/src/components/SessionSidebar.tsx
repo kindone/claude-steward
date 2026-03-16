@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import type { Session, Project } from '../lib/api'
 import { ProjectPicker } from './ProjectPicker'
 import { FileTree } from './FileTree'
+import { TerminalPanel } from './TerminalPanel'
 
 type Props = {
   projects: Project[]
@@ -44,12 +45,12 @@ export function SessionSidebar({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const editInputRef = useRef<HTMLInputElement>(null)
-  const [activeTab, setActiveTab] = useState<'sessions' | 'files'>(() => {
-    try { return (localStorage.getItem('steward:sidebarTab') as 'sessions' | 'files') ?? 'sessions' }
+  const [activeTab, setActiveTab] = useState<'sessions' | 'files' | 'terminal'>(() => {
+    try { return (localStorage.getItem('steward:sidebarTab') as 'sessions' | 'files' | 'terminal') ?? 'sessions' }
     catch { return 'sessions' }
   })
 
-  const switchTab = useCallback((tab: 'sessions' | 'files') => {
+  const switchTab = useCallback((tab: 'sessions' | 'files' | 'terminal') => {
     setActiveTab(tab)
     try { localStorage.setItem('steward:sidebarTab', tab) } catch { /* ignore */ }
   }, [])
@@ -132,17 +133,17 @@ export function SessionSidebar({
 
       {/* Tab bar */}
       <div className="flex border-b border-[#1f1f1f] flex-shrink-0">
-        {(['sessions', 'files'] as const).map((tab) => (
+        {(['sessions', 'files', 'terminal'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => switchTab(tab)}
-            className={`flex-1 py-2 text-[11px] font-semibold tracking-widest uppercase transition-colors border-b-2
+            className={`flex-1 py-2 text-[10px] font-semibold tracking-widest uppercase transition-colors border-b-2
               ${activeTab === tab
                 ? 'text-[#e8e8e8] border-blue-500'
                 : 'text-[#555] border-transparent hover:text-[#888]'}`}
           >
             {tab === 'sessions' ? (
-              <span className="flex items-center justify-center gap-1.5">
+              <span className="flex items-center justify-center gap-1">
                 Sessions
                 {sessions.length > 0 && (
                   <span className="bg-[#2a2a2a] text-[#666] text-[10px] font-semibold px-1.5 py-px rounded-full">
@@ -150,7 +151,7 @@ export function SessionSidebar({
                   </span>
                 )}
               </span>
-            ) : 'Files'}
+            ) : tab === 'terminal' ? 'Term' : 'Files'}
           </button>
         ))}
       </div>
@@ -256,6 +257,14 @@ export function SessionSidebar({
           ? <FileTree projectId={activeProjectId} alwaysExpanded />
           : <p className="px-3 py-4 text-[12px] text-[#444] italic">No project selected</p>
       )}
+
+      {/* Terminal tab — always mounted once first shown so xterm.js instance survives tab switches */}
+      <div className={`flex-1 min-h-0 flex flex-col ${activeTab === 'terminal' ? '' : 'hidden'}`}>
+        {activeProjectId
+          ? <TerminalPanel projectId={activeProjectId} />
+          : <p className="px-3 py-4 text-[12px] text-[#444] italic">No project selected</p>
+        }
+      </div>
 
       {/* Sign out — desktop only (mobile has it in the header bar) */}
       {onLogout && (

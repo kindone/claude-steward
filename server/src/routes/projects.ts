@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { spawn } from 'node:child_process'
 import { projectQueries, type PermissionMode } from '../db/index.js'
 
 // Monorepo root — three directories up from server/src/routes/
@@ -264,6 +265,70 @@ router.get('/:id/files/raw', (req, res) => {
   } catch {
     res.status(404).json({ error: 'File not found' })
   }
+})
+
+// POST /api/projects/:id/exec
+// Body: { command: string }
+// Streams stdout + stderr as SSE `event: output` chunks; `event: done` with exit code at end.
+// Sets FORCE_COLOR / COLORTERM so most CLI tools emit ANSI colours even without a pty.
+const EXEC_TIMEOUT_MS = 60_000
+
+router.post('/:id/exec', (req, res) => {
+  const project = projectQueries.findById(req.params.id)
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' })
+    return
+  }
+
+  const { command } = req.body as { command?: string }
+  if (!command?.trim()) {
+    res.status(400).json({ error: 'command is required' })
+    return
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders()
+
+  const child = spawn('sh', ['-c', command], {
+    cwd: project.path,
+    env: {
+      ...process.env,
+      FORCE_COLOR: '1',
+      COLORTERM: 'truecolor',
+      TERM: 'xterm-256color',
+      COLUMNS: '120',
+      LINES: '40',
+    },
+  })
+
+  function sendOutput(text: string) {
+    if (!res.writableEnded) res.write(`event: output\ndata: ${JSON.stringify({ text })}\n\n`)
+  }
+
+  child.stdout.on('data', (chunk: Buffer) => sendOutput(chunk.toString()))
+  child.stderr.on('data', (chunk: Buffer) => sendOutput(chunk.toString()))
+
+  child.on('close', (code) => {
+    if (!res.writableEnded) {
+      res.write(`event: done\ndata: ${JSON.stringify({ exitCode: code ?? 0 })}\n\n`)
+      res.end()
+    }
+  })
+
+  const timeout = setTimeout(() => {
+    sendOutput('\r\n\x1b[33m[timed out after 60 s]\x1b[0m\r\n')
+    child.kill('SIGTERM')
+  }, EXEC_TIMEOUT_MS)
+
+  child.on('close', () => clearTimeout(timeout))
+
+  // Kill the child if the client disconnects
+  res.on('close', () => {
+    clearTimeout(timeout)
+    child.kill('SIGTERM')
+  })
 })
 
 /** Resolve a user-supplied relative path against the project root, preventing traversal. */
