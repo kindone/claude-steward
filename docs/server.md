@@ -18,7 +18,8 @@ server/src/
 │   └── index.ts      ← schema, migrations, projectQueries/sessionQueries/messageQueries
 ├── lib/
 │   ├── connections.ts     ← global Set<Response> for app-level SSE fan-out
-│   └── sessionWatchers.ts ← Map<sessionId, Set<Response>> for session completion watch
+│   ├── sessionWatchers.ts ← Map<sessionId, Set<Response>> for session completion watch
+│   └── activeChats.ts     ← Map<sessionId, AbortController> for in-flight Claude spawns
 └── routes/
     ├── chat.ts        ← POST /api/chat
     ├── sessions.ts    ← CRUD + GET /:id/messages (paginated) + GET /:id/watch (SSE)
@@ -37,6 +38,7 @@ The `createApp()` / `listen` split exists so tests can import `createApp()` with
 |---|---|---|---|
 | `GET` | `/api/meta` | none | App metadata: `{ appRoot }` |
 | `POST` | `/api/chat` | ✓ | Start SSE stream; spawns Claude subprocess |
+| `DELETE` | `/api/chat/:sessionId` | ✓ | Kill the in-progress Claude subprocess; returns `{ stopped: bool }` |
 | `GET` | `/api/sessions` | ✓ | List sessions; optional `?projectId=` filter |
 | `POST` | `/api/sessions` | ✓ | Create session; `projectId` required in body |
 | `PATCH` | `/api/sessions/:id` | ✓ | Update session fields: `{ title?, systemPrompt?, permissionMode? }` |

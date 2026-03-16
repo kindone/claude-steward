@@ -568,3 +568,16 @@ export function sendMessage(
 
   return () => controller.abort()
 }
+
+/**
+ * Ask the server to kill the in-progress Claude subprocess for this session.
+ * Fire-and-forget; the caller should also abort the SSE fetch via the cancel
+ * function returned by sendMessage.
+ */
+export function stopChat(sessionId: string): void {
+  fetch(`/api/chat/${sessionId}`, {
+    method: 'DELETE',
+    headers: JSON_HEADERS,
+    ...credentialsOpt,
+  }).catch(() => { /* ignore */ })
+}

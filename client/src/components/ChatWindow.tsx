@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, getMessages, watchSession, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode, type ToolCall } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode, type ToolCall } from '../lib/api'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
@@ -316,6 +316,8 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
         onSend={handleSend}
         onStop={() => {
           streamingFromSendRef.current = false
+          // Tell the server to kill the Claude subprocess before aborting the SSE fetch.
+          stopChat(sessionId)
           cancelRef.current?.()
           setMessages((prev) =>
             prev.map((m) => (m.streaming ? { ...m, streaming: false } : m))

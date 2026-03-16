@@ -197,6 +197,7 @@ All functions accept/return typed objects and throw on non-OK responses.
 | `getMessages(sessionId, opts?)` | Paginated: `{ limit?, before? }` → `{ messages, hasMore }` (default limit 50) |
 | `watchSession(sessionId, onDone, onError?)` | `EventSource` on `GET /watch`; returns cancel fn |
 | `sendMessage(sessionId, text, handlers)` | Starts chat SSE; returns cancel fn. See `ChunkHandler` below |
+| `stopChat(sessionId)` | `DELETE /api/chat/:id` — kills the subprocess; fire-and-forget |
 | `subscribeToAppEvents(handlers)` | Starts events SSE; returns cancel fn |
 
 **Key exported types**

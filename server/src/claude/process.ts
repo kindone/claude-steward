@@ -107,7 +107,9 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
     ...(cwd ? { cwd } : {}),
   })
 
+  let intentionalKill = false
   signal?.addEventListener('abort', () => {
+    intentionalKill = true
     child.kill('SIGTERM')
   })
 
@@ -184,6 +186,11 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
   })
 
   child.on('close', (code) => {
+    if (intentionalKill) {
+      // User-initiated stop — close the response cleanly without error or DB persistence.
+      if (!res.writableEnded) res.end()
+      return
+    }
     if (code !== 0 && !res.writableEnded) {
       const isResumeAttempt = Boolean(claudeSessionId)
       const detail = stderrOutput.trim() || undefined

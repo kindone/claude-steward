@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { sessionQueries, messageQueries, projectQueries } from '../db/index.js'
 import { spawnClaude } from '../claude/process.js'
 import { notifyWatchers } from '../lib/sessionWatchers.js'
+import { registerChat, unregisterChat, abortChat } from '../lib/activeChats.js'
 
 function sendSseEvent(res: Response, event: string, data: unknown): void {
   if (res.writableEnded) return
@@ -61,12 +62,16 @@ router.post('/', (req, res) => {
 
   const project = session.project_id ? projectQueries.findById(session.project_id) : undefined
 
+  const controller = new AbortController()
+  registerChat(sessionId, controller)
+
   spawnClaude({
     message,
     claudeSessionId: session.claude_session_id,
     systemPrompt: session.system_prompt,
     permissionMode: session.permission_mode,
     res,
+    signal: controller.signal,
     cwd: project?.path,
     onSessionId: (claudeSessionId) => {
       if (!session.claude_session_id) {
@@ -75,6 +80,7 @@ router.post('/', (req, res) => {
       }
     },
     onComplete: (assistantText) => {
+      unregisterChat(sessionId)
       if (assistantText) {
         messageQueries.insert(uuidv4(), sessionId, 'assistant', assistantText)
       }
@@ -82,6 +88,7 @@ router.post('/', (req, res) => {
       notifyWatchers(sessionId)
     },
     onError: () => {
+      unregisterChat(sessionId)
       // Clear the stale claude_session_id so the next message starts fresh
       // instead of looping on another failed --resume attempt.
       if (session.claude_session_id) {
@@ -98,6 +105,16 @@ router.post('/', (req, res) => {
   res.on('close', () => {
     if (!res.writableEnded) res.end()
   })
+})
+
+/**
+ * DELETE /api/chat/:sessionId
+ * Explicitly stop an in-progress Claude run. Sends SIGTERM to the subprocess
+ * without triggering the error path or persisting a partial response.
+ */
+router.delete('/:sessionId', (req, res) => {
+  const found = abortChat(req.params.sessionId)
+  res.status(found ? 200 : 404).json({ stopped: found })
 })
 
 export default router
