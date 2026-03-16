@@ -40,7 +40,8 @@ App
     ├── session header bar   (always visible: ⚙ Prompt toggle left, Plan/Edit/Full mode selector right)
     │   └── system prompt editor  (collapsible; textarea + Save/Cancel/Clear)
     ├── MessageBubble[]      (one per message; streaming + error states + copy button)
-    ├── tool activity indicator  (visible while streaming; shows pulsing dots + current tool name)
+    │   └── tool history strip   (collapsed by default; ▶ Bash · Read · Edit; click to expand with full command detail)
+    ├── streaming indicator  (pulsing dots; assembled calls shown as "Bash: git log …"; active tool shown in blue)
     └── MessageInput         (textarea + Send/Stop)
 ```
 
@@ -61,7 +62,9 @@ All global state lives in `App.tsx`. No external store.
 | `loading` | `boolean` | Session list loading indicator |
 | `restarting` | `boolean` | Overlay shown during app-level reload |
 
-`ChatWindow` manages its own local state (messages, streaming flag, current tool name) and is fully reset on session switch via React's `key` prop.
+`ChatWindow` manages its own local state (messages, streaming flag, active tool name, accumulated tool calls) and is fully reset on session switch via React's `key` prop.
+
+`App.tsx` persists `{ projectId, sessionId }` to `localStorage` under `steward:lastState` on every selection change and restores it on mount (validating IDs still exist). Since prod and dev run on separate origins, each environment independently tracks its own context.
 
 ### Session list behaviour
 
@@ -88,7 +91,7 @@ Implemented as a `keydown` listener in `App.tsx` (registered once per `activeSes
 The server chat stream uses `Content-Type: text/event-stream`, but the client uses `fetch()` + `ReadableStream` instead of `EventSource`:
 
 > **Why not `EventSource`?**
-> The browser's built-in `EventSource` API does not support custom request headers. Since every request must carry `Authorization: Bearer <API_KEY>`, a manual fetch-based parser is required.
+> The browser's built-in `EventSource` API does not support `credentials: 'include'` for cross-origin requests, nor custom request headers. All requests must carry the session cookie, so a manual fetch-based parser is used instead.
 
 `sendMessage()` in `api.ts` reads the response body as a stream and parses SSE lines manually:
 
@@ -99,11 +102,20 @@ buffer accumulates chunks from ReadableStream
 → 'event: '  lines set pendingEvent
 → 'data: '   lines dispatch based on pendingEvent:
     title   → onTitle()
-    chunk   → content_block_start (tool_use) → onToolActivity(toolName)
+    chunk (stream_event)
+            → content_block_start (tool_use) → onToolActivity(toolName)   [live indicator, name only]
             → content_block_delta (text_delta) → onToolActivity(null) + onTextDelta()
+    chunk (assistant)
+            → content[].type === 'tool_use'  → onToolCall({ name, detail })  [full call with command/path]
+              detail extracted per tool: Bash→command, Read/Edit/Write→file_path,
+              WebSearch→query, WebFetch→url (capped at 80–100 chars)
     done    → onDone()
     error   → onError(message, code?)
 ```
+
+Two separate signals per tool invocation:
+- `onToolActivity(name)` fires from `stream_event → content_block_start` — name only, fires immediately as the tool input starts streaming; used for the live blue indicator
+- `onToolCall({ name, detail })` fires from `assistant` chunks — fires when the full input is assembled; accumulated into the persistent `toolUses[]` list attached to the message
 
 The same pattern is used in `subscribeToAppEvents()` for the `/api/events` connection, which auto-reconnects after a 3-second backoff on unexpected drops.
 
@@ -165,8 +177,16 @@ All functions accept/return typed objects and throw on non-OK responses.
 | `updatePermissionMode(id, mode)` | `PATCH /api/sessions/:id` with `{ permissionMode }` |
 | `deleteSession(id)` | `DELETE /api/sessions/:id` |
 | `getMessages(sessionId)` | `GET /api/sessions/:id/messages` |
-| `sendMessage(sessionId, text, handlers)` | Starts chat SSE; returns cancel fn |
+| `sendMessage(sessionId, text, handlers)` | Starts chat SSE; returns cancel fn. `ChunkHandler` callbacks: `onTextDelta`, `onTitle`, `onDone`, `onError`, `onToolActivity(name\|null)`, `onToolCall({ name, detail? })`, `onActivity` |
 | `subscribeToAppEvents(handlers)` | Starts events SSE; returns cancel fn |
+
+**Key exported types**
+
+| Type | Fields |
+|---|---|
+| `ToolCall` | `name: string`, `detail?: string` — one assembled tool invocation |
+| `ChunkHandler` | All SSE callback handlers for `sendMessage` |
+| `ClaudeErrorCode` | `'session_expired' \| 'process_error' \| 'http_error'` |
 
 ---
 
