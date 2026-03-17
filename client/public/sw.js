@@ -11,8 +11,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title ?? 'Steward', {
       body: data.body ?? '',
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
+      icon: '/favicon.svg',
+      badge: '/favicon.svg',
       data: { url: data.url ?? '/' },
     })
   )

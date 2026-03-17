@@ -24,7 +24,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 ### Core UX
 - [ ] **Chat input persistence** — `MessageInput` uses an uncontrolled textarea ref; draft text is lost on tab close. Fix: persist draft to `localStorage` keyed by session ID (e.g. `draft:<sessionId>`), restore on mount, clear on send. Add a debounced `onInput` handler to avoid writing on every keystroke.
 - [ ] **Last project/session restoration** — revisit the restore-on-reload logic; current behaviour often resets to the topmost session/project instead of the one last visited
-- [ ] **Favicon** — add a favicon for the client app; also add `/icon-192.png` (already referenced in `sw.js` for push notification icon/badge — shows broken until this exists)
+- [x] **Favicon** — `favicon.svg` (🧭 on blue background) added to `client/public/`; `index.html` updated with icon/apple-touch-icon/theme-color meta; `sw.js` updated to use `/favicon.svg` instead of missing `/icon-192.png`
 - [ ] **Rich chat content rendering** — `MessageBubble` currently pipes raw `marked.parse()` output straight into `dangerouslySetInnerHTML` with no sanitization (XSS risk — fix with DOMPurify regardless of other work); beyond that, several rendering gaps to close:
   - **HTML sanitization** (security, do first): wrap `marked.parse()` output with `DOMPurify.sanitize()` before inserting into the DOM
   - **Mermaid diagrams**: detect fenced ` ```mermaid ` blocks and render them via `mermaid.js` instead of showing raw code; Claude generates these frequently
