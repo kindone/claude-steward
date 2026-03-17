@@ -22,7 +22,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 - [ ] **New device passkey login** — RP ID mismatch fixed (`APP_DOMAIN` was hardcoded as `steward.example.com` in ecosystem configs, overriding `.env`; removed and now loads correctly from `.env`). Remaining: new-device bootstrapping flow (a device with no registered passkey and no iCloud/Google sync has no way to authenticate; needs a one-time invite link or similar mechanism). Also: `register/finish` was observed throwing `"User verification was required, but user could not be verified"` — investigate if this resurfaces.
 
 ### Core UX
-- [ ] **Chat input persistence** — `MessageInput` uses an uncontrolled textarea ref; draft text is lost on tab close. Fix: persist draft to `localStorage` keyed by session ID (e.g. `draft:<sessionId>`), restore on mount, clear on send. Add a debounced `onInput` handler to avoid writing on every keystroke.
+- [x] **Chat input persistence** — draft saved to `localStorage` keyed by `steward:draft:<sessionId>`, restored on mount, cleared on send; 400ms debounce on input.
 - [ ] **Last project/session restoration** — revisit the restore-on-reload logic; current behaviour often resets to the topmost session/project instead of the one last visited
 - [x] **Favicon** — `favicon.svg` (🧭 on blue background) added to `client/public/`; `index.html` updated with icon/apple-touch-icon/theme-color meta; `sw.js` updated to use `/favicon.svg` instead of missing `/icon-192.png`
 - [ ] **Rich chat content rendering** — `MessageBubble` currently pipes raw `marked.parse()` output straight into `dangerouslySetInnerHTML` with no sanitization (XSS risk — fix with DOMPurify regardless of other work); beyond that, several rendering gaps to close:

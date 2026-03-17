@@ -363,6 +363,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       </div>
 
       <MessageInput
+        sessionId={sessionId}
         onSend={handleSend}
         onStop={() => {
           streamingFromSendRef.current = false

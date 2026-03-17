@@ -97,16 +97,19 @@ steward-safe  (node safe/server.js)  port 3003  ← frozen, see safe.md
 **`ecosystem.dev.config.cjs`** — development (three processes):
 
 ```
-steward-server  (npm run dev --workspace=server)  port 3001  ← tsx watch, auto-reloads on file changes
-steward-client  (npm run dev --workspace=client)  port 5173  ← Vite HMR
+steward-server  (npm run dev --workspace=server)  port 3002  ← tsx watch, auto-reloads on file changes
+steward-client  (npm run dev --workspace=client)  port 5173  ← Vite HMR dev server
 steward-safe    (node safe/server.js)             port 3003  ← frozen, same as production
 ```
+
+**How dev HMR works through nginx:**
+nginx proxies `dev.steward.jradoo.com → :5173` (Vite dev server). WebSocket upgrade headers (`Upgrade`, `Connection`) are forwarded via the `$connection_upgrade` map in `/etc/nginx/conf.d/ws-map.conf`, so HMR works end-to-end over HTTPS/WSS. Vite proxies `/api → :3002` internally (configured in `vite.config.ts`), so API calls are transparent.
 
 ### Upgrade flow in dev mode
 
 The self-upgrade path (`POST /api/admin/reload` → `process.exit(0)`) still works in dev:
 - PM2 restarts `steward-server` after the clean exit; `tsx watch` picks up any file changes.
-- Client changes are handled by Vite HMR and don't require a restart at all.
+- Client changes: Vite HMR pushes module updates instantly — no page refresh needed.
 - `steward-safe` is unaffected in both modes.
 
 ### Surviving reboots
@@ -125,8 +128,8 @@ nginx sits in front of both domains and handles TLS termination. Configs live in
 
 | Domain | nginx config | Upstream |
 |---|---|---|
-| `steward.jradoo.com` | `steward` | `:3001` (prod) or `:5173` (dev if not using dev subdomain) |
-| `dev.steward.jradoo.com` | `steward-dev` | `:5173` (Vite dev server; optional, for dual-mode) |
+| `steward.jradoo.com` | `steward` | `:3001` (prod `steward-main`) |
+| `dev.steward.jradoo.com` | `steward-dev` | `:5173` (Vite HMR dev server; proxies `/api` to `:3002`) |
 | `safe.steward.jradoo.com` | `steward-safe` | `:3003` (always) |
 
 Both main and safe domains have Let's Encrypt certs (auto-renewing via certbot systemd timer).

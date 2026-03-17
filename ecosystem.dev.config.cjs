@@ -1,7 +1,7 @@
 /**
  * PM2 ecosystem config for development mode.
  *
- * Runs tsx watch (server) and Vite (client) as stable PM2-managed processes.
+ * Runs tsx watch (server) and vite build --watch (client) as PM2-managed processes.
  * Use this instead of `npm run dev` to keep processes alive across SSH sessions.
  *
  * Setup:
@@ -9,9 +9,14 @@
  *   npm run down            # stop all steward processes
  *   pm2 logs                # tail all logs
  *
- * The upgrade flow via POST /api/admin/reload still works in dev:
+ * Dev cycle:
+ *   nginx proxies dev.steward.jradoo.com → :5173 (Vite dev server, HMR enabled).
+ *   Vite proxies /api → :3002 (steward-server). WebSocket upgrades are forwarded
+ *   by nginx using the ws-map in /etc/nginx/conf.d/ws-map.conf.
+ *
+ * Upgrade flow in dev:
  *   process.exit(0) → PM2 restarts steward-server → tsx watch picks up changes
- *   Client changes are handled by Vite HMR without a restart.
+ *   Client changes: Vite HMR pushes updates instantly, no page refresh needed.
  *
  * steward-safe runs identically to production and is always included.
  * FROZEN — do not modify the steward-safe entry or the safe/ directory.
