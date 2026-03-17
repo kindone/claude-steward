@@ -18,10 +18,30 @@ Canonical task list. Completed items → `archived_tasks.md`. Milestone context 
 - [ ] **Push notifications (scheduler)** — extend the existing push infrastructure to fire when a scheduled session produces output; also consider a per-session opt-in so Claude reply notifications can be toggled per session rather than globally
 - [ ] **Scheduler UI** — list/create/toggle schedules; associate with a session; set reminder text
 
+### Auth
+- [ ] **New device passkey login** — RP ID mismatch fixed (`APP_DOMAIN` was hardcoded as `steward.example.com` in ecosystem configs, overriding `.env`; removed and now loads correctly from `.env`). Remaining: new-device bootstrapping flow (a device with no registered passkey and no iCloud/Google sync has no way to authenticate; needs a one-time invite link or similar mechanism). Also: `register/finish` was observed throwing `"User verification was required, but user could not be verified"` — investigate if this resurfaces.
+
 ### Core UX
-- [ ] **Favicon** — add a favicon for the client app
+- [ ] **Chat input persistence** — `MessageInput` uses an uncontrolled textarea ref; draft text is lost on tab close. Fix: persist draft to `localStorage` keyed by session ID (e.g. `draft:<sessionId>`), restore on mount, clear on send. Add a debounced `onInput` handler to avoid writing on every keystroke.
+- [ ] **Last project/session restoration** — revisit the restore-on-reload logic; current behaviour often resets to the topmost session/project instead of the one last visited
+- [ ] **Favicon** — add a favicon for the client app; also add `/icon-192.png` (already referenced in `sw.js` for push notification icon/badge — shows broken until this exists)
+- [ ] **Rich chat content rendering** — `MessageBubble` currently pipes raw `marked.parse()` output straight into `dangerouslySetInnerHTML` with no sanitization (XSS risk — fix with DOMPurify regardless of other work); beyond that, several rendering gaps to close:
+  - **HTML sanitization** (security, do first): wrap `marked.parse()` output with `DOMPurify.sanitize()` before inserting into the DOM
+  - **Mermaid diagrams**: detect fenced ` ```mermaid ` blocks and render them via `mermaid.js` instead of showing raw code; Claude generates these frequently
+  - **Image rendering**: project-relative image paths in markdown (e.g. `![](./output.png)`) should resolve via the file binary endpoint so Claude-generated images display inline
+  - **Sandboxed HTML preview**: when Claude produces a standalone HTML artifact (detected heuristically or via a special fence like ` ```html preview `), render it in a sandboxed `<iframe srcdoc>` with a toggle between source and preview views
+  - **Math / LaTeX** (lower priority): KaTeX rendering for `$...$` and `$$...$$` blocks
+
+### Push Notifications (hardening)
+- [ ] **Revisit push notification reliability** — several known brittleness points to address:
+  - `setVapidDetails` is re-called on every `notifyAll()` invocation; move to a one-time init
+  - Transient send failures (non-410/404) are swallowed with `console.error`; add a retry or at-least structured error logging
+  - `notified === 0` race: if the SSE tab closes just as Claude finishes, the watcher count may be wrong and the push is skipped — consider a small grace window or a persist-then-notify pattern
+  - No per-session or per-user targeting (all subscribers get all notifications); prerequisite for the scheduler per-session opt-in
+  - iOS requires "Add to Home Screen" with no in-app guidance; add a dismissible install prompt or at least a tooltip on the bell icon
 
 ### Workspace / Files
+- [ ] **File upload / download** — download button per file in the file browser (binary endpoint already exists, just needs UI); upload via drag-and-drop or file picker into a selected directory (`POST /api/projects/:id/files/upload` multipart endpoint + tree UI entry point); v2: attach a file to a chat message so Claude can work with it directly
 - [ ] **MCP support** — pass `--mcp-config <path>` to spawn args; `mcp_configs` table per project; UI to manage JSON configs
 
 ### Integrations

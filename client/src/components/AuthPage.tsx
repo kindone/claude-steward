@@ -32,8 +32,9 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
       onAuthenticated()
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      // User cancelled is not an error worth showing prominently
-      if (!msg.includes('cancelled') && !msg.includes('NotAllowedError')) {
+      if (msg.includes('authenticate first')) {
+        setError('To register a new device, sign in on an existing device first — your passkey must be available here via iCloud Keychain or Google Password Manager sync.')
+      } else if (!msg.includes('cancelled') && !msg.includes('NotAllowedError')) {
         setError(msg)
       }
     } finally {
@@ -112,13 +113,13 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
         {/* Secondary: add device after login */}
         {hasCredentials && (
           <p className="mt-4 text-center text-xs text-[#555]">
-            New device?{' '}
+            New device? Your passkey should sync via iCloud or Google Password Manager.{' '}
             <button
               onClick={handleRegister}
               disabled={busy}
               className="text-[#888] underline hover:text-white disabled:opacity-50"
             >
-              Register it after signing in
+              Try registering this device
             </button>
           </p>
         )}
