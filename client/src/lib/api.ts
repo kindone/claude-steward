@@ -107,6 +107,7 @@ export type Message = {
   content: string
   is_error: number        // 0 = normal, 1 = error message
   error_code: string | null
+  status: 'complete' | 'streaming' | 'interrupted'
   created_at: number
 }
 

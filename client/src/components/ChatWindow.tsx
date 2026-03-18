@@ -23,8 +23,10 @@ type Message = {
 function dbMessageToLocal(m: ApiMessage): Message {
   return {
     ...m,
-    streaming: false,
-    errorCode: m.is_error ? (m.error_code as ClaudeErrorCode ?? 'process_error') : undefined,
+    streaming: m.status === 'streaming',
+    errorCode: m.status === 'interrupted'
+      ? (m.error_code as ClaudeErrorCode ?? 'process_error')
+      : m.is_error ? (m.error_code as ClaudeErrorCode ?? 'process_error') : undefined,
   }
 }
 
@@ -104,9 +106,15 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       if (cancelled) return
       setMessages(page.messages.map(dbMessageToLocal))
       setHasMore(page.hasMore)
-      // If the last message is from the user, Claude is still (or was) processing.
-      // Subscribe via SSE so the UI updates the instant the response lands — no poll ceiling.
-      if (page.messages.length > 0 && page.messages[page.messages.length - 1].role === 'user') {
+      // Show spinner and watch for completion if:
+      // - last message is from the user (Claude hasn't responded yet), OR
+      // - last message is a streaming assistant message (in-progress, possibly partial content)
+      const last = page.messages[page.messages.length - 1]
+      const inProgress = last && (
+        last.role === 'user' ||
+        (last.role === 'assistant' && last.status === 'streaming')
+      )
+      if (inProgress) {
         setStreaming(true)
         cancelWatch = watchSession(
           sessionId,
