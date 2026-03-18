@@ -6,6 +6,7 @@ import { spawnClaude } from '../claude/process.js'
 import { notifyWatchers } from '../lib/sessionWatchers.js'
 import { registerChat, unregisterChat, abortChat } from '../lib/activeChats.js'
 import { notifyAll } from '../lib/pushNotifications.js'
+import { workerClient } from '../worker/client.js'
 
 function sendSseEvent(res: Response, event: string, data: unknown): void {
   if (res.writableEnded) return
@@ -63,6 +64,84 @@ router.post('/', (req, res) => {
 
   const project = session.project_id ? projectQueries.findById(session.project_id) : undefined
 
+  // ── Shared completion handlers ─────────────────────────────────────────────
+
+  const onComplete = (assistantText: string) => {
+    unregisterChat(sessionId)
+    if (assistantText) {
+      messageQueries.insert(uuidv4(), sessionId, 'assistant', assistantText)
+    }
+    const notified = notifyWatchers(sessionId)
+    if (notified === 0 && res.writableEnded && assistantText) {
+      const preview = assistantText.replace(/\s+/g, ' ').trim().slice(0, 80)
+      void notifyAll({
+        title: session.title === 'New Chat' ? 'Claude replied' : session.title,
+        body: preview + (assistantText.length > 80 ? '…' : ''),
+        url: `/?session=${sessionId}`,
+      })
+    }
+  }
+
+  const onError = (message: string, code: string, content: string) => {
+    unregisterChat(sessionId)
+    if (session.claude_session_id) {
+      sessionQueries.clearClaudeSessionId(sessionId)
+      session.claude_session_id = null
+    }
+    messageQueries.insert(uuidv4(), sessionId, 'assistant', message, true, code)
+    notifyWatchers(sessionId)
+    sendSseEvent(res, 'error', { message, code })
+    if (!res.writableEnded) res.end()
+  }
+
+  // ── Worker path ────────────────────────────────────────────────────────────
+
+  if (workerClient.isConnected()) {
+    workerClient.subscribe(sessionId, (event) => {
+      switch (event.type) {
+        case 'chunk':
+          sendSseEvent(res, 'chunk', event.chunk)
+          break
+        case 'session_id':
+          if (!session.claude_session_id) {
+            sessionQueries.updateClaudeSessionId(event.claudeSessionId, sessionId)
+            session.claude_session_id = event.claudeSessionId
+          }
+          break
+        case 'done':
+          workerClient.unsubscribe(sessionId)
+          sendSseEvent(res, 'done', { session_id: event.claudeSessionId })
+          if (!res.writableEnded) res.end()
+          onComplete(event.content)
+          break
+        case 'error':
+          workerClient.unsubscribe(sessionId)
+          onError(event.message, event.errorCode, event.content)
+          break
+      }
+    })
+
+    workerClient.send({
+      type: 'start',
+      sessionId,
+      prompt: message,
+      claudeSessionId: session.claude_session_id,
+      projectPath: project?.path ?? process.cwd(),
+      permissionMode: session.permission_mode,
+      systemPrompt: session.system_prompt,
+    })
+
+    res.on('close', () => {
+      // Client disconnected — unsubscribe from events but do NOT stop the worker job.
+      // The worker keeps running and persists to its DB; watchSession notifies on completion.
+      workerClient.unsubscribe(sessionId)
+      if (!res.writableEnded) res.end()
+    })
+    return
+  }
+
+  // ── Direct-spawn fallback (worker not available) ───────────────────────────
+
   const controller = new AbortController()
   registerChat(sessionId, controller)
 
@@ -80,46 +159,10 @@ router.post('/', (req, res) => {
         session.claude_session_id = claudeSessionId
       }
     },
-    onComplete: (assistantText) => {
-      unregisterChat(sessionId)
-      if (assistantText) {
-        messageQueries.insert(uuidv4(), sessionId, 'assistant', assistantText)
-      }
-      // Notify any clients watching this session (returned after navigating away mid-stream).
-      const notified = notifyWatchers(sessionId)
-      // If no browser tab was watching, send a push notification instead.
-      // Also skip push if the sending client is still connected (res not yet ended) —
-      // notifyWatchers only tracks watchSession connections, not active sendMessage SSEs,
-      // so we use res.writableEnded as the signal that the sender has disconnected.
-      if (notified === 0 && res.writableEnded && assistantText) {
-        const preview = assistantText.replace(/\s+/g, ' ').trim().slice(0, 80)
-        void notifyAll({
-          title: session.title === 'New Chat' ? 'Claude replied' : session.title,
-          body: preview + (assistantText.length > 80 ? '…' : ''),
-          url: `/?session=${sessionId}`,
-        })
-      }
-    },
-    onError: (err) => {
-      unregisterChat(sessionId)
-      // Clear the stale claude_session_id so the next message starts fresh
-      // instead of looping on another failed --resume attempt.
-      if (session.claude_session_id) {
-        sessionQueries.clearClaudeSessionId(sessionId)
-        session.claude_session_id = null
-      }
-      // Persist the error as an assistant message so it survives a page reload.
-      messageQueries.insert(uuidv4(), sessionId, 'assistant', err.message, true, err.code)
-      // Notify any clients watching this session (e.g. page was reloaded mid-stream).
-      // Without this, their SSE connection parks forever and the spinner never clears.
-      notifyWatchers(sessionId)
-    },
+    onComplete,
+    onError: (err) => onError(err.message, err.code, ''),
   })
 
-  // res.on('close') fires when the client disconnects (socket closed).
-  // Do NOT use req.on('close') — it fires when the request body is consumed, not on disconnect.
-  // We intentionally do NOT kill the Claude subprocess here — let it finish and persist to DB
-  // so the response is available when the user returns to the session.
   res.on('close', () => {
     if (!res.writableEnded) res.end()
   })
@@ -131,8 +174,10 @@ router.post('/', (req, res) => {
  * without triggering the error path or persisting a partial response.
  */
 router.delete('/:sessionId', (req, res) => {
-  const found = abortChat(req.params.sessionId)
-  res.status(found ? 200 : 404).json({ stopped: found })
+  const { sessionId } = req.params
+  const workerStopped = workerClient.send({ type: 'stop', sessionId })
+  const directStopped = abortChat(sessionId)
+  res.status(workerStopped || directStopped ? 200 : 404).json({ stopped: workerStopped || directStopped })
 })
 
 export default router

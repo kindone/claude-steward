@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto'
 import dotenv from 'dotenv'
 import { createApp } from './app.js'
 import { projectQueries, migrateOrphanedSessions } from './db/index.js'
+import { workerClient } from './worker/client.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // .env lives in the monorepo root (two levels up from server/src/)
@@ -20,6 +21,9 @@ if (!stewardExists) {
 }
 
 migrateOrphanedSessions(APP_ROOT)
+
+// Begin connecting to the Claude worker. Falls back to direct spawn if unavailable.
+workerClient.connect()
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
 
