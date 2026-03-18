@@ -38,9 +38,12 @@ router.get('/:id/watch', (req, res) => {
     return
   }
 
-  // If the last message is already from the assistant, we're done — reply immediately.
+  // If the last message is already a completed assistant message, reply immediately.
+  // Do NOT short-circuit on status='streaming' — the job is still in progress and
+  // the client must park here until notifyWatchers() fires on completion.
   const messages = messageQueries.listPaged(req.params.id, 1)
-  if (messages.length > 0 && messages[messages.length - 1].role === 'assistant') {
+  const last = messages[messages.length - 1]
+  if (messages.length > 0 && last.role === 'assistant' && last.status !== 'streaming') {
     res.setHeader('Content-Type', 'text/event-stream')
     res.setHeader('Cache-Control', 'no-cache')
     res.setHeader('X-Accel-Buffering', 'no')
