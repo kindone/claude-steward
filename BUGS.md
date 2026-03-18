@@ -7,7 +7,7 @@ Known defects. Fixed bugs → `archived_tasks.md` (§ Fixed Bugs). New features 
 ## Open
 
 ### UI
-- [ ] **Diff/code output may not display properly** — large or formatted tool output (e.g. `git diff`) sent by Claude may be clipped or not rendered in the chat UI. Root cause unknown; may be a rendering, truncation, or SSE chunking issue.
+- [x] **Bash tool output collapsed by default** — tool call results (e.g. `git diff`, logs, shell output) are rendered as collapsed blocks in the UI. Fixed: tool output is now captured end-to-end (`process.ts` → `api.ts` → `ChatWindow.tsx`) and displayed inline in the expanded tool view as a `<pre>` block (truncated at 2000 chars).
 
 ### Security
 

@@ -120,14 +120,21 @@ export function MessageBubble({ role, content, streaming = false, errorCode, too
               {toolsOpen && (
                 <div className="mt-1.5 flex flex-col gap-1 pl-3.5">
                   {toolUses.map((call, i) => (
-                    <div key={i} className="flex items-baseline gap-1.5 min-w-0">
-                      <span className="text-[11px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#666] flex-shrink-0">
-                        {call.name}
-                      </span>
-                      {call.detail && (
-                        <span className="text-[11px] text-[#444] truncate" title={call.detail}>
-                          {call.detail}
+                    <div key={i} className="flex flex-col gap-0.5 min-w-0">
+                      <div className="flex items-baseline gap-1.5 min-w-0">
+                        <span className="text-[11px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#666] flex-shrink-0">
+                          {call.name}
                         </span>
+                        {call.detail && (
+                          <span className="text-[11px] text-[#444] truncate" title={call.detail}>
+                            {call.detail}
+                          </span>
+                        )}
+                      </div>
+                      {call.output && (
+                        <pre className="mt-1 text-[11px] text-[#555] bg-[#0d0d0d] border border-[#1a1a1a] rounded px-2 py-1.5 overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all">
+                          {call.output.length > 2000 ? call.output.slice(0, 2000) + '\n… (truncated)' : call.output}
+                        </pre>
                       )}
                     </div>
                   ))}

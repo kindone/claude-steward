@@ -450,9 +450,12 @@ export type ClaudeErrorCode = 'session_expired' | 'context_limit' | 'process_err
 
 /** A single tool invocation with the key detail extracted from its input. */
 export type ToolCall = {
+  id: string
   name: string
   /** Human-readable summary of what the tool is doing (command, file path, query…). */
   detail?: string
+  output?: string
+  isError?: boolean
 }
 
 /** Pull the most useful field out of a tool's input object. */
@@ -479,6 +482,7 @@ export type ChunkHandler = {
   onToolActivity?: (toolName: string | null) => void
   /** Fired when a complete tool call is assembled (name + detail from input). */
   onToolCall?: (call: ToolCall) => void
+  onToolResult?: (toolUseId: string, output: string, isError: boolean) => void
   onActivity?: () => void
 }
 
@@ -544,10 +548,14 @@ export function sendMessage(
                   }
                   // assistant chunks carry the assembled message with full tool inputs
                   message?: {
+                    role?: string
                     content?: Array<{
                       type: string
+                      id?: string
                       name?: string
                       input?: Record<string, unknown>
+                      tool_use_id?: string
+                      is_error?: boolean
                     }>
                   }
                 }
@@ -565,9 +573,20 @@ export function sendMessage(
                   for (const block of chunk.message?.content ?? []) {
                     if (block.type === 'tool_use' && block.name) {
                       handlers.onToolCall?.({
+                        id: block.id ?? '',
                         name: block.name,
                         detail: extractToolDetail(block.name, block.input ?? {}),
                       })
+                    }
+                  }
+                } else if (chunk.type === 'user') {
+                  for (const block of chunk.message?.content ?? []) {
+                    if (block.type === 'tool_result' && block.tool_use_id !== undefined) {
+                      handlers.onToolResult?.(
+                        block.tool_use_id,
+                        (block as unknown as { content: string }).content ?? '',
+                        block.is_error ?? false,
+                      )
                     }
                   }
                 }

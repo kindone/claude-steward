@@ -19,7 +19,26 @@ type StreamEventChunk = {
 
 type AssistantChunk = {
   type: 'assistant'
-  message: { content: Array<{ type: string; text: string }> }
+  message: { content: Array<{ type: string; id?: string; name?: string; text?: string; input?: Record<string, unknown> }> }
+}
+
+type UserChunk = {
+  type: 'user'
+  message: {
+    role: 'user'
+    content: Array<{
+      type: 'tool_result'
+      tool_use_id: string
+      content: string
+      is_error: boolean
+    }>
+  }
+  tool_use_result?: {
+    stdout: string
+    stderr: string
+    interrupted: boolean
+    isImage: boolean
+  }
 }
 
 type ResultChunk = {
@@ -31,7 +50,7 @@ type ResultChunk = {
   errors?: string[]
 }
 
-type ClaudeChunk = SystemInitChunk | StreamEventChunk | AssistantChunk | ResultChunk
+type ClaudeChunk = SystemInitChunk | StreamEventChunk | AssistantChunk | UserChunk | ResultChunk
 
 export type ClaudeError = {
   message: string
@@ -49,6 +68,7 @@ export type SpawnOptions = {
   onSessionId: (id: string) => void
   onComplete?: (text: string) => void
   onError?: (err: ClaudeError) => void
+  onToolResult?: (toolUseId: string, output: string, isError: boolean) => void
   signal?: AbortSignal
   cwd?: string
 }
@@ -61,7 +81,7 @@ function sendSseEvent(res: Response, event: string, data: unknown): void {
 // Allow overriding the claude binary path via env var, with ~/.local/bin fallback
 const CLAUDE_BIN = process.env.CLAUDE_PATH ?? `${process.env.HOME ?? '/usr/local'}/.local/bin/claude`
 
-export function spawnClaude({ message, claudeSessionId, systemPrompt, permissionMode, res, onSessionId, onComplete, onError, signal, cwd }: SpawnOptions): void {
+export function spawnClaude({ message, claudeSessionId, systemPrompt, permissionMode, res, onSessionId, onComplete, onError, onToolResult, signal, cwd }: SpawnOptions): void {
   const args = [
     '--print', message,
     '--output-format', 'stream-json',
@@ -145,6 +165,14 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
       chunk.event.delta?.type === 'text_delta'
     ) {
       accumulatedText += chunk.event.delta.text
+    }
+
+    if (chunk.type === 'user') {
+      for (const block of chunk.message?.content ?? []) {
+        if (block.type === 'tool_result') {
+          onToolResult?.(block.tool_use_id, block.content, block.is_error)
+        }
+      }
     }
 
     sendSseEvent(res, 'chunk', chunk)

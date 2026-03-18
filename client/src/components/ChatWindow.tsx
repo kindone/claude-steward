@@ -55,6 +55,8 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   const streamingFromSendRef = useRef(false)
   /** Accumulates tool calls (with detail) as assistant chunks arrive during the current send. */
   const toolUsesRef = useRef<ToolCall[]>([])
+  /** Accumulates tool results keyed by tool_use_id during the current send. */
+  const toolResultsRef = useRef<Map<string, { output: string; isError: boolean }>>(new Map())
   /** Live copy of toolUsesRef for rendering the streaming indicator. */
   const [streamingToolUses, setStreamingToolUses] = useState<ToolCall[]>([])
   const { state: pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
@@ -170,6 +172,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
 
     streamingFromSendRef.current = true
     toolUsesRef.current = []
+    toolResultsRef.current = new Map()
     setStreamingTool(null)
     setStreamingToolUses([])
     setMessages((prev) => [
@@ -196,10 +199,18 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
         toolUsesRef.current = [...toolUsesRef.current, call]
         setStreamingToolUses([...toolUsesRef.current])
       },
+      onToolResult: (toolUseId, output, isError) => {
+        toolResultsRef.current.set(toolUseId, { output, isError })
+      },
       onDone: () => {
         streamingFromSendRef.current = false
         setStreamingTool(null)
-        const capturedToolUses = toolUsesRef.current.length > 0 ? [...toolUsesRef.current] : undefined
+        const capturedToolUses = toolUsesRef.current.length > 0
+          ? toolUsesRef.current.map((call) => {
+              const result = toolResultsRef.current.get(call.id)
+              return result ? { ...call, output: result.output, isError: result.isError } : call
+            })
+          : undefined
         setStreamingToolUses([])
         setMessages((prev) =>
           prev.map((m) =>
@@ -382,6 +393,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
             prev.map((m) => (m.streaming ? { ...m, streaming: false } : m))
           )
           setStreamingTool(null)
+          toolResultsRef.current = new Map()
           setStreamingToolUses([])
           setStreaming(false)
         }}
