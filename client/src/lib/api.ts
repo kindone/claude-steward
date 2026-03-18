@@ -105,6 +105,8 @@ export type Message = {
   session_id: string
   role: 'user' | 'assistant'
   content: string
+  is_error: number        // 0 = normal, 1 = error message
+  error_code: string | null
   created_at: number
 }
 

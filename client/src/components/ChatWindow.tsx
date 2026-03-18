@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode, type ToolCall } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage } from '../lib/api'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
@@ -18,6 +18,14 @@ type Message = {
   errorCode?: ClaudeErrorCode
   /** Tool calls made while generating this message, in invocation order. */
   toolUses?: ToolCall[]
+}
+
+function dbMessageToLocal(m: ApiMessage): Message {
+  return {
+    ...m,
+    streaming: false,
+    errorCode: m.is_error ? (m.error_code as ClaudeErrorCode ?? 'process_error') : undefined,
+  }
 }
 
 type Props = {
@@ -92,7 +100,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
 
     getMessages(sessionId).then((page) => {
       if (cancelled) return
-      setMessages(page.messages.map((m) => ({ ...m, streaming: false })))
+      setMessages(page.messages.map(dbMessageToLocal))
       setHasMore(page.hasMore)
       // If the last message is from the user, Claude is still (or was) processing.
       // Subscribe via SSE so the UI updates the instant the response lands — no poll ceiling.
@@ -104,7 +112,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
             if (cancelled) return
             try {
               const fresh = await getMessages(sessionId)
-              setMessages(fresh.messages.map((m) => ({ ...m, streaming: false })))
+              setMessages(fresh.messages.map(dbMessageToLocal))
               setHasMore(fresh.hasMore)
             } finally {
               setStreaming(false)
@@ -133,7 +141,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       const container = scrollContainerRef.current
       const prevScrollHeight = container?.scrollHeight ?? 0
       scrollBehaviorRef.current = 'none'
-      setMessages((prev) => [...page.messages.map((m) => ({ ...m, streaming: false })), ...prev])
+      setMessages((prev) => [...page.messages.map(dbMessageToLocal), ...prev])
       setHasMore(page.hasMore)
       // Restore position: shift scrollTop by the new content height added above
       requestAnimationFrame(() => {

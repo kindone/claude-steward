@@ -23,7 +23,6 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 
 ### Sessions & Projects
 - [ ] **Per-project system prompt** — add `system_prompt TEXT` to the `projects` table; project settings UI to set it; new sessions under a project pre-populate `session.system_prompt` from the project default (session-level still overrides); follows existing `ALTER TABLE` migration pattern
-- [ ] **Persist error messages to DB** — when `onError` fires in `chat.ts`, insert an assistant message with the error text so it survives a page reload. Requires a way to mark a message as an error (e.g. `is_error BOOLEAN` column or a sentinel role) so `MessageBubble` can render it as an error bubble rather than plain content. Also extend `notifyWatchers` / the watch SSE to carry an error signal so reloaded tabs can distinguish "Claude errored" from "still running". Tracked as a bug in `BUGS.md` (Interrupted session handling).
 
 ### Core UX
 - [x] **Chat input persistence** — draft saved to `localStorage` keyed by `steward:draft:<sessionId>`, restored on mount, cleared on send; 400ms debounce on input.

@@ -97,7 +97,7 @@ router.post('/', (req, res) => {
         })
       }
     },
-    onError: () => {
+    onError: (err) => {
       unregisterChat(sessionId)
       // Clear the stale claude_session_id so the next message starts fresh
       // instead of looping on another failed --resume attempt.
@@ -105,6 +105,8 @@ router.post('/', (req, res) => {
         sessionQueries.clearClaudeSessionId(sessionId)
         session.claude_session_id = null
       }
+      // Persist the error as an assistant message so it survives a page reload.
+      messageQueries.insert(uuidv4(), sessionId, 'assistant', err.message, true, err.code)
       // Notify any clients watching this session (e.g. page was reloaded mid-stream).
       // Without this, their SSE connection parks forever and the spinner never clears.
       notifyWatchers(sessionId)

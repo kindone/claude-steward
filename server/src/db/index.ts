@@ -70,6 +70,12 @@ db.exec(`
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
   )
 `)
+try {
+  db.exec(`ALTER TABLE messages ADD COLUMN is_error INTEGER NOT NULL DEFAULT 0`)
+} catch { /* already exists */ }
+try {
+  db.exec(`ALTER TABLE messages ADD COLUMN error_code TEXT`)
+} catch { /* already exists */ }
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS passkey_credentials (
@@ -130,6 +136,8 @@ export type Message = {
   session_id: string
   role: 'user' | 'assistant'
   content: string
+  is_error: number        // 0 = normal, 1 = error message
+  error_code: string | null
   created_at: number
 }
 
@@ -212,7 +220,7 @@ export const sessionQueries = {
 // ── Message queries ───────────────────────────────────────────────────────────
 
 const insertMessageStmt = db.prepare(
-  `INSERT INTO messages (id, session_id, role, content) VALUES (?, ?, ?, ?)`
+  `INSERT INTO messages (id, session_id, role, content, is_error, error_code) VALUES (?, ?, ?, ?, ?, ?)`
 )
 const listMessagesBySessionStmt = db.prepare(
   `SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC`
@@ -233,8 +241,8 @@ const deleteMessagesBySessionStmt = db.prepare(
 )
 
 export const messageQueries = {
-  insert: (id: string, sessionId: string, role: 'user' | 'assistant', content: string) =>
-    insertMessageStmt.run(id, sessionId, role, content),
+  insert: (id: string, sessionId: string, role: 'user' | 'assistant', content: string, isError = false, errorCode?: string) =>
+    insertMessageStmt.run(id, sessionId, role, content, isError ? 1 : 0, errorCode ?? null),
   listBySessionId: (sessionId: string) =>
     listMessagesBySessionStmt.all(sessionId) as Message[],
   /**

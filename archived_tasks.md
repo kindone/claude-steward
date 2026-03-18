@@ -43,6 +43,8 @@
 
 ## Fixed Bugs
 
+- [x] **Interrupted session handling** — errors (token limit, process crash, etc.) are now persisted to the DB as assistant messages with `is_error=1` and `error_code`. `onError` in `chat.ts` inserts the error message before calling `notifyWatchers`, so a reloaded tab re-fetches and renders the error bubble correctly. `dbMessageToLocal` in `ChatWindow` maps `is_error` → `errorCode` for all load paths (initial, watch, pagination).
+- [x] **Push notification hardening** — VAPID credentials now initialised once per process (lazy `vapidInitialised` flag) instead of on every send. Transient failures (5xx, network errors) are retried once after 1 s with structured logging; stale 410/404 subscriptions continue to be auto-deleted.
 - [x] **XSS in MessageBubble** — `marked.parse()` output was inserted via `dangerouslySetInnerHTML` with no sanitization; crafted Claude output could execute arbitrary scripts. Fixed by adding `dompurify` to the client and wrapping the `marked.parse()` result with `DOMPurify.sanitize()` before insertion.
 - [x] **Spinner stuck after page reload + error** — `onError` in `chat.ts` did not call `notifyWatchers()`, so any tab that reloaded mid-stream and parked on the watch SSE endpoint would never receive a `done` event and its spinner would hang forever. Fixed by calling `notifyWatchers(sessionId)` in the `onError` callback.
 - [x] **`onDone` fires after `onError` (double callback)** — `doneFired` in `api.ts` was only set on `event: done`, so when the stream closed after an `event: error` the fallback `if (!doneFired) handlers.onDone()` would still fire. Added `errorFired` flag to guard the fallback.
