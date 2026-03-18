@@ -88,7 +88,10 @@ router.post('/', (req, res) => {
       // Notify any clients watching this session (returned after navigating away mid-stream).
       const notified = notifyWatchers(sessionId)
       // If no browser tab was watching, send a push notification instead.
-      if (notified === 0 && assistantText) {
+      // Also skip push if the sending client is still connected (res not yet ended) —
+      // notifyWatchers only tracks watchSession connections, not active sendMessage SSEs,
+      // so we use res.writableEnded as the signal that the sender has disconnected.
+      if (notified === 0 && res.writableEnded && assistantText) {
         const preview = assistantText.replace(/\s+/g, ' ').trim().slice(0, 80)
         void notifyAll({
           title: session.title === 'New Chat' ? 'Claude replied' : session.title,

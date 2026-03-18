@@ -35,8 +35,8 @@ type ClaudeChunk = SystemInitChunk | StreamEventChunk | AssistantChunk | ResultC
 
 export type ClaudeError = {
   message: string
-  /** 'session_expired' when a --resume attempt failed; 'process_error' for other failures */
-  code: 'session_expired' | 'process_error'
+  /** 'session_expired' when a --resume attempt failed; 'context_limit' when context window exceeded; 'process_error' for other failures */
+  code: 'session_expired' | 'context_limit' | 'process_error'
   detail?: string
 }
 
@@ -154,12 +154,27 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
         // Claude exited cleanly (code 0) but reported a logical error in the result.
         // "No conversation found with session ID" is the canonical resume-failure message.
         const errorText = chunk.errors?.join('; ') || chunk.result || `Claude error: ${chunk.subtype}`
-        const isSessionError = Boolean(claudeSessionId) ||
-          errorText.toLowerCase().includes('session') ||
-          errorText.toLowerCase().includes('conversation')
-        const claudeErr: ClaudeError = isSessionError
+        const lowerError = errorText.toLowerCase()
+        const isContextLimit =
+          lowerError.includes('context') ||
+          lowerError.includes('too long') ||
+          lowerError.includes('too many tokens') ||
+          lowerError.includes('maximum') ||
+          lowerError.includes('token limit')
+        const isSessionError = !isContextLimit && (
+          Boolean(claudeSessionId) ||
+          lowerError.includes('session') ||
+          lowerError.includes('conversation')
+        )
+        const claudeErr: ClaudeError = isContextLimit
           ? {
-              message: 'The previous Claude session could not be resumed. Your next message will start a fresh conversation.',
+              message: 'Context limit reached — your next message will start a fresh conversation.',
+              code: 'context_limit',
+              detail: errorText,
+            }
+          : isSessionError
+          ? {
+              message: 'The previous session could not be resumed — your next message will start a fresh conversation.',
               code: 'session_expired',
               detail: errorText,
             }

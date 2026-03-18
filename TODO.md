@@ -31,6 +31,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 - [ ] **Per-project system prompt** — add `system_prompt TEXT` to the `projects` table; project settings UI to set it; new sessions under a project pre-populate `session.system_prompt` from the project default (session-level still overrides); follows existing `ALTER TABLE` migration pattern
 
 ### Core UX
+- [ ] **Client-side JS console for AI** — a browser-side REPL that Claude can interact with via a tool or SSE channel. Lets Claude evaluate JS expressions in the live page context (DOM queries, state inspection, exception capture) without relying on the user to relay errors. Useful for debugging rendering issues (e.g. swallowed exceptions, layout problems) and verifying UI changes. Possible approach: a `POST /api/projects/:id/eval` endpoint that pushes JS to the client via SSE, executes it via `eval()` in a sandboxed scope, and returns the result/exception back to the server.
 - [x] **Chat input persistence** — draft saved to `localStorage` keyed by `steward:draft:<sessionId>`, restored on mount, cleared on send; 400ms debounce on input.
 - [x] **Favicon** — `favicon.svg` (🧭 on blue background) added to `client/public/`; `index.html` updated with icon/apple-touch-icon/theme-color meta; `sw.js` updated to use `/favicon.svg` instead of missing `/icon-192.png`
 - [ ] **Rich chat content rendering** — several rendering gaps to close (XSS sanitization tracked separately in `BUGS.md`):

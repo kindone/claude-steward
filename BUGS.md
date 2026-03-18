@@ -6,6 +6,9 @@ Known defects. Fixed bugs → `archived_tasks.md` (§ Fixed Bugs). New features 
 
 ## Open
 
+### UI
+- [ ] **Diff/code output may not display properly** — large or formatted tool output (e.g. `git diff`) sent by Claude may be clipped or not rendered in the chat UI. Root cause unknown; may be a rendering, truncation, or SSE chunking issue.
+
 ### Security
 
 ### Auth
@@ -16,5 +19,5 @@ Known defects. Fixed bugs → `archived_tasks.md` (§ Fixed Bugs). New features 
 - [x] **Last project/session not restored on reload** — after a page reload, the app often resets to the topmost session/project in the list instead of the one that was last active. The restore-on-load logic needs to persist and re-apply the last-active project + session IDs (e.g. via `localStorage`).
 
 ### Push Notifications
-- [ ] **Push notifications unreliable in practice** *(hardening applied — monitor for recurrence)* — notifications are intermittently not delivered or arrive with significant delay. Root cause not yet fully isolated; the `setVapidDetails` reinit and swallowed error bugs have been fixed; if it persists investigate the watcher race condition.
+- [ ] **Push notifications unreliable in practice** *(hardening applied — monitor for recurrence)* — notifications are intermittently not delivered or arrive with significant delay. Root cause not yet fully isolated; the `setVapidDetails` reinit, swallowed error, VapidPkHashMismatch, and active-sender bugs have been fixed; if it persists investigate the watcher race condition.
 - [ ] **`notified === 0` race condition** — if the SSE watcher tab closes just as Claude finishes, `notifyWatchers()` returns 0 and a push is fired even though the user was watching. Consider a short grace window (e.g. 2s) before deciding no watchers are active, or a persist-then-notify pattern.

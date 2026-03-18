@@ -446,7 +446,7 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
   return () => { cancelled = true; controller.abort() }
 }
 
-export type ClaudeErrorCode = 'session_expired' | 'process_error' | 'http_error'
+export type ClaudeErrorCode = 'session_expired' | 'context_limit' | 'process_error' | 'http_error'
 
 /** A single tool invocation with the key detail extracted from its input. */
 export type ToolCall = {

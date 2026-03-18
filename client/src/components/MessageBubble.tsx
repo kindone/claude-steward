@@ -37,15 +37,43 @@ export function MessageBubble({ role, content, streaming = false, errorCode, too
   }
 
   if (errorCode) {
-    const isSessionExpired = errorCode === 'session_expired'
+    const errorMeta: Record<string, { icon: string; style: string; message: string }> = {
+      context_limit: {
+        icon: '⚠',
+        style: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300',
+        message: 'Context limit reached — your next message will start a fresh conversation.',
+      },
+      session_expired: {
+        icon: '⚠',
+        style: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300',
+        message: 'Session ended — your next message will start a fresh conversation.',
+      },
+      process_error: {
+        icon: '✕',
+        style: 'bg-red-500/10 border-red-500/30 text-red-300',
+        message: content || 'Something went wrong. You can try sending your message again.',
+      },
+      http_error: {
+        icon: '✕',
+        style: 'bg-red-500/10 border-red-500/30 text-red-300',
+        message: content || 'Connection error. Please try again.',
+      },
+    }
+    const { icon, style, message } = errorMeta[errorCode] ?? errorMeta.process_error
+    const hasPartialContent = content && errorCode !== 'process_error' && errorCode !== 'http_error'
     return (
-      <div className={`flex items-start gap-2 px-3.5 py-2.5 rounded-lg text-sm leading-relaxed
-        ${isSessionExpired
-          ? 'bg-yellow-500/10 border border-yellow-500/30 text-yellow-300'
-          : 'bg-red-500/10 border border-red-500/30 text-red-300'}`}
-      >
-        <span className="flex-shrink-0 text-sm mt-px">{isSessionExpired ? '⚠' : '✕'}</span>
-        <p className="flex-1">{content}</p>
+      <div className="max-w-[820px] w-full flex flex-col gap-2 self-start items-start">
+        {hasPartialContent && (
+          <div
+            ref={contentRef}
+            className="prose text-sm leading-[1.65] break-words w-full"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(content) as string) }}
+          />
+        )}
+        <div className={`flex items-start gap-2 px-3.5 py-2.5 rounded-lg text-sm leading-relaxed border w-full ${style}`}>
+          <span className="flex-shrink-0 text-sm mt-px">{icon}</span>
+          <p className="flex-1">{message}</p>
+        </div>
       </div>
     )
   }

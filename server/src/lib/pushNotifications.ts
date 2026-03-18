@@ -40,8 +40,12 @@ async function sendOne(
     )
   } catch (err: unknown) {
     const status = (err as { statusCode?: number }).statusCode
-    if (status === 410 || status === 404) {
-      // Subscription is gone — remove it.
+    const body = (err as { body?: string }).body ?? ''
+    const isPermanent = status === 410 || status === 404 ||
+      (status === 400 && body.includes('VapidPkHashMismatch'))
+    if (isPermanent) {
+      // Subscription is gone or permanently incompatible (e.g. VAPID key rotation) — remove it.
+      console.warn('[push] removing stale subscription:', { endpoint: sub.endpoint.slice(-30), status, body })
       pushSubscriptionQueries.deleteByEndpoint(sub.endpoint)
     } else if (attempt < 2 && (!status || status >= 500)) {
       // Transient failure (5xx or network error) — retry once after a short delay.
@@ -62,7 +66,7 @@ async function sendOne(
 /**
  * Send a push notification to all registered subscriptions.
  * VAPID credentials are initialised once per process lifetime (lazy).
- * Stale subscriptions (410/404) are automatically removed.
+ * Stale subscriptions (410/404/VapidPkHashMismatch) are automatically removed.
  * Transient failures (5xx, network) are retried once.
  */
 export async function notifyAll(payload: PushPayload): Promise<void> {

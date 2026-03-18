@@ -208,14 +208,14 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
         )
         setStreaming(false)
       },
-      onError: (errorMsg, code) => {
+      onError: (_errorMsg, code) => {
         streamingFromSendRef.current = false
         setStreamingTool(null)
         setStreamingToolUses([])
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId
-              ? { ...m, content: errorMsg, streaming: false, errorCode: code }
+              ? { ...m, streaming: false, errorCode: code }
               : m
           )
         )
