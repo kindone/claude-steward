@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
+import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
 import type { ClaudeErrorCode, ToolCall } from '../lib/api'
@@ -63,7 +64,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, too
             <div
               ref={contentRef}
               className={`prose text-sm leading-[1.65] break-words w-full${streaming ? ' streaming-cursor' : ''}`}
-              dangerouslySetInnerHTML={{ __html: marked.parse(content) as string }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(content) as string) }}
             />
             {!streaming && content && (
               <button

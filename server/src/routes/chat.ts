@@ -105,6 +105,9 @@ router.post('/', (req, res) => {
         sessionQueries.clearClaudeSessionId(sessionId)
         session.claude_session_id = null
       }
+      // Notify any clients watching this session (e.g. page was reloaded mid-stream).
+      // Without this, their SSE connection parks forever and the spinner never clears.
+      notifyWatchers(sessionId)
     },
   })
 

@@ -507,6 +507,7 @@ export function sendMessage(
       let activityFired = false
       let pendingEvent = ''
       let doneFired = false
+      let errorFired = false
 
       function processLines(lines: string[]): void {
         for (const line of lines) {
@@ -523,6 +524,7 @@ export function sendMessage(
                 handlers.onTitle?.(payload.title)
               } catch { /* ignore */ }
             } else if (pendingEvent === 'error') {
+              errorFired = true
               try {
                 const payload = JSON.parse(raw) as { message: string; code?: ClaudeErrorCode }
                 handlers.onError(payload.message, payload.code)
@@ -591,7 +593,7 @@ export function sendMessage(
       // If we had "event: done" at end of previous chunk and no data in last chunk, stream ended without data — still stop spinner
       if (pendingEvent === 'done') { doneFired = true; handlers.onDone() }
       // Fallback: stream ended without explicit done event (e.g. nginx closed connection, server never sent done) — stop spinner anyway
-      if (!doneFired) handlers.onDone()
+      if (!doneFired && !errorFired) handlers.onDone()
     })
     .catch((err: Error) => {
       if (err.name !== 'AbortError') {

@@ -43,6 +43,10 @@
 
 ## Fixed Bugs
 
+- [x] **XSS in MessageBubble** — `marked.parse()` output was inserted via `dangerouslySetInnerHTML` with no sanitization; crafted Claude output could execute arbitrary scripts. Fixed by adding `dompurify` to the client and wrapping the `marked.parse()` result with `DOMPurify.sanitize()` before insertion.
+- [x] **Spinner stuck after page reload + error** — `onError` in `chat.ts` did not call `notifyWatchers()`, so any tab that reloaded mid-stream and parked on the watch SSE endpoint would never receive a `done` event and its spinner would hang forever. Fixed by calling `notifyWatchers(sessionId)` in the `onError` callback.
+- [x] **`onDone` fires after `onError` (double callback)** — `doneFired` in `api.ts` was only set on `event: done`, so when the stream closed after an `event: error` the fallback `if (!doneFired) handlers.onDone()` would still fire. Added `errorFired` flag to guard the fallback.
+
 - [x] **WebAuthn RP ID mismatch on new devices** — `APP_DOMAIN` was hardcoded as `steward.example.com` in `ecosystem.dev.config.cjs`, overriding the real value in `.env`; removed the hardcoded value so `dotenv` loads it correctly.
 - [x] **VAPID keys not loading (503 on push subscribe)** — three-layered fix: (1) removed empty VAPID key entries from PM2 ecosystem configs that `dotenv` refused to override; (2) moved `process.env` reads from module init to inside functions in `pushNotifications.ts` to avoid ESM hoisting order issues; (3) used `--update-env` on `pm2 restart` to apply new `.env` values.
 - [x] **`sw.js` JSON parse crash from DevTools test push** — `event.data?.json()` threw on the plain-string payload sent by Chrome DevTools' Push button; wrapped in `try/catch` with `event.data?.text()` fallback.
