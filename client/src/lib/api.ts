@@ -108,6 +108,7 @@ export type Message = {
   is_error: number        // 0 = normal, 1 = error message
   error_code: string | null
   status: 'complete' | 'streaming' | 'interrupted'
+  tool_calls: string | null  // JSON-encoded ToolCall array, null if none
   created_at: number
 }
 

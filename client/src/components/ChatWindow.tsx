@@ -21,12 +21,17 @@ type Message = {
 }
 
 function dbMessageToLocal(m: ApiMessage): Message {
+  let toolUses: ToolCall[] | undefined
+  if (m.tool_calls) {
+    try { toolUses = JSON.parse(m.tool_calls) as ToolCall[] } catch { /* ignore */ }
+  }
   return {
     ...m,
     streaming: m.status === 'streaming',
     errorCode: m.status === 'interrupted'
       ? (m.error_code as ClaudeErrorCode ?? 'process_error')
       : m.is_error ? (m.error_code as ClaudeErrorCode ?? 'process_error') : undefined,
+    toolUses,
   }
 }
 

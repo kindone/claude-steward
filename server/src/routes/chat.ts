@@ -114,20 +114,65 @@ router.post('/', (req, res) => {
       if (streamingText) messageQueries.updateStreamingContent(streamingMsgId, streamingText)
     }, 3_000)
 
+    // Accumulate tool calls for persistence: keyed by tool_use_id
+    type StoredToolCall = { id: string; name: string; detail?: string; output?: string; isError?: boolean }
+    const toolCallsMap = new Map<string, StoredToolCall>()
+
+    const extractToolDetail = (name: string, input: Record<string, unknown>): string | undefined => {
+      const s = (v: unknown) => typeof v === 'string' ? v.trim() : undefined
+      switch (name) {
+        case 'Bash':      return s(input.command)?.replace(/\s+/g, ' ').slice(0, 100)
+        case 'Read':      return s(input.file_path)
+        case 'Edit':
+        case 'Write':
+        case 'MultiEdit': return s(input.file_path)
+        case 'WebSearch': return s(input.query)?.slice(0, 80)
+        case 'WebFetch':  return s(input.url)?.slice(0, 80)
+        default:          return undefined
+      }
+    }
+
     const finalize = (content: string, isError: boolean, errorCode?: string) => {
       clearInterval(flushTimer)
-      messageQueries.finalizeMessage(streamingMsgId, content, isError, errorCode)
+      const toolCallsJson = toolCallsMap.size > 0 ? JSON.stringify([...toolCallsMap.values()]) : undefined
+      messageQueries.finalizeMessage(streamingMsgId, content, isError, errorCode, toolCallsJson)
     }
 
     workerClient.subscribe(sessionId, (event) => {
       switch (event.type) {
         case 'chunk': {
           sendSseEvent(res, 'chunk', event.chunk)
-          // Accumulate text deltas for periodic DB flush
           const c = event.chunk as Record<string, unknown>
+          // Accumulate text deltas for periodic DB flush
           if (c.type === 'stream_event') {
             const delta = ((c.event as Record<string, unknown>)?.delta as Record<string, unknown>)
             if (delta?.type === 'text_delta') streamingText += String(delta.text ?? '')
+          }
+          // Capture assembled tool calls from assistant chunks
+          if (c.type === 'assistant') {
+            const content = (c.message as Record<string, unknown>)?.content as Array<Record<string, unknown>> ?? []
+            for (const block of content) {
+              if (block.type === 'tool_use' && block.name && block.id) {
+                toolCallsMap.set(block.id as string, {
+                  id: block.id as string,
+                  name: block.name as string,
+                  detail: extractToolDetail(block.name as string, (block.input as Record<string, unknown>) ?? {}),
+                })
+              }
+            }
+          }
+          // Capture tool results from user chunks
+          if (c.type === 'user') {
+            const content = (c.message as Record<string, unknown>)?.content as Array<Record<string, unknown>> ?? []
+            for (const block of content) {
+              if (block.type === 'tool_result' && block.tool_use_id) {
+                const existing = toolCallsMap.get(block.tool_use_id as string)
+                if (existing) {
+                  existing.output = (block.content as string) ?? ''
+                  existing.isError = (block.is_error as boolean) ?? false
+                }
+              }
+            }
           }
           break
         }
