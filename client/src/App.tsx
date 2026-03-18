@@ -228,7 +228,7 @@ export default function App() {
   // Persist last-used project + session so we can restore them on next load.
   // Only save when we have a real project (skip the null state during loading transitions).
   useEffect(() => {
-    if (activeProjectId) saveLastState(activeProjectId, activeSessionId)
+    if (activeProjectId && activeSessionId) saveLastState(activeProjectId, activeSessionId)
   }, [activeProjectId, activeSessionId])
 
   const activeProject = projects.find((p) => p.id === activeProjectId)

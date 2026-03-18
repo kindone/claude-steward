@@ -43,6 +43,7 @@
 
 ## Fixed Bugs
 
+- [x] **Last project/session not restored on reload** — the persist effect was firing with `activeSessionId=null` during loading transitions (Phase 2 sets it null before the async `listSessions` resolves), overwriting the stored session ID before it could be restored. Fixed by guarding on both `activeProjectId && activeSessionId` before saving.
 - [x] **Interrupted session handling** — errors (token limit, process crash, etc.) are now persisted to the DB as assistant messages with `is_error=1` and `error_code`. `onError` in `chat.ts` inserts the error message before calling `notifyWatchers`, so a reloaded tab re-fetches and renders the error bubble correctly. `dbMessageToLocal` in `ChatWindow` maps `is_error` → `errorCode` for all load paths (initial, watch, pagination).
 - [x] **Push notification hardening** — VAPID credentials now initialised once per process (lazy `vapidInitialised` flag) instead of on every send. Transient failures (5xx, network errors) are retried once after 1 s with structured logging; stale 410/404 subscriptions continue to be auto-deleted.
 - [x] **XSS in MessageBubble** — `marked.parse()` output was inserted via `dangerouslySetInnerHTML` with no sanitization; crafted Claude output could execute arbitrary scripts. Fixed by adding `dompurify` to the client and wrapping the `marked.parse()` result with `DOMPurify.sanitize()` before insertion.

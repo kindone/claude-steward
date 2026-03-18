@@ -4,6 +4,12 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 
 ---
 
+## Notes
+
+- **Verify fixes after reload** — bug fixes only take effect after `npm run build` + server reload (`POST /api/admin/reload`). Any fix applied during an active coding session won't be live until the next reload. Worth smoke-testing each fix after deploying.
+
+---
+
 ## Planned
 
 ### Mini-App Platform
