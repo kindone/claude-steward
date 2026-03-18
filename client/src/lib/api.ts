@@ -515,6 +515,22 @@ export function sendMessage(
       let doneFired = false
       let errorFired = false
 
+      // Inactivity timeout — if no data arrives for 90s, treat as a hung connection.
+      // Reset on every chunk; cleared when stream ends normally.
+      const INACTIVITY_MS = 90_000
+      let inactivityTimer: ReturnType<typeof setTimeout> | null = null
+      const resetInactivity = () => {
+        if (inactivityTimer) clearTimeout(inactivityTimer)
+        inactivityTimer = setTimeout(() => {
+          reader.cancel()
+          if (!doneFired && !errorFired) {
+            errorFired = true
+            handlers.onError('No response from server — connection timed out', 'process_error')
+          }
+        }, INACTIVITY_MS)
+      }
+      resetInactivity()
+
       function processLines(lines: string[]): void {
         for (const line of lines) {
           if (line.startsWith('event: ')) {
@@ -604,17 +620,22 @@ export function sendMessage(
         if (done) break
 
         if (!activityFired) { activityFired = true; handlers.onActivity?.() }
+        resetInactivity()
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
         buffer = lines.pop() ?? ''
         processLines(lines)
       }
+      if (inactivityTimer) clearTimeout(inactivityTimer)
       // Process any remaining buffer (final "event: done\ndata: ..." or "data: ..." when event was in previous chunk)
       if (buffer.trim()) processLines(buffer.split('\n'))
       // If we had "event: done" at end of previous chunk and no data in last chunk, stream ended without data — still stop spinner
       if (pendingEvent === 'done') { doneFired = true; handlers.onDone() }
-      // Fallback: stream ended without explicit done event (e.g. nginx closed connection, server never sent done) — stop spinner anyway
-      if (!doneFired && !errorFired) handlers.onDone()
+      // Stream ended without a terminal event — server likely restarted or connection dropped
+      if (!doneFired && !errorFired) {
+        errorFired = true
+        handlers.onError('Connection lost — server may have restarted', 'process_error')
+      }
     })
     .catch((err: Error) => {
       if (err.name !== 'AbortError') {
