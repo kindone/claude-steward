@@ -76,6 +76,11 @@ try {
 try {
   db.exec(`ALTER TABLE messages ADD COLUMN error_code TEXT`)
 } catch { /* already exists */ }
+try {
+  db.exec(`ALTER TABLE messages ADD COLUMN status TEXT NOT NULL DEFAULT 'complete'`)
+} catch { /* already exists */ }
+// On boot: any message left 'streaming' means the server was killed mid-run — mark interrupted.
+db.exec(`UPDATE messages SET status = 'interrupted' WHERE status = 'streaming'`)
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS passkey_credentials (
@@ -138,6 +143,7 @@ export type Message = {
   content: string
   is_error: number        // 0 = normal, 1 = error message
   error_code: string | null
+  status: 'complete' | 'streaming' | 'interrupted'
   created_at: number
 }
 
@@ -220,7 +226,16 @@ export const sessionQueries = {
 // ── Message queries ───────────────────────────────────────────────────────────
 
 const insertMessageStmt = db.prepare(
-  `INSERT INTO messages (id, session_id, role, content, is_error, error_code) VALUES (?, ?, ?, ?, ?, ?)`
+  `INSERT INTO messages (id, session_id, role, content, is_error, error_code, status) VALUES (?, ?, ?, ?, ?, ?, ?)`
+)
+const insertStreamingMessageStmt = db.prepare(
+  `INSERT INTO messages (id, session_id, role, content, is_error, error_code, status) VALUES (?, ?, 'assistant', '', 0, NULL, 'streaming')`
+)
+const updateStreamingContentStmt = db.prepare(
+  `UPDATE messages SET content = ? WHERE id = ? AND status = 'streaming'`
+)
+const finalizeMessageStmt = db.prepare(
+  `UPDATE messages SET content = ?, status = ?, is_error = ?, error_code = ? WHERE id = ?`
 )
 const listMessagesBySessionStmt = db.prepare(
   `SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC`
@@ -242,7 +257,16 @@ const deleteMessagesBySessionStmt = db.prepare(
 
 export const messageQueries = {
   insert: (id: string, sessionId: string, role: 'user' | 'assistant', content: string, isError = false, errorCode?: string) =>
-    insertMessageStmt.run(id, sessionId, role, content, isError ? 1 : 0, errorCode ?? null),
+    insertMessageStmt.run(id, sessionId, role, content, isError ? 1 : 0, errorCode ?? null, 'complete'),
+  /** Insert an empty assistant message that will be filled in as streaming progresses. */
+  insertStreaming: (id: string, sessionId: string) =>
+    insertStreamingMessageStmt.run(id, sessionId),
+  /** Flush partial content to DB during streaming (safe no-op if already finalized). */
+  updateStreamingContent: (id: string, content: string) =>
+    updateStreamingContentStmt.run(content, id),
+  /** Finalize a streaming message on completion or error. */
+  finalizeMessage: (id: string, content: string, isError: boolean, errorCode?: string) =>
+    finalizeMessageStmt.run(content, 'complete', isError ? 1 : 0, errorCode ?? null, id),
   listBySessionId: (sessionId: string) =>
     listMessagesBySessionStmt.all(sessionId) as Message[],
   /**

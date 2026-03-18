@@ -82,13 +82,15 @@ router.post('/', (req, res) => {
     }
   }
 
-  const onError = (message: string, code: string, content: string) => {
+  const onError = (message: string, code: string, persistMsg: boolean) => {
     unregisterChat(sessionId)
     if (session.claude_session_id) {
       sessionQueries.clearClaudeSessionId(sessionId)
       session.claude_session_id = null
     }
-    messageQueries.insert(uuidv4(), sessionId, 'assistant', message, true, code)
+    // Worker path calls finalize() before onError so the streaming row is already updated.
+    // Direct-spawn path has no streaming row, so we insert here.
+    if (persistMsg) messageQueries.insert(uuidv4(), sessionId, 'assistant', message, true, code)
     notifyWatchers(sessionId)
     sendSseEvent(res, 'error', { message, code })
     if (!res.writableEnded) res.end()
@@ -97,11 +99,32 @@ router.post('/', (req, res) => {
   // ── Worker path ────────────────────────────────────────────────────────────
 
   if (workerClient.isConnected()) {
+    // Insert a streaming placeholder immediately so partial content survives a server restart.
+    const streamingMsgId = uuidv4()
+    messageQueries.insertStreaming(streamingMsgId, sessionId)
+
+    let streamingText = ''
+    const flushTimer = setInterval(() => {
+      if (streamingText) messageQueries.updateStreamingContent(streamingMsgId, streamingText)
+    }, 3_000)
+
+    const finalize = (content: string, isError: boolean, errorCode?: string) => {
+      clearInterval(flushTimer)
+      messageQueries.finalizeMessage(streamingMsgId, content, isError, errorCode)
+    }
+
     workerClient.subscribe(sessionId, (event) => {
       switch (event.type) {
-        case 'chunk':
+        case 'chunk': {
           sendSseEvent(res, 'chunk', event.chunk)
+          // Accumulate text deltas for periodic DB flush
+          const c = event.chunk as Record<string, unknown>
+          if (c.type === 'stream_event') {
+            const delta = ((c.event as Record<string, unknown>)?.delta as Record<string, unknown>)
+            if (delta?.type === 'text_delta') streamingText += String(delta.text ?? '')
+          }
           break
+        }
         case 'session_id':
           if (!session.claude_session_id) {
             sessionQueries.updateClaudeSessionId(event.claudeSessionId, sessionId)
@@ -110,13 +133,15 @@ router.post('/', (req, res) => {
           break
         case 'done':
           workerClient.unsubscribe(sessionId)
+          finalize(event.content, false)
           sendSseEvent(res, 'done', { session_id: event.claudeSessionId })
           if (!res.writableEnded) res.end()
           onComplete(event.content)
           break
         case 'error':
           workerClient.unsubscribe(sessionId)
-          onError(event.message, event.errorCode, event.content)
+          finalize(event.message, true, event.errorCode)
+          onError(event.message, event.errorCode, false)  // streaming row already finalized
           break
       }
     })
@@ -160,7 +185,7 @@ router.post('/', (req, res) => {
       }
     },
     onComplete,
-    onError: (err) => onError(err.message, err.code, ''),
+    onError: (err) => onError(err.message, err.code, true),  // no streaming row, persist here
   })
 
   res.on('close', () => {
