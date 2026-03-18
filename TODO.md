@@ -58,12 +58,12 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 - [ ] **Environment switcher UI** — floating toggle (authenticated users only) to navigate between `steward.jradoo.com` (prod) and `dev.steward.jradoo.com` (dev); consider long-press on header to avoid accidental switches; works in Capacitor WebView too
 
 ### Claude Worker Process
-- [ ] **Step 2 — DB write-through** — add `messages.status` (`streaming|complete|interrupted`), flush partial content to steward.db every 3s during streaming, on-boot set `streaming→interrupted`; no process split yet (see `docs/worker-protocol.md`)
-- [ ] **Step 3 — Extract JobManager** — move `spawnClaude` into `server/src/worker/job-manager.ts`; still imported directly by HTTP server; enables unit testing
-- [ ] **Step 4 — Worker process** — `server/src/worker/main.ts` listens on Unix socket (`/tmp/claude-worker.sock`); HTTP server connects and delegates start/stop via NDJSON frames
-- [ ] **Step 5 — Worker DB** — worker writes ephemeral `worker.db` (jobs + job_chunks tables); HTTP server promotes to steward.db on completion
-- [ ] **Step 6 — Client reconnect UX** — detect in-progress sessions on load, show partial content + spinner, recover via watchSession on done
-- [ ] **Step 7 — PM2 integration** — worker as separate PM2 process; document startup order
+- [x] **Step 2 — DB write-through** — add `messages.status` (`streaming|complete|interrupted`), flush partial content to steward.db every 3s during streaming, on-boot set `streaming→interrupted`; no process split yet (see `docs/worker-protocol.md`)
+- [x] **Step 3 — Extract JobManager** — move `spawnClaude` into `server/src/worker/job-manager.ts`; still imported directly by HTTP server; enables unit testing
+- [x] **Step 4 — Worker process** — `server/src/worker/main.ts` listens on Unix socket (`/tmp/claude-worker.sock`); HTTP server connects and delegates start/stop via NDJSON frames
+- [x] **Step 5 — Worker DB** — worker writes ephemeral `worker.db` (jobs + job_chunks tables); HTTP server promotes to steward.db on completion
+- [x] **Step 6 — Client reconnect UX** — detect in-progress sessions on load, show partial content + spinner, recover via watchSession on done
+- [x] **Step 7 — PM2 integration** — worker as separate PM2 process; document startup order
 
 ### Operational Reliability
 - [ ] **Granular tier scripts** — split `down` / `restart` / `logs` by tier so a single command can only affect one at a time: `down:dev`, `down:prod`, `down:safe`, `restart:dev`, `restart:prod`, `logs:dev`, `logs:prod`; bulk `down` / `restart` should warn and require `--force`; `safe` must never be killed by a bulk command

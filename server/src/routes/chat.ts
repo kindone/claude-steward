@@ -66,13 +66,19 @@ router.post('/', (req, res) => {
 
   // ── Shared completion handlers ─────────────────────────────────────────────
 
-  const onComplete = (assistantText: string) => {
+  // Set to true if the client SSE connection dropped before the job finished.
+  // Used to decide whether to send a push notification on completion.
+  let clientDisconnectedEarly = false
+
+  // persistMsg=false for the worker path (streaming row already finalized via finalizeMessage).
+  // persistMsg=true (default) for the direct-spawn path (no streaming row, insert here).
+  const onComplete = (assistantText: string, persistMsg = true) => {
     unregisterChat(sessionId)
-    if (assistantText) {
+    if (assistantText && persistMsg) {
       messageQueries.insert(uuidv4(), sessionId, 'assistant', assistantText)
     }
     const notified = notifyWatchers(sessionId)
-    if (notified === 0 && res.writableEnded && assistantText) {
+    if (notified === 0 && clientDisconnectedEarly && assistantText) {
       const preview = assistantText.replace(/\s+/g, ' ').trim().slice(0, 80)
       void notifyAll({
         title: session.title === 'New Chat' ? 'Claude replied' : session.title,
@@ -136,7 +142,7 @@ router.post('/', (req, res) => {
           finalize(event.content, false)
           sendSseEvent(res, 'done', { session_id: event.claudeSessionId })
           if (!res.writableEnded) res.end()
-          onComplete(event.content)
+          onComplete(event.content, false)
           break
         case 'error':
           workerClient.unsubscribe(sessionId)
@@ -157,10 +163,13 @@ router.post('/', (req, res) => {
     })
 
     res.on('close', () => {
-      // Client disconnected — unsubscribe from events but do NOT stop the worker job.
-      // The worker keeps running and persists to its DB; watchSession notifies on completion.
-      workerClient.unsubscribe(sessionId)
-      if (!res.writableEnded) res.end()
+      // Client disconnected early — mark flag for push notification decision, but do NOT
+      // unsubscribe from the worker. The handler must stay alive so that when the job
+      // completes, finalize() + notifyWatchers() still fire (enabling watchSession recovery).
+      if (!res.writableEnded) {
+        clientDisconnectedEarly = true
+        res.end()
+      }
     })
     return
   }
