@@ -3,8 +3,8 @@ import { http, HttpResponse } from 'msw'
 import type { Project, Session, FileEntry } from '../lib/api'
 
 export const mockProjects: Project[] = [
-  { id: 'proj-1', name: 'my-project', path: '/home/user/my-project', allow_all_tools: 0, permission_mode: 'acceptEdits', created_at: 1000 },
-  { id: 'proj-2', name: 'other-project', path: '/home/user/other', allow_all_tools: 0, permission_mode: 'acceptEdits', created_at: 2000 },
+  { id: 'proj-1', name: 'my-project', path: '/home/user/my-project', allow_all_tools: 0, permission_mode: 'acceptEdits', system_prompt: null, created_at: 1000 },
+  { id: 'proj-2', name: 'other-project', path: '/home/user/other', allow_all_tools: 0, permission_mode: 'acceptEdits', system_prompt: null, created_at: 2000 },
 ]
 
 export const mockSessions: Session[] = [
@@ -28,6 +28,7 @@ export const handlers = [
       path: body.path,
       allow_all_tools: 0,
       permission_mode: 'acceptEdits',
+      system_prompt: null,
       created_at: Date.now(),
     }
     return HttpResponse.json(project, { status: 201 })

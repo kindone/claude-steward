@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { sessionQueries, messageQueries, type PermissionMode } from '../db/index.js'
+import { sessionQueries, messageQueries, projectQueries, type PermissionMode } from '../db/index.js'
 import { addWatcher, removeWatcher } from '../lib/sessionWatchers.js'
 
 const VALID_MODES = new Set<PermissionMode>(['default', 'plan', 'acceptEdits', 'bypassPermissions'])
@@ -22,7 +22,8 @@ router.post('/', (req, res) => {
     return
   }
   const id = uuidv4()
-  const session = sessionQueries.create(id, 'New Chat', projectId)
+  const project = projectQueries.findById(projectId)
+  const session = sessionQueries.create(id, 'New Chat', projectId, project?.system_prompt)
   res.status(201).json(session)
 })
 

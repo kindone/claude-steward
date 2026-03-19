@@ -7,18 +7,20 @@ type Props = {
   onSelect: (id: string | null) => void
   onCreate: (name: string, path: string) => Promise<void>
   onDelete: (id: string) => void
+  onUpdateSystemPrompt?: (projectId: string, systemPrompt: string | null) => Promise<void>
   protectedPath?: string | null
 }
 
-export function ProjectPicker({ projects, activeProjectId, onSelect, onCreate, onDelete, protectedPath }: Props) {
+export function ProjectPicker({ projects, activeProjectId, onSelect, onCreate, onDelete, onUpdateSystemPrompt, protectedPath }: Props) {
   const [open, setOpen] = useState(false)
   const [creating, setCreating] = useState(false)
+  const [editingPrompt, setEditingPrompt] = useState(false)
   const [name, setName] = useState('')
   const [pathVal, setPathVal] = useState('')
+  const [promptDraft, setPromptDraft] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
-
   const activeProject = projects.find((p) => p.id === activeProjectId)
 
   // Close dropdown on outside click
@@ -57,6 +59,24 @@ export function ProjectPicker({ projects, activeProjectId, onSelect, onCreate, o
     if (window.confirm('Delete this project? Sessions will be unlinked but not deleted.')) {
       onDelete(id)
     }
+  }
+
+  async function handlePromptSave(e: React.FormEvent) {
+    e.preventDefault()
+    if (!activeProjectId || !onUpdateSystemPrompt) return
+    setSubmitting(true)
+    try {
+      await onUpdateSystemPrompt(activeProjectId, promptDraft.trim() || null)
+      setEditingPrompt(false)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function handleOpenPrompt() {
+    setPromptDraft(activeProject?.system_prompt ?? '')
+    setCreating(false)
+    setEditingPrompt(true)
   }
 
   return (
@@ -101,14 +121,24 @@ export function ProjectPicker({ projects, activeProjectId, onSelect, onCreate, o
           </ul>
 
           <div className="border-t border-[#222] p-1.5">
-            {!creating ? (
-              <button
-                className="w-full bg-transparent border-none text-[#555] text-xs px-2 py-1.5 cursor-pointer text-left rounded hover:bg-[#1e1e1e] hover:text-[#aaa] transition-colors"
-                onClick={() => setCreating(true)}
-              >
-                + New project
-              </button>
-            ) : (
+            {!creating && !editingPrompt ? (
+              <div className="flex flex-col gap-0.5">
+                <button
+                  className="w-full bg-transparent border-none text-[#555] text-xs px-2 py-1.5 cursor-pointer text-left rounded hover:bg-[#1e1e1e] hover:text-[#aaa] transition-colors"
+                  onClick={() => { setCreating(true) }}
+                >
+                  + New project
+                </button>
+                {activeProject && onUpdateSystemPrompt && (
+                  <button
+                    className="w-full bg-transparent border-none text-[#555] text-xs px-2 py-1.5 cursor-pointer text-left rounded hover:bg-[#1e1e1e] hover:text-[#aaa] transition-colors"
+                    onClick={handleOpenPrompt}
+                  >
+                    {activeProject.system_prompt ? '✎ Edit default prompt' : '+ Set default prompt'}
+                  </button>
+                )}
+              </div>
+            ) : creating ? (
               <form className="flex flex-col gap-1.5 p-0.5" onSubmit={handleCreate}>
                 <input
                   autoFocus
@@ -138,6 +168,34 @@ export function ProjectPicker({ projects, activeProjectId, onSelect, onCreate, o
                     disabled={submitting || !name.trim() || !pathVal.trim()}
                   >
                     {submitting ? 'Adding…' : 'Add'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form className="flex flex-col gap-1.5 p-0.5" onSubmit={handlePromptSave}>
+                <p className="text-[10px] text-[#555] px-0.5">Default system prompt for new sessions</p>
+                <textarea
+                  autoFocus
+                  rows={4}
+                  className="bg-[#1a1a1a] border border-[#2a2a2a] focus:border-blue-600 rounded text-[#e8e8e8] text-xs px-2 py-1.5 outline-none font-[inherit] resize-none"
+                  placeholder="You are a helpful assistant…"
+                  value={promptDraft}
+                  onChange={(e) => setPromptDraft(e.target.value)}
+                />
+                <div className="flex gap-1.5 justify-end">
+                  <button
+                    type="button"
+                    className="bg-transparent border border-[#333] hover:border-[#555] hover:text-[#bbb] rounded text-[#888] text-xs px-2.5 py-1.5 cursor-pointer transition-colors"
+                    onClick={() => setEditingPrompt(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="bg-blue-600 hover:bg-blue-500 disabled:bg-[#1e2a3a] disabled:text-[#555] disabled:cursor-not-allowed border-none rounded text-white text-xs px-3 py-1.5 cursor-pointer transition-colors"
+                    disabled={submitting}
+                  >
+                    {submitting ? 'Saving…' : 'Save'}
                   </button>
                 </div>
               </form>

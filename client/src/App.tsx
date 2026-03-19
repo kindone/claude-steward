@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  listProjects, createProject, deleteProject, fetchMeta, updatePermissionMode,
+  listProjects, createProject, deleteProject, fetchMeta, updatePermissionMode, updateProject,
   listSessions, createSession, deleteSession, renameSession,
   subscribeToAppEvents, getAuthStatus, logout,
   type Project, type Session,
@@ -127,6 +127,11 @@ export default function App() {
   async function handlePermissionModeChange(sessionId: string, mode: import('./lib/api').PermissionMode) {
     const updated = await updatePermissionMode(sessionId, mode)
     setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)))
+  }
+
+  async function handleUpdateProjectSystemPrompt(projectId: string, systemPrompt: string | null) {
+    const updated = await updateProject(projectId, { systemPrompt })
+    setProjects((prev) => prev.map((p) => (p.id === projectId ? updated : p)))
   }
 
   async function handleDeleteProject(id: string) {
@@ -275,6 +280,7 @@ export default function App() {
           onSelectProject={handleSelectProject}
           onCreateProject={handleCreateProject}
           onDeleteProject={handleDeleteProject}
+          onUpdateProjectSystemPrompt={handleUpdateProjectSystemPrompt}
           protectedProjectPath={appRoot}
           sessions={sessions}
           activeSessionId={activeSessionId}

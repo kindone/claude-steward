@@ -58,6 +58,9 @@ try {
 try {
   db.exec(`ALTER TABLE projects ADD COLUMN permission_mode TEXT NOT NULL DEFAULT 'default'`)
 } catch { /* already exists */ }
+try {
+  db.exec(`ALTER TABLE projects ADD COLUMN system_prompt TEXT`)
+} catch { /* already exists */ }
 // Promote any rows that were set to allow_all_tools=1 before permission_mode existed
 db.exec(`UPDATE projects SET permission_mode = 'bypassPermissions' WHERE allow_all_tools = 1 AND permission_mode = 'default'`)
 
@@ -125,6 +128,7 @@ export type Project = {
   path: string
   allow_all_tools: number       // legacy; superseded by permission_mode
   permission_mode: PermissionMode
+  system_prompt: string | null
   created_at: number
 }
 
@@ -164,6 +168,9 @@ const updateAllowAllToolsStmt = db.prepare(
 const updatePermissionModeStmt = db.prepare(
   `UPDATE projects SET permission_mode = ? WHERE id = ?`
 )
+const updateProjectSystemPromptStmt = db.prepare(
+  `UPDATE projects SET system_prompt = ? WHERE id = ?`
+)
 const deleteProjectStmt = db.prepare(`DELETE FROM projects WHERE id = ?`)
 const nullifyProjectSessionsStmt = db.prepare(
   `UPDATE sessions SET project_id = NULL WHERE project_id = ?`
@@ -178,6 +185,8 @@ export const projectQueries = {
     updateAllowAllToolsStmt.run(allow ? 1 : 0, id),
   updatePermissionMode: (mode: PermissionMode, id: string) =>
     updatePermissionModeStmt.run(mode, id),
+  updateSystemPrompt: (systemPrompt: string | null, id: string) =>
+    updateProjectSystemPromptStmt.run(systemPrompt, id),
   delete: (id: string) => {
     nullifyProjectSessionsStmt.run(id)
     deleteProjectStmt.run(id)
@@ -187,7 +196,7 @@ export const projectQueries = {
 // ── Session queries ───────────────────────────────────────────────────────────
 
 const createSessionStmt = db.prepare(
-  `INSERT INTO sessions (id, title, project_id) VALUES (?, ?, ?) RETURNING *`
+  `INSERT INTO sessions (id, title, project_id, system_prompt) VALUES (?, ?, ?, ?) RETURNING *`
 )
 const findSessionByIdStmt = db.prepare(`SELECT * FROM sessions WHERE id = ?`)
 const listAllSessionsStmt = db.prepare(`SELECT * FROM sessions ORDER BY updated_at DESC`)
@@ -209,8 +218,8 @@ const updatePermissionModeSessionStmt = db.prepare(
 const deleteSessionStmt = db.prepare(`DELETE FROM sessions WHERE id = ?`)
 
 export const sessionQueries = {
-  create: (id: string, title: string, projectId?: string | null) =>
-    createSessionStmt.get(id, title, projectId ?? null) as Session,
+  create: (id: string, title: string, projectId?: string | null, systemPrompt?: string | null) =>
+    createSessionStmt.get(id, title, projectId ?? null, systemPrompt ?? null) as Session,
   findById: (id: string) => findSessionByIdStmt.get(id) as Session | undefined,
   list: () => listAllSessionsStmt.all() as Session[],
   listByProject: (projectId: string) =>

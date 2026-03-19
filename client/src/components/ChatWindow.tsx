@@ -91,6 +91,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   }
 
   useEffect(() => {
+    if (messages.length === 0) return
     const behavior = scrollBehaviorRef.current
     if (behavior === 'none') {
       // loadOlder prepended messages — don't scroll, position already restored by loadOlder

@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
-import { projectQueries, type PermissionMode } from '../db/index.js'
+import { projectQueries, type PermissionMode, type Project } from '../db/index.js'
 
 // Monorepo root — three directories up from server/src/routes/
 const APP_ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..')
@@ -48,7 +48,7 @@ router.patch('/:id', (req, res) => {
     res.status(404).json({ error: 'Project not found' })
     return
   }
-  const { permissionMode } = req.body as { permissionMode?: string }
+  const { permissionMode, systemPrompt } = req.body as { permissionMode?: string; systemPrompt?: string | null }
   if (permissionMode !== undefined) {
     if (!VALID_MODES.has(permissionMode as PermissionMode)) {
       res.status(400).json({ error: `permissionMode must be one of: ${[...VALID_MODES].join(', ')}` })
@@ -56,6 +56,11 @@ router.patch('/:id', (req, res) => {
     }
     projectQueries.updatePermissionMode(permissionMode as PermissionMode, req.params.id)
     project.permission_mode = permissionMode as PermissionMode
+  }
+  if (systemPrompt !== undefined) {
+    const value = systemPrompt?.trim() || null
+    projectQueries.updateSystemPrompt(value, req.params.id)
+    ;(project as Project).system_prompt = value
   }
   res.json(project)
 })

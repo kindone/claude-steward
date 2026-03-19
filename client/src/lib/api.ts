@@ -80,6 +80,7 @@ export type Project = {
   path: string
   allow_all_tools: number   // legacy
   permission_mode: PermissionMode
+  system_prompt: string | null
   created_at: number
 }
 
@@ -140,7 +141,7 @@ export async function fetchMeta(): Promise<{ appRoot: string }> {
   return res.json() as Promise<{ appRoot: string }>
 }
 
-export async function updateProject(projectId: string, patch: { permissionMode?: PermissionMode }): Promise<Project> {
+export async function updateProject(projectId: string, patch: { permissionMode?: PermissionMode; systemPrompt?: string | null }): Promise<Project> {
   const res = await fetch(`/api/projects/${projectId}`, {
     method: 'PATCH',
     headers: JSON_HEADERS,
