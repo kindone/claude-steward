@@ -52,10 +52,8 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 - [ ] **Environment switcher UI** — floating toggle (authenticated users only) to navigate between `steward.jradoo.com` (prod) and `dev.steward.jradoo.com` (dev); consider long-press on header to avoid accidental switches; works in Capacitor WebView too
 
 ### Operational Reliability
-- [ ] **Granular tier scripts** — split `down` / `restart` / `logs` by tier so a single command can only affect one at a time: `down:dev`, `down:prod`, `down:safe`, `restart:dev`, `restart:prod`, `logs:dev`, `logs:prod`; bulk `down` / `restart` should warn and require `--force`; `safe` must never be killed by a bulk command
 - [ ] **Enhanced `npm run status`** — extend beyond port checks to cover: PM2 process names + states, required env vars present (`APP_DOMAIN`, `VAPID_PUBLIC_KEY`), nginx `proxy_pass` targets match expected ports, live nginx config matches repo copy (`config/nginx-*.conf`), `server/public/` freshness for prod, TLS cert expiry days
 - [ ] **External health monitor** — GitHub Actions scheduled workflow (every 5 min) that `curl`s all three public URLs (`steward`, `dev.steward`, `safe.steward`) and sends a push notification on failure; catches EC2-level and nginx-level outages that an on-server check cannot
-- [ ] **Server startup env validation** — on boot, log a loud structured warning (not a crash) for each missing or suspicious config value: `APP_DOMAIN` absent or placeholder, VAPID keys absent, DB path not writable; surfaces silent misconfigs before a user hits them
 
 ### Safe Core
 - [ ] **Extending safe core** — discuss splitting into multiple focused safe-cores: current one stays as the Claude Code emergency interface; a second could expose read-only DB queries (session/project browser); further cores could cover other admin tasks. Consider shared port-allocation convention and a lightweight process registry.

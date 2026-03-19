@@ -28,7 +28,12 @@ export type StatusCmd = {
   sessionId: string
 }
 
-export type WorkerCommand = StartCmd | StopCmd | StatusCmd
+export type GetResultCmd = {
+  type: 'get_result'
+  sessionId: string
+}
+
+export type WorkerCommand = StartCmd | StopCmd | StatusCmd | GetResultCmd
 
 // ── Events (worker → HTTP server) ────────────────────────────────────────────
 
@@ -80,6 +85,15 @@ export type StatusReplyEvent = {
   partialContent?: string
 }
 
+/** Response to a get_result query — returns final content from worker DB */
+export type ResultReplyEvent = {
+  type: 'result_reply'
+  sessionId: string
+  status: 'complete' | 'interrupted' | 'not_found'
+  content: string
+  errorCode: string | null
+}
+
 export type WorkerEvent =
   | ChunkEvent
   | ToolResultEvent
@@ -87,3 +101,4 @@ export type WorkerEvent =
   | DoneEvent
   | ErrorEvent
   | StatusReplyEvent
+  | ResultReplyEvent

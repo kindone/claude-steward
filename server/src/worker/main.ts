@@ -81,6 +81,16 @@ const server = net.createServer((socket) => {
         partialContent: status === 'running' ? manager.partialContent(cmd.sessionId) : undefined,
       }
       socket.write(JSON.stringify(reply) + '\n')
+    } else if (cmd.type === 'get_result') {
+      const job = jobQueries.find(cmd.sessionId)
+      const reply: WorkerEvent = {
+        type: 'result_reply',
+        sessionId: cmd.sessionId,
+        status: job ? (job.status as 'complete' | 'interrupted') : 'not_found',
+        content: job?.content ?? '',
+        errorCode: job?.error_code ?? null,
+      }
+      socket.write(JSON.stringify(reply) + '\n')
     }
   })
 

@@ -85,8 +85,9 @@ try {
 try {
   db.exec(`ALTER TABLE messages ADD COLUMN tool_calls TEXT`)
 } catch { /* already exists */ }
-// On boot: any message left 'streaming' means the server was killed mid-run — mark interrupted.
-db.exec(`UPDATE messages SET status = 'interrupted' WHERE status = 'streaming'`)
+// NOTE: stale 'streaming' rows are NOT migrated here — recovery.ts handles them after the
+// worker reconnects so in-flight jobs can be recovered. Only call markStaleStreamingMessages()
+// after recovery completes (or times out).
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS passkey_credentials (
@@ -267,6 +268,14 @@ const listBeforeDescStmt = db.prepare(
 const deleteMessagesBySessionStmt = db.prepare(
   `DELETE FROM messages WHERE session_id = ?`
 )
+const listStreamingStmt = db.prepare(
+  `SELECT * FROM messages WHERE status = 'streaming' ORDER BY created_at ASC`
+)
+
+/** Mark any remaining 'streaming' rows as interrupted. Call after recovery completes. */
+export function markStaleStreamingMessages(): void {
+  db.exec(`UPDATE messages SET status = 'interrupted' WHERE status = 'streaming'`)
+}
 
 export const messageQueries = {
   insert: (id: string, sessionId: string, role: 'user' | 'assistant', content: string, isError = false, errorCode?: string) =>
@@ -295,6 +304,9 @@ export const messageQueries = {
   },
   deleteBySessionId: (sessionId: string) =>
     deleteMessagesBySessionStmt.run(sessionId),
+  /** All messages currently mid-stream (server was restarted before they completed). */
+  listStreaming: () =>
+    listStreamingStmt.all() as Message[],
 }
 
 // ── Auth types ────────────────────────────────────────────────────────────────

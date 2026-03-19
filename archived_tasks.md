@@ -48,6 +48,8 @@
 - [x] **Smarter context-limit UX** — `context_limit` error banner includes a "Compact & Continue" button that triggers compaction in-place instead of starting cold
 - [x] **System prompt hygiene guidance** — char counter shown next to Save in the system prompt editor; turns yellow above 2 000 chars
 - [x] **Claude worker process** (Steps 2–7) — DB write-through with `messages.status`; `JobManager` extracted; worker process on Unix socket (`/tmp/claude-worker.sock`); worker writes ephemeral `worker.db` promoted on completion; client reconnect UX for in-progress sessions; PM2 integration as `steward-worker`
+- [x] **Granular tier scripts** — `scripts/tier.js` handles `restart|down|logs` per tier (`prod|dev|safe|all`); bulk `all` requires `--force`; `safe` never included in bulk; `package.json` gains `down:prod`, `down:dev`, `down:safe`, `restart:prod`, `restart:dev`, `restart:safe`, `logs:prod`, `logs:dev`
+- [x] **Server startup env validation** — `validateEnv()` IIFE in `server/src/index.ts`; logs `[config] WARN` lines (no crash) for missing `APP_DOMAIN`, placeholder domain, and absent VAPID keys; DB path guard already existed in `db/index.ts`
 
 ---
 

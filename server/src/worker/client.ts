@@ -27,6 +27,9 @@ class WorkerClient {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private started = false
 
+  /** Called each time the socket connects (initial + every reconnect). */
+  onReconnected: (() => void) | null = null
+
   /** Call once on server startup to begin connecting. */
   connect(): void {
     if (this.started) return
@@ -41,6 +44,7 @@ class WorkerClient {
       this.socket = socket
       this.connected = true
       console.log('[worker-client] connected to worker')
+      this.onReconnected?.()
     })
 
     socket.on('error', (err) => {
@@ -54,16 +58,8 @@ class WorkerClient {
       this.socket = null
       this.connected = false
 
-      // Notify all pending session handlers so they can surface an error to the client
-      for (const [sessionId, handler] of this.handlers) {
-        handler({
-          type: 'error',
-          sessionId,
-          errorCode: 'process_error',
-          message: 'Worker disconnected',
-          content: '',
-        })
-      }
+      // Clear handlers WITHOUT firing errors — the worker may still be running the jobs.
+      // Recovery logic (recovery.ts) re-subscribes on reconnect and finalizes properly.
       this.handlers.clear()
 
       this._scheduleReconnect()
