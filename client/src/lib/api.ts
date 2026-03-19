@@ -476,6 +476,14 @@ function extractToolDetail(name: string, input: Record<string, unknown>): string
   }
 }
 
+export type UsageInfo = {
+  input_tokens: number
+  output_tokens: number
+  cache_read_input_tokens?: number
+  cache_creation_input_tokens?: number
+  total_cost_usd?: number
+}
+
 export type ChunkHandler = {
   onTextDelta: (text: string) => void
   onTitle?: (title: string) => void
@@ -487,6 +495,8 @@ export type ChunkHandler = {
   onToolCall?: (call: ToolCall) => void
   onToolResult?: (toolUseId: string, output: string, isError: boolean) => void
   onActivity?: () => void
+  /** Fired with token usage when the result chunk arrives (if Claude CLI exposes it). */
+  onUsage?: (usage: UsageInfo) => void
 }
 
 export function sendMessage(
@@ -608,6 +618,11 @@ export function sendMessage(
                       )
                     }
                   }
+                } else if (chunk.type === 'result') {
+                  const r = chunk as unknown as { usage?: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number }; total_cost_usd?: number }
+                  if (r.usage) {
+                    handlers.onUsage?.({ ...r.usage, total_cost_usd: r.total_cost_usd })
+                  }
                 }
               } catch {
                 // ignore malformed chunks
@@ -660,4 +675,21 @@ export function stopChat(sessionId: string): void {
     headers: JSON_HEADERS,
     ...credentialsOpt,
   }).catch(() => { /* ignore */ })
+}
+
+/**
+ * Compact a session: summarizes it via Claude and creates a new session
+ * primed with that summary. Returns the new session ID.
+ */
+export async function compactSession(sessionId: string): Promise<{ sessionId: string }> {
+  const res = await fetch(`/api/sessions/${sessionId}/compact`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const body = await res.text()
+    throw new Error(`Compact failed: ${body}`)
+  }
+  return res.json() as Promise<{ sessionId: string }>
 }

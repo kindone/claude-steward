@@ -27,14 +27,8 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 ### Auth
 - [ ] **New device passkey login** — new-device bootstrapping: a device with no registered passkey and no iCloud/Google sync has no way to authenticate; needs a one-time invite link or similar mechanism. (RP ID mismatch fixed; "user verification required" error tracked in `BUGS.md`.)
 
-### Sessions & Projects
-- [ ] **Per-project system prompt** — add `system_prompt TEXT` to the `projects` table; project settings UI to set it; new sessions under a project pre-populate `session.system_prompt` from the project default (session-level still overrides); follows existing `ALTER TABLE` migration pattern
-
 ### Core UX
-- [ ] **Suppress scroll animation on page load** — on reload the chat view animates a full scroll-to-bottom which is jarring; the initial scroll should be instantaneous (`behavior: 'instant'`) and only subsequent new messages should use smooth scroll
 - [ ] **Client-side JS console for AI** — a browser-side REPL that Claude can interact with via a tool or SSE channel. Lets Claude evaluate JS expressions in the live page context (DOM queries, state inspection, exception capture) without relying on the user to relay errors. Useful for debugging rendering issues (e.g. swallowed exceptions, layout problems) and verifying UI changes. Possible approach: a `POST /api/projects/:id/eval` endpoint that pushes JS to the client via SSE, executes it via `eval()` in a sandboxed scope, and returns the result/exception back to the server.
-- [x] **Chat input persistence** — draft saved to `localStorage` keyed by `steward:draft:<sessionId>`, restored on mount, cleared on send; 400ms debounce on input.
-- [x] **Favicon** — `favicon.svg` (🧭 on blue background) added to `client/public/`; `index.html` updated with icon/apple-touch-icon/theme-color meta; `sw.js` updated to use `/favicon.svg` instead of missing `/icon-192.png`
 - [ ] **Rich chat content rendering** — several rendering gaps to close (XSS sanitization tracked separately in `BUGS.md`):
   - **Mermaid diagrams**: detect fenced ` ```mermaid ` blocks and render via `mermaid.js`; Claude generates these frequently
   - **Image rendering**: project-relative image paths in markdown (e.g. `![](./output.png)`) should resolve via the file binary endpoint so Claude-generated images display inline
@@ -56,14 +50,6 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 ### Dev / Production Workflow
 - [ ] **Production deploy workflow** — develop + test on `dev.steward.jradoo.com` → `npm run build` → `POST /api/admin/reload` hot-reloads `steward.jradoo.com`; document and wire up the build step so deploying is a single command
 - [ ] **Environment switcher UI** — floating toggle (authenticated users only) to navigate between `steward.jradoo.com` (prod) and `dev.steward.jradoo.com` (dev); consider long-press on header to avoid accidental switches; works in Capacitor WebView too
-
-### Claude Worker Process
-- [x] **Step 2 — DB write-through** — add `messages.status` (`streaming|complete|interrupted`), flush partial content to steward.db every 3s during streaming, on-boot set `streaming→interrupted`; no process split yet (see `docs/worker-protocol.md`)
-- [x] **Step 3 — Extract JobManager** — move `spawnClaude` into `server/src/worker/job-manager.ts`; still imported directly by HTTP server; enables unit testing
-- [x] **Step 4 — Worker process** — `server/src/worker/main.ts` listens on Unix socket (`/tmp/claude-worker.sock`); HTTP server connects and delegates start/stop via NDJSON frames
-- [x] **Step 5 — Worker DB** — worker writes ephemeral `worker.db` (jobs + job_chunks tables); HTTP server promotes to steward.db on completion
-- [x] **Step 6 — Client reconnect UX** — detect in-progress sessions on load, show partial content + spinner, recover via watchSession on done
-- [x] **Step 7 — PM2 integration** — worker as separate PM2 process; document startup order
 
 ### Operational Reliability
 - [ ] **Granular tier scripts** — split `down` / `restart` / `logs` by tier so a single command can only affect one at a time: `down:dev`, `down:prod`, `down:safe`, `restart:dev`, `restart:prod`, `logs:dev`, `logs:prod`; bulk `down` / `restart` should warn and require `--force`; `safe` must never be killed by a bulk command

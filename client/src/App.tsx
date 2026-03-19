@@ -200,6 +200,13 @@ export default function App() {
     setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)))
   }
 
+  async function handleCompact(newSessionId: string) {
+    if (!activeProjectId) return
+    const updated = await listSessions(activeProjectId)
+    setSessions(updated)
+    setActiveSessionId(newSessionId)
+  }
+
   // Keyboard shortcuts
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -334,6 +341,7 @@ export default function App() {
               )
             }
             onPermissionModeChange={(mode) => handlePermissionModeChange(activeSessionId, mode)}
+            onCompact={handleCompact}
           />
         ) : (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-[#666]">

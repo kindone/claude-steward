@@ -48,6 +48,8 @@ type ResultChunk = {
   session_id: string
   is_error: boolean
   errors?: string[]
+  usage?: { input_tokens: number; output_tokens: number }
+  total_cost_usd?: number
 }
 
 type ClaudeChunk = SystemInitChunk | StreamEventChunk | AssistantChunk | UserChunk | ResultChunk
@@ -228,7 +230,7 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
     if (!res.writableEnded) res.end()
   })
 
-  child.on('close', (code) => {
+  child.on('close', (code: number | null) => {
     if (intentionalKill) {
       // User-initiated stop — close the response cleanly without error or DB persistence.
       if (!res.writableEnded) res.end()
@@ -260,5 +262,75 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
       sendSseEvent(res, 'done', { session_id: '' })
       res.end()
     }
+  })
+}
+
+/**
+ * Run a one-shot Claude prompt and return the text response.
+ * No SSE streaming — resolves when Claude finishes, rejects on error.
+ * Used for compact summarization where we don't need a live stream.
+ */
+export function runClaudePrompt(prompt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '--print', prompt,
+      '--output-format', 'stream-json',
+      '--verbose',
+      '--include-partial-messages',
+      '--permission-mode', 'plan',
+    ]
+
+    const cleanEnv: NodeJS.ProcessEnv = {}
+    for (const [key, val] of Object.entries(process.env)) {
+      if (!key.startsWith('CLAUDE') && key !== 'ANTHROPIC_BASE_URL') {
+        cleanEnv[key] = val
+      }
+    }
+    if (process.env.ANTHROPIC_BASE_URL) {
+      cleanEnv.ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL
+    }
+
+    const child = spawn(CLAUDE_BIN, args, {
+      env: { ...cleanEnv, CI: 'true' },
+      shell: false,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+
+    const rl = createInterface({ input: child.stdout, crlfDelay: Infinity })
+    let accumulated = ''
+    let stderr = ''
+    let settled = false
+
+    child.stderr.on('data', (d: Buffer) => { stderr += d.toString() })
+
+    rl.on('line', (line) => {
+      if (!line.trim() || settled) return
+      try {
+        const chunk = JSON.parse(line) as ClaudeChunk
+        if (
+          chunk.type === 'stream_event' &&
+          chunk.event.type === 'content_block_delta' &&
+          chunk.event.delta?.type === 'text_delta'
+        ) {
+          accumulated += chunk.event.delta.text
+        }
+        if (chunk.type === 'result') {
+          settled = true
+          if (chunk.is_error) {
+            reject(new Error(chunk.errors?.join('; ') || chunk.result || 'Claude error'))
+          } else {
+            resolve(accumulated || chunk.result)
+          }
+        }
+      } catch { /* ignore malformed lines */ }
+    })
+
+    child.on('error', (err) => { if (!settled) { settled = true; reject(err) } })
+    child.on('close', (code: number | null) => {
+      if (settled) return
+      settled = true
+      if (code !== 0) reject(new Error(stderr.trim() || `Claude exited with code ${code}`))
+      else resolve(accumulated)
+    })
   })
 }

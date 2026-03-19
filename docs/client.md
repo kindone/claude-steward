@@ -53,11 +53,13 @@ App
 │       └── TerminalPanel    (xterm.js viewport + input bar + history)
 │
 └── ChatWindow  (keyed on sessionId — remounts on session switch)
-    ├── session header bar   (always visible: ⚙ Prompt toggle left, Plan/Edit/Full mode selector right)
-    │   └── system prompt editor  (collapsible; textarea + Save/Cancel/Clear)
+    ├── session header bar   (always visible: ⚙ Prompt toggle left, ⊡ Compact button + Plan/Edit/Full mode selector right)
+    │   ├── token usage row  (shown after first response: "N ctx · M out · $X.XXXX"; ctx = input + cache_read + cache_creation; hover for breakdown)
+    │   └── system prompt editor  (collapsible; textarea + Save/Cancel/Clear + char counter, turns yellow above 2 000)
     ├── "↑ Load older messages" button  (shown when hasMore=true; fetches cursor page)
     ├── MessageBubble[]      (one per message; streaming + error states + copy button)
-    │   └── tool history strip   (collapsed by default; ▶ Bash · Read · Edit; click to expand with full command detail)
+    │   ├── tool history strip   (collapsed by default; ▶ Bash · Read · Edit; click to expand with full command detail)
+    │   └── "Compact & Continue" button  (shown only on context_limit error bubbles)
     ├── streaming indicator  (pulsing dots; assembled calls shown as "Bash: git log …"; active tool shown in blue)
     └── MessageInput         (textarea + Send/Stop)
 ```
@@ -151,6 +153,7 @@ Claude errors carry a `code` field:
 
 | Code | UI | Meaning |
 |---|---|---|
+| `context_limit` | Yellow warning banner ⚠ + "Compact & Continue" button | Claude's context window is full; compact to continue |
 | `session_expired` | Amber warning banner ⚠ | `--resume` failed; next message starts fresh |
 | `process_error` | Red fatal banner ✕ | Claude exited non-zero for another reason |
 | `http_error` | Red fatal banner ✕ | Non-2xx HTTP response from the server |
@@ -206,6 +209,7 @@ All functions accept/return typed objects and throw on non-OK responses.
 | `watchSession(sessionId, onDone, onError?)` | `EventSource` on `GET /watch`; returns cancel fn |
 | `sendMessage(sessionId, text, handlers)` | Starts chat SSE; returns cancel fn. See `ChunkHandler` below |
 | `stopChat(sessionId)` | `DELETE /api/chat/:id` — kills the subprocess; fire-and-forget |
+| `compactSession(sessionId)` | `POST /api/sessions/:id/compact` — summarizes session via Claude, forks new session primed with summary; returns `{ sessionId: string }` |
 | `getVapidPublicKey()` | `GET /api/push/vapid-public-key` → `string` |
 | `savePushSubscription(sub)` | `POST /api/push/subscribe` with `PushSubscription` object |
 | `deletePushSubscription(endpoint)` | `DELETE /api/push/subscribe` |
@@ -216,8 +220,9 @@ All functions accept/return typed objects and throw on non-OK responses.
 | Type | Fields |
 |---|---|
 | `ToolCall` | `name: string`, `detail?: string` — one assembled tool invocation |
-| `ChunkHandler` | All SSE callbacks for `sendMessage`: `onTextDelta`, `onTitle`, `onDone`, `onError`, `onToolActivity`, `onToolCall`, `onActivity` |
-| `ClaudeErrorCode` | `'session_expired' \| 'process_error' \| 'http_error'` |
+| `ChunkHandler` | All SSE callbacks for `sendMessage`: `onTextDelta`, `onTitle`, `onDone`, `onError`, `onToolActivity`, `onToolCall`, `onActivity`, `onUsage` |
+| `UsageInfo` | `input_tokens`, `output_tokens`, `cache_read_input_tokens?`, `cache_creation_input_tokens?`, `total_cost_usd?` — fired via `onUsage` when the result chunk arrives |
+| `ClaudeErrorCode` | `'context_limit' \| 'session_expired' \| 'process_error' \| 'http_error'` |
 | `FileContent` | `{ content: string, lastModified: number }` — returned by `getFileContent` |
 | `FileConflictError` | `Error` subclass; thrown by `patchFile` on 409 Conflict |
 | `MessagesPage` | `{ messages: Message[], hasMore: boolean }` — returned by `getMessages` |

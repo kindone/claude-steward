@@ -2,6 +2,7 @@ import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { sessionQueries, messageQueries, projectQueries, type PermissionMode } from '../db/index.js'
 import { addWatcher, removeWatcher } from '../lib/sessionWatchers.js'
+import { runClaudePrompt } from '../claude/process.js'
 
 const VALID_MODES = new Set<PermissionMode>(['default', 'plan', 'acceptEdits', 'bypassPermissions'])
 
@@ -131,6 +132,56 @@ router.patch('/:id', (req, res) => {
   }
 
   res.json(session)
+})
+
+router.post('/:id/compact', async (req, res) => {
+  const session = sessionQueries.findById(req.params.id)
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' })
+    return
+  }
+
+  const messages = messageQueries.listBySessionId(req.params.id)
+  const relevant = messages.filter((m) => !m.is_error && m.content.trim())
+  if (relevant.length === 0) {
+    res.status(400).json({ error: 'No messages to compact' })
+    return
+  }
+
+  const transcript = relevant
+    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`)
+    .join('\n\n')
+
+  const prompt = [
+    'Summarize the following conversation concisely but completely.',
+    'The summary will prime a new session so the conversation can continue naturally.',
+    'Include all important facts, decisions, code changes, file paths, and open questions.',
+    '',
+    'Conversation:',
+    '',
+    transcript,
+    '',
+    'Summary:',
+  ].join('\n')
+
+  let summary: string
+  try {
+    summary = await runClaudePrompt(prompt)
+  } catch (err) {
+    console.error('[compact] summarization failed:', err)
+    res.status(500).json({ error: 'Failed to generate summary' })
+    return
+  }
+
+  const newId = uuidv4()
+  const basePrompt = session.system_prompt ? `${session.system_prompt}\n\n---\n\n` : ''
+  const systemPrompt = `${basePrompt}Previous conversation summary:\n${summary.trim()}`
+  const newSession = sessionQueries.create(newId, `[Compacted] ${session.title}`, session.project_id, systemPrompt)
+  if (session.permission_mode !== 'acceptEdits') {
+    sessionQueries.updatePermissionMode(session.permission_mode, newId)
+  }
+
+  res.status(201).json({ sessionId: newSession.id })
 })
 
 router.delete('/:id', (req, res) => {

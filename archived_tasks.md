@@ -39,6 +39,16 @@
 - [x] **Stop button kills Claude on server** — `DELETE /api/chat/:sessionId` SIGTERMs the subprocess via `AbortController`; `activeChats.ts` registry (`Map<sessionId, AbortController>`); `intentionalKill` flag in `process.ts` skips error path and DB persistence; `stopChat(sessionId)` in `api.ts` called by the Stop button before aborting the SSE fetch
 - [x] **Tailwind CSS v4 mobile-responsive migration** — replaced monolithic `index.css` with Tailwind utilities across all components; sidebar is now a fixed drawer on mobile (slides in/out) and inline on desktop (md+); hamburger toggle + mobile header bar; `100dvh` throughout for iOS dynamic toolbar fix; all inputs bumped to 16px to prevent iOS Safari auto-zoom; send/stop buttons `min-h-[44px]`; session/project delete buttons and message copy button made permanently visible on touch devices via `[@media(hover:none)]`; file tree touch targets enlarged; also fixed pre-existing build blockers (missing `vite-env.d.ts`, stale test fixtures, unused imports)
 
+- [x] **Chat input persistence** — draft saved to `localStorage` keyed by `steward:draft:<sessionId>`, restored on mount, cleared on send; 400ms debounce on input.
+- [x] **Favicon** — `favicon.svg` (🧭 on blue background) added to `client/public/`; `index.html` updated with icon/apple-touch-icon/theme-color meta; `sw.js` updated to use `/favicon.svg` instead of missing `/icon-192.png`
+- [x] **Suppress scroll animation on page load** — initial scroll uses `behavior: 'instant'`; subsequent new messages use smooth scroll; `scrollBehaviorRef` tracks mode across load/stream/paginate paths
+- [x] **Per-project system prompt** — `system_prompt TEXT` column added to `projects` table via `ALTER TABLE` migration; project settings UI; new sessions under a project inherit the project default (session-level still overrides)
+- [x] **Session compaction** — `⊡ Compact` button in session header; `POST /api/sessions/:id/compact` summarizes conversation via `runClaudePrompt()` and forks a new session primed with the summary as system prompt; `runClaudePrompt()` is a non-streaming one-shot Claude helper in `process.ts`
+- [x] **Token usage display** — `ResultChunk` extended with `usage` + `total_cost_usd`; `UsageInfo` type with cache fields (`cache_read_input_tokens`, `cache_creation_input_tokens`); `onUsage` callback in `ChunkHandler`; session header shows cache-aware `N ctx · M out · $X.XXXX` row (ctx = input + cache_read + cache_creation); hover for full per-field breakdown
+- [x] **Smarter context-limit UX** — `context_limit` error banner includes a "Compact & Continue" button that triggers compaction in-place instead of starting cold
+- [x] **System prompt hygiene guidance** — char counter shown next to Save in the system prompt editor; turns yellow above 2 000 chars
+- [x] **Claude worker process** (Steps 2–7) — DB write-through with `messages.status`; `JobManager` extracted; worker process on Unix socket (`/tmp/claude-worker.sock`); worker writes ephemeral `worker.db` promoted on completion; client reconnect UX for in-progress sessions; PM2 integration as `steward-worker`
+
 ---
 
 ## Fixed Bugs

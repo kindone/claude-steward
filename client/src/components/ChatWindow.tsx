@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, updateSystemPrompt, updatePermissionMode, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, updateSystemPrompt, updatePermissionMode, compactSession, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
@@ -43,9 +43,10 @@ type Props = {
   onActivity?: () => void
   onSystemPromptChange?: (prompt: string | null) => void
   onPermissionModeChange?: (mode: PermissionMode) => void
+  onCompact?: (newSessionId: string) => void
 }
 
-export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange }: Props) {
+export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onCompact }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -53,6 +54,8 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   const [streamingTool, setStreamingTool] = useState<string | null>(null)
   const [promptOpen, setPromptOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState(systemPrompt ?? '')
+  const [compacting, setCompacting] = useState(false)
+  const [lastUsage, setLastUsage] = useState<UsageInfo | null>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   /** 'instant' on first load, 'smooth' during streaming, 'none' when prepending older messages. */
@@ -88,6 +91,18 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
 
   function handlePromptKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Escape') { setPromptDraft(systemPrompt ?? ''); setPromptOpen(false) }
+  }
+
+  async function handleCompact() {
+    setCompacting(true)
+    try {
+      const { sessionId: newId } = await compactSession(sessionId)
+      onCompact?.(newId)
+    } catch (err) {
+      console.error('[compact] failed:', err)
+    } finally {
+      setCompacting(false)
+    }
   }
 
   useEffect(() => {
@@ -199,6 +214,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
     cancelRef.current = sendMessage(sessionId, text, {
       onTitle,
       onActivity,
+      onUsage: (usage) => setLastUsage(usage),
       onTextDelta: (delta) => {
         setMessages((prev) =>
           prev.map((m) =>
@@ -264,6 +280,16 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
           </button>
 
           <span className="flex items-center gap-2">
+            {/* Compact button */}
+            <button
+              className={`bg-transparent border border-[#222] hover:border-[#444] rounded text-[#444] hover:text-[#888] cursor-pointer text-xs px-2.5 py-1.5 transition-colors ${(compacting || streaming) ? 'opacity-40 cursor-default' : ''}`}
+              onClick={handleCompact}
+              disabled={compacting || streaming}
+              title="Summarize this session and start fresh — resets the context window"
+            >
+              {compacting ? 'Compacting…' : '⊡ Compact'}
+            </button>
+
             {/* Permission mode segmented control */}
             <span className="inline-flex border border-[#222] rounded overflow-hidden">
               {MODES.map((m) => (
@@ -307,6 +333,29 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
           </span>
         </div>
 
+        {/* Token usage row — full width, only shown after a response */}
+        {lastUsage && (() => {
+          const ctx = lastUsage.input_tokens + (lastUsage.cache_read_input_tokens ?? 0) + (lastUsage.cache_creation_input_tokens ?? 0)
+          const titleParts = [
+            `ctx: ${ctx.toLocaleString()} (${lastUsage.input_tokens.toLocaleString()} new` +
+              (lastUsage.cache_read_input_tokens ? ` + ${lastUsage.cache_read_input_tokens.toLocaleString()} cached` : '') +
+              (lastUsage.cache_creation_input_tokens ? ` + ${lastUsage.cache_creation_input_tokens.toLocaleString()} created` : '') +
+            `)`,
+            `out: ${lastUsage.output_tokens.toLocaleString()}`,
+            lastUsage.total_cost_usd != null ? `$${lastUsage.total_cost_usd.toFixed(4)}` : null,
+          ].filter(Boolean).join(' · ')
+          return (
+            <div className="flex items-center gap-2 px-3 pb-1">
+              <span className="text-[11px] text-[#444] tabular-nums" title={titleParts}>
+                {ctx.toLocaleString()} ctx · {lastUsage.output_tokens.toLocaleString()} out
+                {lastUsage.total_cost_usd != null && (
+                  <span className="ml-1.5 text-[#333]">${lastUsage.total_cost_usd.toFixed(4)}</span>
+                )}
+              </span>
+            </div>
+          )
+        })()}
+
         {promptOpen && (
           <div className="px-3 pb-3 flex flex-col gap-2">
             <textarea
@@ -318,13 +367,16 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
               rows={4}
               autoFocus
             />
-            <div className="flex gap-1.5">
+            <div className="flex gap-1.5 items-center">
               <button
                 className="bg-blue-600 hover:bg-blue-500 border-none rounded text-white cursor-pointer text-xs px-3 py-1.5 transition-colors"
                 onClick={handlePromptSave}
               >
                 Save
               </button>
+              <span className={`text-[11px] tabular-nums ml-1 ${promptDraft.length > 2000 ? 'text-yellow-500' : 'text-[#555]'}`}>
+                {promptDraft.length} chars
+              </span>
               <button
                 className="bg-transparent border border-[#2a2a2a] hover:border-[#444] hover:text-[#aaa] rounded text-[#666] cursor-pointer text-xs px-2.5 py-1.5 transition-colors"
                 onClick={() => { setPromptDraft(systemPrompt ?? ''); setPromptOpen(false) }}
@@ -370,6 +422,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
             streaming={m.streaming}
             errorCode={m.errorCode}
             toolUses={m.toolUses}
+            onCompact={m.errorCode === 'context_limit' ? handleCompact : undefined}
           />
         ))}
         {streaming && (

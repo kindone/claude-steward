@@ -15,9 +15,10 @@ type Props = {
   streaming?: boolean
   errorCode?: ClaudeErrorCode
   toolUses?: ToolCall[]
+  onCompact?: () => void
 }
 
-export function MessageBubble({ role, content, streaming = false, errorCode, toolUses }: Props) {
+export function MessageBubble({ role, content, streaming = false, errorCode, toolUses, onCompact }: Props) {
   const contentRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -72,7 +73,17 @@ export function MessageBubble({ role, content, streaming = false, errorCode, too
         )}
         <div className={`flex items-start gap-2 px-3.5 py-2.5 rounded-lg text-sm leading-relaxed border w-full ${style}`}>
           <span className="flex-shrink-0 text-sm mt-px">{icon}</span>
-          <p className="flex-1">{message}</p>
+          <div className="flex-1 flex flex-col gap-2">
+            <p>{message}</p>
+            {errorCode === 'context_limit' && onCompact && (
+              <button
+                onClick={onCompact}
+                className="self-start bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/40 text-yellow-300 rounded px-2.5 py-1 text-xs cursor-pointer transition-colors"
+              >
+                Compact &amp; Continue
+              </button>
+            )}
+          </div>
         </div>
       </div>
     )
