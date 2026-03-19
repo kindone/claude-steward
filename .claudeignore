@@ -1,0 +1,19 @@
+# Same patterns as .cursorignore — reduce token usage when Claude indexes the project
+node_modules/
+server/public/
+server/dist/
+client/dist/
+package-lock.json
+*.db
+*.db-shm
+*.db-wal
+.env
+.env.*
+!.env.example
+test-results/
+playwright-report/
+coverage/
+screenshots/
+.playwright/
+client/src/**/*.js
+client/src/**/*.js.map

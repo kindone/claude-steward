@@ -28,3 +28,6 @@ screenshots/
 
 # macOS
 .DS_Store
+
+# Local token optimization — keep .cursorignore out of repo
+.cursorignore

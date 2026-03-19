@@ -28,6 +28,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 - [ ] **New device passkey login** — new-device bootstrapping: a device with no registered passkey and no iCloud/Google sync has no way to authenticate; needs a one-time invite link or similar mechanism. (RP ID mismatch fixed; "user verification required" error tracked in `BUGS.md`.)
 
 ### Core UX
+- [ ] **Per-session model selection** — add `model` column to sessions (or project default); pass `--model <value>` to spawn args in `process.ts` and worker `job-manager.ts`; UI selector in session header (sonnet/opus/haiku or full IDs like `claude-sonnet-4-6`); follows same pattern as system prompt and permission mode
 - [ ] **Client-side JS console for AI** — a browser-side REPL that Claude can interact with via a tool or SSE channel. Lets Claude evaluate JS expressions in the live page context (DOM queries, state inspection, exception capture) without relying on the user to relay errors. Useful for debugging rendering issues (e.g. swallowed exceptions, layout problems) and verifying UI changes. Possible approach: a `POST /api/projects/:id/eval` endpoint that pushes JS to the client via SSE, executes it via `eval()` in a sandboxed scope, and returns the result/exception back to the server.
 - [ ] **Rich chat content rendering** — several rendering gaps to close (XSS sanitization tracked separately in `BUGS.md`):
   - **Mermaid diagrams**: detect fenced ` ```mermaid ` blocks and render via `mermaid.js`; Claude generates these frequently
