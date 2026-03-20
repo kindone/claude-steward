@@ -24,6 +24,12 @@ db.exec(`
   )
 `)
 
+try {
+  db.exec(`ALTER TABLE jobs ADD COLUMN tool_calls TEXT`)
+} catch {
+  /* already exists */
+}
+
 // ── Queries ───────────────────────────────────────────────────────────────────
 
 const insertJobStmt = db.prepare(
@@ -33,7 +39,7 @@ const updateContentStmt = db.prepare(
   `UPDATE jobs SET content = ?, updated_at = unixepoch() WHERE session_id = ?`
 )
 const updateStatusStmt = db.prepare(
-  `UPDATE jobs SET status = ?, error_code = ?, content = ?, updated_at = unixepoch() WHERE session_id = ?`
+  `UPDATE jobs SET status = ?, error_code = ?, content = ?, tool_calls = ?, updated_at = unixepoch() WHERE session_id = ?`
 )
 const findJobStmt = db.prepare(`SELECT * FROM jobs WHERE session_id = ?`)
 const deleteJobStmt = db.prepare(`DELETE FROM jobs WHERE session_id = ?`)
@@ -44,6 +50,7 @@ export type JobRow = {
   status: 'running' | 'complete' | 'interrupted'
   content: string
   error_code: string | null
+  tool_calls: string | null
   started_at: number
   updated_at: number
 }
@@ -53,8 +60,13 @@ export const jobQueries = {
     insertJobStmt.run(sessionId),
   updateContent: (sessionId: string, content: string) =>
     updateContentStmt.run(content, sessionId),
-  updateStatus: (sessionId: string, status: string, errorCode: string | null, content: string) =>
-    updateStatusStmt.run(status, errorCode, content, sessionId),
+  updateStatus: (
+    sessionId: string,
+    status: string,
+    errorCode: string | null,
+    content: string,
+    toolCalls: string | null = null,
+  ) => updateStatusStmt.run(status, errorCode, content, toolCalls, sessionId),
   find: (sessionId: string) =>
     findJobStmt.get(sessionId) as JobRow | undefined,
   delete: (sessionId: string) =>

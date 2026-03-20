@@ -449,7 +449,7 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
   return () => { cancelled = true; controller.abort() }
 }
 
-export type ClaudeErrorCode = 'session_expired' | 'context_limit' | 'process_error' | 'http_error'
+export type ClaudeErrorCode = 'session_expired' | 'context_limit' | 'process_error' | 'http_error' | 'connection_lost'
 
 /** A single tool invocation with the key detail extracted from its input. */
 export type ToolCall = {
@@ -652,7 +652,7 @@ export function sendMessage(
       // Stream ended without a terminal event — server likely restarted or connection dropped
       if (!doneFired && !errorFired) {
         errorFired = true
-        handlers.onError('Connection lost — server may have restarted', 'process_error')
+        handlers.onError('Connection lost — server may have restarted', 'connection_lost')
       }
     })
     .catch((err: Error) => {

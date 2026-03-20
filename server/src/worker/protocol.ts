@@ -92,6 +92,8 @@ export type ResultReplyEvent = {
   status: 'complete' | 'interrupted' | 'not_found'
   content: string
   errorCode: string | null
+  /** JSON array of StoredToolCall — persisted by worker on job completion */
+  toolCalls?: string | null
 }
 
 export type WorkerEvent =

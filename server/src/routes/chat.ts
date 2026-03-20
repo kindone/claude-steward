@@ -6,6 +6,7 @@ import { spawnClaude } from '../claude/process.js'
 import { notifyWatchers } from '../lib/sessionWatchers.js'
 import { registerChat, unregisterChat, abortChat } from '../lib/activeChats.js'
 import { notifyAll } from '../lib/pushNotifications.js'
+import { extractToolDetail } from '../claude/toolDetail.js'
 import { workerClient } from '../worker/client.js'
 
 function sendSseEvent(res: Response, event: string, data: unknown): void {
@@ -115,22 +116,7 @@ router.post('/', (req, res) => {
     }, 3_000)
 
     // Accumulate tool calls for persistence: keyed by tool_use_id
-    type StoredToolCall = { id: string; name: string; detail?: string; output?: string; isError?: boolean }
-    const toolCallsMap = new Map<string, StoredToolCall>()
-
-    const extractToolDetail = (name: string, input: Record<string, unknown>): string | undefined => {
-      const s = (v: unknown) => typeof v === 'string' ? v.trim() : undefined
-      switch (name) {
-        case 'Bash':      return s(input.command)?.replace(/\s+/g, ' ').slice(0, 100)
-        case 'Read':      return s(input.file_path)
-        case 'Edit':
-        case 'Write':
-        case 'MultiEdit': return s(input.file_path)
-        case 'WebSearch': return s(input.query)?.slice(0, 80)
-        case 'WebFetch':  return s(input.url)?.slice(0, 80)
-        default:          return undefined
-      }
-    }
+    const toolCallsMap = new Map<string, { id: string; name: string; detail?: string; output?: string; isError?: boolean }>()
 
     const finalize = (content: string, isError: boolean, errorCode?: string) => {
       clearInterval(flushTimer)

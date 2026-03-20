@@ -62,6 +62,9 @@ On job completion the worker notifies the HTTP server, which reads the final con
 
 // Query status of a job
 { type: 'status', sessionId: string }
+
+// Fetch final job row after status=idle (recovery)
+{ type: 'get_result', sessionId: string }
 ```
 
 ### Worker → HTTP Server (events)
@@ -84,6 +87,9 @@ On job completion the worker notifies the HTTP server, which reads the final con
 
 // Response to a status query
 { type: 'status_reply', sessionId: string, status: 'running' | 'idle' | 'unknown' }
+
+// Response to get_result — includes tool_calls JSON when job finished with tools
+{ type: 'result_reply', sessionId: string, status: 'complete' | 'interrupted' | 'not_found', content: string, errorCode: string | null, toolCalls?: string | null }
 ```
 
 ---
@@ -98,6 +104,7 @@ CREATE TABLE jobs (
   status       TEXT NOT NULL DEFAULT 'running',  -- running | complete | interrupted
   content      TEXT NOT NULL DEFAULT '',          -- accumulated assistant text
   error_code   TEXT,
+  tool_calls   TEXT,                              -- JSON array of StoredToolCall; set on job completion
   started_at   INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at   INTEGER NOT NULL DEFAULT (unixepoch())
 );

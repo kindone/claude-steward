@@ -6,6 +6,7 @@
 
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
+import { extractToolDetail } from '../claude/toolDetail.js'
 import { jobQueries } from './db.js'
 import type { WorkerEvent } from './protocol.js'
 
@@ -50,6 +51,7 @@ export class JobManager {
     let stderrOutput = ''
     let sessionIdEmitted = false
     let resolved = false // prevent double done/error
+    const toolCallsMap = new Map<string, { id: string; name: string; detail?: string; output?: string; isError?: boolean }>()
 
     const flush = () => jobQueries.updateContent(sessionId, accumulatedText)
 
@@ -59,7 +61,8 @@ export class JobManager {
       if (resolved) return
       resolved = true
       clearInterval(flushTimer)
-      jobQueries.updateStatus(sessionId, status, errorCode, accumulatedText)
+      const toolCallsJson = toolCallsMap.size > 0 ? JSON.stringify([...toolCallsMap.values()]) : null
+      jobQueries.updateStatus(sessionId, status, errorCode, accumulatedText, toolCallsJson)
       this.jobs.delete(sessionId)
     }
 
@@ -138,15 +141,35 @@ export class JobManager {
         accumulatedText += (((chunk.event as Record<string, unknown>)?.delta as Record<string, unknown>)?.text as string) ?? ''
       }
 
+      // Assembled tool_use blocks (same shape as chat route / recovery)
+      if (chunk.type === 'assistant') {
+        const content = (chunk.message as Record<string, unknown>)?.content as Array<Record<string, unknown>> ?? []
+        for (const block of content) {
+          if (block.type === 'tool_use' && block.name && block.id) {
+            toolCallsMap.set(block.id as string, {
+              id: block.id as string,
+              name: block.name as string,
+              detail: extractToolDetail(block.name as string, (block.input as Record<string, unknown>) ?? {}),
+            })
+          }
+        }
+      }
+
       // Tool results
       if (chunk.type === 'user') {
         const content = (chunk.message as Record<string, unknown>)?.content as Array<Record<string, unknown>> ?? []
         for (const block of content) {
           if (block.type === 'tool_result') {
+            const tid = block.tool_use_id as string
+            const existing = toolCallsMap.get(tid)
+            if (existing) {
+              existing.output = (block.content as string) ?? ''
+              existing.isError = (block.is_error as boolean) ?? false
+            }
             this.onEvent({
               type: 'tool_result',
               sessionId,
-              toolUseId: block.tool_use_id as string,
+              toolUseId: tid,
               output: block.content as string,
               isError: block.is_error as boolean,
             })

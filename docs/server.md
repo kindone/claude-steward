@@ -8,25 +8,33 @@ Node.js 23 + TypeScript (ESM) + Express 5. Serves the REST/SSE API and, in produ
 
 ```
 server/src/
-├── index.ts          ← entry point: dotenv load, createApp(), listen
+├── index.ts          ← entry point: dotenv, validateEnv(), workerClient.connect(), recover hook, listen
 ├── app.ts            ← createApp() factory (exported for tests)
 ├── auth/
 │   └── middleware.ts ← requireApiKey — Bearer token check on all /api routes
 ├── claude/
-│   └── process.ts    ← spawnClaude(): CLI spawn, NDJSON → SSE pipe, error handling
+│   ├── process.ts    ← spawnClaude(): direct CLI spawn (fallback when worker unavailable)
+│   └── toolDetail.ts ← extractToolDetail() — shared tool pill metadata (chat route, worker, recovery)
 ├── db/
 │   └── index.ts      ← schema, migrations, projectQueries/sessionQueries/messageQueries
 ├── lib/
 │   ├── connections.ts     ← global Set<Response> for app-level SSE fan-out
-│   ├── sessionWatchers.ts    ← Map<sessionId, Set<Response>> for session completion watch
-│   ├── activeChats.ts        ← Map<sessionId, AbortController> for in-flight Claude spawns
-│   └── pushNotifications.ts  ← web-push VAPID init, notifyAll(), isPushEnabled()
+│   ├── sessionWatchers.ts ← Map<sessionId, Set<Response>> for session completion watch
+│   ├── activeChats.ts     ← Map<sessionId, AbortController> for direct-spawn stop
+│   └── pushNotifications.ts
+├── worker/           ← Claude worker IPC (see [worker-protocol](worker-protocol.md))
+│   ├── main.ts       ← Unix socket server; get_result / status / start / stop
+│   ├── job-manager.ts← spawn Claude; accumulate text + tool_calls → worker.db
+│   ├── client.ts     ← HTTP-side NDJSON socket; onReconnected → recoverStreamingSessions
+│   ├── recovery.ts   ← finalize streaming rows after worker reconnect; merges tool_calls from chunks or result_reply
+│   ├── db.ts         ← worker.db jobs table (content, tool_calls, status)
+│   └── protocol.ts   ← WorkerCommand / WorkerEvent types
 └── routes/
-    ├── chat.ts        ← POST /api/chat
-    ├── sessions.ts    ← CRUD + GET /:id/messages (paginated) + GET /:id/watch (SSE)
-    ├── projects.ts    ← CRUD + file listing/content/raw/write + POST /:id/exec
-    ├── events.ts      ← GET /api/events (app-level SSE)
-    └── admin.ts       ← GET /api/admin/version, POST /api/admin/reload
+    ├── chat.ts       ← POST /api/chat (worker path + direct-spawn fallback)
+    ├── sessions.ts   ← CRUD + GET /:id/messages (paginated) + GET /:id/watch (SSE)
+    ├── projects.ts
+    ├── events.ts
+    └── admin.ts
 ```
 
 The `createApp()` / `listen` split exists so tests can import `createApp()` without binding a port.
@@ -38,8 +46,8 @@ The `createApp()` / `listen` split exists so tests can import `createApp()` with
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/api/meta` | none | App metadata: `{ appRoot }` |
-| `POST` | `/api/chat` | ✓ | Start SSE stream; spawns Claude subprocess |
-| `DELETE` | `/api/chat/:sessionId` | ✓ | Kill the in-progress Claude subprocess; returns `{ stopped: bool }` |
+| `POST` | `/api/chat` | ✓ | Start SSE stream; delegates to **worker** when connected, else **direct spawn** (`process.ts`) |
+| `DELETE` | `/api/chat/:sessionId` | ✓ | Stop job: worker `stop` + `abortChat` for direct path; returns `{ stopped: bool }` |
 | `GET` | `/api/sessions` | ✓ | List sessions; optional `?projectId=` filter |
 | `POST` | `/api/sessions` | ✓ | Create session; `projectId` required in body |
 | `PATCH` | `/api/sessions/:id` | ✓ | Update session fields: `{ title?, systemPrompt?, permissionMode? }` |
@@ -145,9 +153,19 @@ Resume failure:
 | `done` | `{ session_id: string }` | After Claude `result` chunk; server closes response |
 | `error` | `{ message, code, detail? }` | Spawn error or non-zero exit |
 
-Error codes:
+Error codes (SSE `error` event and persisted `messages.error_code`):
 - `session_expired` — `--resume` attempt failed; `claude_session_id` cleared automatically
-- `process_error` — any other non-zero exit; `detail` contains stderr
+- `context_limit` — context window exceeded; client may offer compact flow
+- `process_error` — other failures
+- `connection_lost` — **client-only classification**: stream ended without `done`/`error` (e.g. HTTP server restarted mid-stream). Not sent as SSE `error` from server; `sendMessage` synthesizes this so `ChatWindow` can switch to `watchSession` instead of a permanent error bubble when the worker may still complete the job.
+
+### Worker path vs direct spawn
+
+When `workerClient.isConnected()`:
+- A **`messages` row** is inserted with `status = 'streaming'` immediately; content and **`tool_calls`** (JSON) are updated during the run and finalized on `done`/`error`.
+- **`worker.db.jobs`** stores parallel state including **`tool_calls`** at job completion so **`get_result` / `result_reply`** can promote tool metadata after an HTTP-only restart (see [worker-protocol](worker-protocol.md)).
+
+When the worker is down, **`spawnClaude`** in `process.ts` runs in-process; streaming rows are not used; **`tool_calls`** are not persisted on that path (see `TODO.md`).
 
 ---
 

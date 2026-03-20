@@ -33,7 +33,7 @@ const stale = jobQueries.listRunning()
 if (stale.length > 0) {
   console.log(`[worker] marking ${stale.length} stale running job(s) as interrupted`)
   for (const job of stale) {
-    jobQueries.updateStatus(job.session_id, 'interrupted', 'process_error', job.content)
+    jobQueries.updateStatus(job.session_id, 'interrupted', 'process_error', job.content, job.tool_calls ?? null)
   }
 }
 
@@ -89,6 +89,7 @@ const server = net.createServer((socket) => {
         status: job ? (job.status as 'complete' | 'interrupted') : 'not_found',
         content: job?.content ?? '',
         errorCode: job?.error_code ?? null,
+        toolCalls: job?.tool_calls ?? null,
       }
       socket.write(JSON.stringify(reply) + '\n')
     }

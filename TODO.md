@@ -48,6 +48,11 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 ### Integrations
 - [ ] **Amazing Marvin** — scheduled session that pulls tasks from Marvin API, summarizes via Claude, pushes updates back
 
+### Dev Hot-Reload Resilience
+- [ ] **Server restart → error bubble (scenario 2)** — when `sendMessage` SSE drops without a terminal event (e.g. tsx watch restarts the server mid-stream), `onError` fires and marks the assistant bubble as a permanent error, even though the worker keeps running and the message completes successfully. Fix: in `handleSend`'s `onError`, detect connection-drop errors (stream ended without `done`/`error`) and switch to `watchSession` mode instead of marking error — same recovery path Tab 2 already uses correctly.
+- [ ] **Worker restart → SSE hangs for 90 seconds (scenario 3)** — when the worker process restarts (tsx watch), the in-flight Claude job is killed (irrecoverable). The worker client clears its subscription handlers without notifying them, leaving the client's `sendMessage` SSE open and idle until the 90-second inactivity timeout fires. Fix: either (a) reduce the inactivity timeout significantly (e.g. 10–15s), or (b) have `WorkerClient` emit a synthetic error event to active handlers on socket close so the SSE closes immediately with a clean error.
+- [ ] **Tool calls on direct-spawn path** — worker + `result_reply` recovery now persist `tool_calls` to steward.db (`worker.db.jobs.tool_calls`, shared `extractToolDetail` in `server/src/claude/toolDetail.ts`). **Direct-spawn** fallback (`process.ts`) still does not write `tool_calls`; add if parity needed when worker is down.
+
 ### Dev / Production Workflow
 - [ ] **Production deploy workflow** — develop + test on `dev.steward.jradoo.com` → `npm run build` → `POST /api/admin/reload` hot-reloads `steward.jradoo.com`; document and wire up the build step so deploying is a single command
 - [ ] **Environment switcher UI** — floating toggle (authenticated users only) to navigate between `steward.jradoo.com` (prod) and `dev.steward.jradoo.com` (dev); consider long-press on header to avoid accidental switches; works in Capacitor WebView too

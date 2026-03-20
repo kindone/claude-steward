@@ -135,7 +135,10 @@ buffer accumulates chunks from ReadableStream
               WebSearch→query, WebFetch→url (capped at 80–100 chars)
     done    → onDone()
     error   → onError(message, code?)
+→ if stream ends without done/error (e.g. dev server restarted): onError('Connection lost…', 'connection_lost')
 ```
+
+**`connection_lost`** — synthesized client-side only. `ChatWindow` treats it as a soft disconnect: it starts **`watchSession`** and **`getMessages`** so the UI can pick up a completed assistant row from the DB when the **worker** finished the job after an HTTP restart (see [Server](server.md)).
 
 Two separate signals per tool invocation:
 - `onToolActivity(name)` fires from `stream_event → content_block_start` — name only, fires immediately as the tool input starts streaming; used for the live blue indicator
@@ -157,8 +160,9 @@ Claude errors carry a `code` field:
 | `session_expired` | Amber warning banner ⚠ | `--resume` failed; next message starts fresh |
 | `process_error` | Red fatal banner ✕ | Claude exited non-zero for another reason |
 | `http_error` | Red fatal banner ✕ | Non-2xx HTTP response from the server |
+| `connection_lost` | *(special)* — not a red banner; triggers **`watchSession`** recovery path | SSE closed without terminal event (often `tsx watch` / HTTP restart mid-stream) |
 
-`MessageBubble` renders errors as styled banners rather than attempting markdown parsing.
+`MessageBubble` renders errors as styled banners rather than attempting markdown parsing. **`connection_lost`** is handled in **`handleSend`** before the generic error styling.
 
 ### Copy button
 
@@ -222,7 +226,7 @@ All functions accept/return typed objects and throw on non-OK responses.
 | `ToolCall` | `name: string`, `detail?: string` — one assembled tool invocation |
 | `ChunkHandler` | All SSE callbacks for `sendMessage`: `onTextDelta`, `onTitle`, `onDone`, `onError`, `onToolActivity`, `onToolCall`, `onActivity`, `onUsage` |
 | `UsageInfo` | `input_tokens`, `output_tokens`, `cache_read_input_tokens?`, `cache_creation_input_tokens?`, `total_cost_usd?` — fired via `onUsage` when the result chunk arrives |
-| `ClaudeErrorCode` | `'context_limit' \| 'session_expired' \| 'process_error' \| 'http_error'` |
+| `ClaudeErrorCode` | `'context_limit' \| 'session_expired' \| 'process_error' \| 'http_error' \| 'connection_lost'` |
 | `FileContent` | `{ content: string, lastModified: number }` — returned by `getFileContent` |
 | `FileConflictError` | `Error` subclass; thrown by `patchFile` on 409 Conflict |
 | `MessagesPage` | `{ messages: Message[], hasMore: boolean }` — returned by `getMessages` |

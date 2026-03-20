@@ -253,6 +253,32 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
         streamingFromSendRef.current = false
         setStreamingTool(null)
         setStreamingToolUses([])
+        if (code === 'connection_lost') {
+          // Server restarted mid-stream — don't mark as error yet.
+          // The worker is likely still running; switch to watchSession and wait for recovery.
+          cancelRef.current = watchSession(
+            sessionId,
+            async () => {
+              try {
+                const fresh = await getMessages(sessionId)
+                setMessages(fresh.messages.map(dbMessageToLocal))
+                setHasMore(fresh.hasMore)
+              } finally {
+                setStreaming(false)
+              }
+            },
+            () => {
+              // watchSession itself failed — fall back to error
+              setMessages((prev) =>
+                prev.map((m) =>
+                  m.id === assistantMsgId ? { ...m, streaming: false, errorCode: 'process_error' } : m
+                )
+              )
+              setStreaming(false)
+            },
+          )
+          return
+        }
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantMsgId

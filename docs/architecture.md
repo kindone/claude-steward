@@ -10,6 +10,7 @@ This document covers the overall system structure, how the three programs relate
 | [Terminal Panel](terminal.md) | Exec endpoint, xterm.js rendering, SSE streaming, node-pty rationale |
 | [Safe-Mode Core](safe.md) | Emergency terminal internals and freeze policy |
 | [Self-Management](self-management.md) | In-app upgrade flow, PM2 process management, nginx dev/prod switching |
+| [Worker protocol](worker-protocol.md) | Claude worker process, Unix socket IPC, `worker.db`, recovery flow |
 | [Roadmap](roadmap.md) | Planned features |
 
 ---
@@ -206,9 +207,15 @@ CREATE TABLE messages (
   session_id TEXT NOT NULL REFERENCES sessions(id),
   role       TEXT NOT NULL,           -- 'user' | 'assistant'
   content    TEXT NOT NULL,
-  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  created_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  is_error   INTEGER NOT NULL DEFAULT 0,
+  error_code TEXT,
+  status     TEXT NOT NULL DEFAULT 'complete',  -- complete | streaming | interrupted
+  tool_calls TEXT                              -- JSON array of tool pill metadata (worker path + recovery)
 )
 ```
+
+Migrations add columns idempotently on older DBs. **`tool_calls`** is populated when chat runs through the **worker** (including **`result_reply`** recovery after an HTTP restart). Direct-spawn fallback does not yet write `tool_calls`. Details: [Server](server.md), [Worker protocol](worker-protocol.md).
 
 The two-ID session design separates concerns: `id` is a stable client-facing identifier; `claude_session_id` is an opaque CLI handle that only exists after the first message and is cleared automatically if a `--resume` attempt fails.
 
