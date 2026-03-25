@@ -53,6 +53,14 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 - [ ] **Worker restart → SSE hangs for 90 seconds (scenario 3)** — when the worker process restarts (tsx watch), the in-flight Claude job is killed (irrecoverable). The worker client clears its subscription handlers without notifying them, leaving the client's `sendMessage` SSE open and idle until the 90-second inactivity timeout fires. Fix: either (a) reduce the inactivity timeout significantly (e.g. 10–15s), or (b) have `WorkerClient` emit a synthetic error event to active handlers on socket close so the SSE closes immediately with a clean error.
 - [ ] **Tool calls on direct-spawn path** — worker + `result_reply` recovery now persist `tool_calls` to steward.db (`worker.db.jobs.tool_calls`, shared `extractToolDetail` in `server/src/claude/toolDetail.ts`). **Direct-spawn** fallback (`process.ts`) still does not write `tool_calls`; add if parity needed when worker is down.
 
+### Claude Code Project Structure
+- [x] **`CLAUDE.md` at repo root** — the most impactful gap: Claude Code auto-loads this on every session; consolidate key content from `MEMORY.md` + docs gotchas (env var stripping, safe/ freeze, CI=true, etc.) + build/test/lint commands + current focus areas so every session is immediately oriented without relying on the auto-memory system
+- [x] **`.claude/commands/`** — custom slash commands: `/deploy` (build → reload) and `/test` (test strategy + commands)
+- [x] **`.claude/settings.json`** — project-level tool permissions; allow build/test/status, deny commit/push/rm-rf
+- [x] **`server/CLAUDE.md` + `client/CLAUDE.md`** — per-subdirectory context for server-specific (Express/worker/SQLite patterns) and client-specific (React/Tailwind/Vite patterns) rules
+- [ ] **`.mcp.json`** — MCP server config; a custom MCP server querying steward.db or wrapping pm2/nginx commands would be natural for self-management
+- [ ] **ADRs in `docs/adr/`** — structured Architecture Decision Records capturing *why* key decisions were made (node:sqlite over better-sqlite3, worker IPC over in-process, safe/ freeze policy); helps Claude judge whether constraints are load-bearing
+
 ### Dev / Production Workflow
 - [ ] **Production deploy workflow** — develop + test on `dev.steward.jradoo.com` → `npm run build` → `POST /api/admin/reload` hot-reloads `steward.jradoo.com`; document and wire up the build step so deploying is a single command
 - [ ] **Environment switcher UI** — floating toggle (authenticated users only) to navigate between `steward.jradoo.com` (prod) and `dev.steward.jradoo.com` (dev); consider long-press on header to avoid accidental switches; works in Capacitor WebView too
