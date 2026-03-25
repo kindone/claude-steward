@@ -10,7 +10,7 @@ import sessionsRouter from './routes/sessions.js'
 import projectsRouter from './routes/projects.js'
 import eventsRouter from './routes/events.js'
 import adminRouter from './routes/admin.js'
-import pushRouter from './routes/push.js'
+import pushRouter, { vapidPublicKeyHandler } from './routes/push.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Monorepo root — two levels up from server/src/
@@ -37,6 +37,9 @@ export function createApp() {
     res.json({ appRoot: APP_ROOT })
   })
   app.use('/api/auth', authRouter)
+
+  // Public: VAPID public key only (required for push subscription; not a secret).
+  app.get('/api/push/vapid-public-key', vapidPublicKeyHandler)
 
   app.use('/api', requireAuth)
   app.use('/api/chat', chatRouter)

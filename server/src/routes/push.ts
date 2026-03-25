@@ -1,9 +1,23 @@
+import type { Request, Response } from 'express'
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { pushSubscriptionQueries } from '../db/index.js'
 import { isPushEnabled } from '../lib/pushNotifications.js'
 
 const router = Router()
+
+/**
+ * GET /api/push/vapid-public-key — public (no auth). The key is not secret.
+ * Mounted in app.ts before requireAuth so the SW can fetch it anytime.
+ */
+export function vapidPublicKeyHandler(_req: Request, res: Response): void {
+  const key = process.env.VAPID_PUBLIC_KEY
+  if (!key) {
+    res.status(503).json({ error: 'Push not configured' })
+    return
+  }
+  res.json({ key })
+}
 
 /**
  * POST /api/push/subscribe
@@ -43,16 +57,6 @@ router.delete('/subscribe', (req, res) => {
   }
   pushSubscriptionQueries.deleteByEndpoint(endpoint)
   res.json({ ok: true })
-})
-
-/** GET /api/push/vapid-public-key — lets the client fetch the key without a build-time env var */
-router.get('/vapid-public-key', (_req, res) => {
-  const key = process.env.VAPID_PUBLIC_KEY
-  if (!key) {
-    res.status(503).json({ error: 'Push not configured' })
-    return
-  }
-  res.json({ key })
 })
 
 export default router

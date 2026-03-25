@@ -24,10 +24,9 @@ const PORTS = {
     { port: 3003, name: 'safe-mode core' },
     { port: 5173, name: 'client (Vite)'  },
   ],
-  prod: [
-    { port: 3001, name: 'main server'    },
-    { port: 3003, name: 'safe-mode core' },
-  ],
+  // Prod: only require :3001 free for steward-main. :3003 may stay bound by steward-safe
+  // after `npm run down` (safe is excluded from tier `all`) — PM2 will reconcile safe from ecosystem.
+  prod: [{ port: 3001, name: 'main server' }],
 }
 
 const ECOSYSTEM = {

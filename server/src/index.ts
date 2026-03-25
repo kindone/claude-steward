@@ -8,7 +8,7 @@ import { workerClient } from './worker/client.js'
 import { recoverStreamingSessions } from './worker/recovery.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-// .env lives in the monorepo root (two levels up from server/src/)
+// .env lives in the monorepo root (two levels up from server/src/ or server/dist/)
 dotenv.config({ path: path.join(__dirname, '../../.env') })
 
 const APP_ROOT = path.resolve(__dirname, '../..')
