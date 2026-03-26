@@ -32,6 +32,7 @@
     "@types/uuid": "^10.0.0",
     "@types/web-push": "^3.6.4",
     "@vitest/coverage-v8": "^4.1.0",
+    "jsproptest": "^0.5.4",
     "supertest": "^7.2.2",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3",

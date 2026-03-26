@@ -23,9 +23,9 @@ function renderPicker(overrides: Partial<React.ComponentProps<typeof ProjectPick
 }
 
 describe('ProjectPicker', () => {
-  it('shows "No project" when no active project', () => {
+  it('shows "Select project…" when no active project', () => {
     renderPicker()
-    expect(screen.getByText('No project')).toBeInTheDocument()
+    expect(screen.getByText('Select project…')).toBeInTheDocument()
   })
 
   it('shows active project name', () => {
@@ -35,29 +35,21 @@ describe('ProjectPicker', () => {
 
   it('opens dropdown on trigger click', async () => {
     renderPicker()
-    await userEvent.click(screen.getByRole('button', { name: /no project/i }))
+    await userEvent.click(screen.getByTitle('Switch project'))
     expect(screen.getByText('my-project')).toBeInTheDocument()
     expect(screen.getByText('other-project')).toBeInTheDocument()
   })
 
   it('calls onSelect when a project is clicked', async () => {
     const { onSelect } = renderPicker()
-    await userEvent.click(screen.getByRole('button', { name: /no project/i }))
+    await userEvent.click(screen.getByTitle('Switch project'))
     await userEvent.click(screen.getByText('my-project'))
     expect(onSelect).toHaveBeenCalledWith('proj-1')
   })
 
-  it('calls onSelect(null) when "No project" option is clicked', async () => {
-    const { onSelect } = renderPicker({ activeProjectId: 'proj-1' })
-    await userEvent.click(screen.getByRole('button'))
-    const noProjectItems = screen.getAllByText('No project')
-    await userEvent.click(noProjectItems[noProjectItems.length - 1])
-    expect(onSelect).toHaveBeenCalledWith(null)
-  })
-
   it('shows creation form on "+ New project" click', async () => {
     renderPicker()
-    await userEvent.click(screen.getByRole('button', { name: /no project/i }))
+    await userEvent.click(screen.getByTitle('Switch project'))
     await userEvent.click(screen.getByText('+ New project'))
     expect(screen.getByPlaceholderText('Project name')).toBeInTheDocument()
     expect(screen.getByPlaceholderText('/absolute/path/on/server')).toBeInTheDocument()
@@ -65,7 +57,7 @@ describe('ProjectPicker', () => {
 
   it('calls onCreate with name and path on form submit', async () => {
     const { onCreate } = renderPicker()
-    await userEvent.click(screen.getByRole('button', { name: /no project/i }))
+    await userEvent.click(screen.getByTitle('Switch project'))
     await userEvent.click(screen.getByText('+ New project'))
     await userEvent.type(screen.getByPlaceholderText('Project name'), 'new-proj')
     await userEvent.type(screen.getByPlaceholderText('/absolute/path/on/server'), '/some/path')
@@ -76,7 +68,7 @@ describe('ProjectPicker', () => {
   it('shows error message when onCreate rejects', async () => {
     const { onCreate } = renderPicker()
     onCreate.mockRejectedValueOnce(new Error('Path does not exist'))
-    await userEvent.click(screen.getByRole('button', { name: /no project/i }))
+    await userEvent.click(screen.getByTitle('Switch project'))
     await userEvent.click(screen.getByText('+ New project'))
     await userEvent.type(screen.getByPlaceholderText('Project name'), 'bad')
     await userEvent.type(screen.getByPlaceholderText('/absolute/path/on/server'), '/bad')
@@ -87,8 +79,7 @@ describe('ProjectPicker', () => {
   it('calls onDelete with confirmation', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     const { onDelete } = renderPicker({ activeProjectId: 'proj-1' })
-    await userEvent.click(screen.getByRole('button'))
-    // Use title query to get the delete button directly (CSS hover not applicable in jsdom)
+    await userEvent.click(screen.getByTitle('Switch project'))
     const deleteButtons = screen.getAllByTitle('Delete project')
     await userEvent.click(deleteButtons[0])
     expect(onDelete).toHaveBeenCalledWith('proj-1')

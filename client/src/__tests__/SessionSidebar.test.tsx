@@ -34,7 +34,7 @@ describe('SessionSidebar', () => {
   it('marks the active session', () => {
     renderSidebar()
     const active = screen.getByText('First chat').closest('li')!
-    expect(active).toHaveClass('sidebar__item--active')
+    expect(active).toHaveClass('bg-[#1e3a5f]')
   })
 
   it('calls onSelectSession when a session is clicked', async () => {
@@ -50,11 +50,12 @@ describe('SessionSidebar', () => {
   })
 
   it('calls onDeleteSession with confirmation', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     const { onDeleteSession } = renderSidebar()
-    // Delete buttons are visible on hover — use click directly
+    // First click sets pending state (shows inline Yes/No)
     const deleteButtons = screen.getAllByTitle('Delete session')
     await userEvent.click(deleteButtons[0])
+    // Second click confirms
+    await userEvent.click(screen.getByRole('button', { name: 'Yes' }))
     expect(onDeleteSession).toHaveBeenCalledWith('ses-1')
   })
 
@@ -73,8 +74,9 @@ describe('SessionSidebar', () => {
     expect(screen.getByText('Files')).toBeInTheDocument()
   })
 
-  it('does not render file tree when no project is active', () => {
+  it('shows "No project selected" when no project is active', () => {
     renderSidebar({ activeProjectId: null })
-    expect(screen.queryByText('Files')).not.toBeInTheDocument()
+    // "Files" tab label is always present; check that the tree is replaced with the placeholder
+    expect(screen.getAllByText('No project selected').length).toBeGreaterThan(0)
   })
 })

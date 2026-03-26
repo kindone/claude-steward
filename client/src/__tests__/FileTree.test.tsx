@@ -34,7 +34,8 @@ describe('FileTree', () => {
     await userEvent.click(screen.getByText('Files'))
     await waitFor(() => screen.getByText('README.md'))
     await userEvent.click(screen.getByText('README.md'))
-    await waitFor(() => expect(screen.getByText('# Hello')).toBeInTheDocument())
+    // '# Hello' is rendered as markdown → <h1>Hello</h1>
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Hello' })).toBeInTheDocument())
   })
 
   it('closes file viewer on × button', async () => {
@@ -42,8 +43,8 @@ describe('FileTree', () => {
     await userEvent.click(screen.getByText('Files'))
     await waitFor(() => screen.getByText('README.md'))
     await userEvent.click(screen.getByText('README.md'))
-    await waitFor(() => screen.getByText('# Hello'))
-    await userEvent.click(screen.getByRole('button', { name: '×' }))
-    expect(screen.queryByText('# Hello')).not.toBeInTheDocument()
+    await waitFor(() => screen.getByRole('heading', { name: 'Hello' }))
+    await userEvent.click(screen.getByRole('button', { name: /close/i }))
+    expect(screen.queryByRole('heading', { name: 'Hello' })).not.toBeInTheDocument()
   })
 })

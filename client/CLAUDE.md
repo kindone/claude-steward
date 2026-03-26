@@ -29,6 +29,8 @@ cd client && npx tsc --noEmit        # type-check only (run after every TS chang
 
 Vitest + React Testing Library + MSW (Mock Service Worker). Mock handlers in `client/src/__tests__/msw-server.ts`. Run `npm test --workspace=client` — no server needed.
 
+**jsproptest** is available for property-based tests alongside Vitest. Best used for pure utility functions and data transformations; React component tests are better handled with example-based RTL tests.
+
 ## Build Output
 
 `npm run build --workspace=client` outputs to `server/public/`. In production, Express serves this directory as static files. The client is a pure SPA — all routes fall through to `index.html`.

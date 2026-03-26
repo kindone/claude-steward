@@ -6,6 +6,20 @@ For full details start with `docs/architecture.md`, then the relevant program do
 
 ---
 
+## Mental Model
+
+**Testing and testability is our highest value.** Every design, implementation, and deployment decision must be made with tests in mind.
+
+- **Design for testability first** — prefer pure functions over side effects, injectable dependencies over hard-coded ones, clear module boundaries over tangled internals. If something is hard to test, that's a design signal, not a test problem.
+- **No feature is done without tests** — new code ships with coverage. A working implementation without a test is a draft, not a deliverable.
+- **Property-based testing (jsproptest) for pure functions and data transformations** — generate inputs, assert invariants, explore edge cases the author didn't think of. Example-based tests (Vitest) for routes, components, and integration flows.
+- **Tests pass before reload** — `npm test` must exit 0 before `POST /api/admin/reload`. A broken test suite means the build doesn't ship.
+- **Read before editing** — understand existing code before changing it. Don't propose modifications to files you haven't read.
+- **Minimal scope** — change only what the task requires. Don't refactor bystander code, add unsolicited features, or over-engineer. Three similar lines are better than a premature abstraction.
+- **Verify your work** — after every change: build (`npm run build`), type-check (`tsc --noEmit`), test (`npm test`). Don't hand back unverified work.
+
+---
+
 ## Commands
 
 ```bash
@@ -99,5 +113,4 @@ These have caused significant bugs — do not skip:
 
 ## Current Open Issues
 
-See `TODO.md` for planned work, `BUGS.md` for known defects.
-Notable active gaps: server-restart error bubble (scenario 2), worker-restart 90s hang (scenario 3), per-session model selection, rich chat rendering (Mermaid/images/HTML).
+See `TODO.md` for planned work, `BUGS.md` for known defects. Move completed works and fixed defects into `archived_tasks.md`.

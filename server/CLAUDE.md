@@ -27,6 +27,8 @@ cd server && npx tsc --noEmit        # type-check only
 
 Each test file gets its own isolated SQLite DB via `server/src/__tests__/setup.ts` (temp file, cleaned up after). `spawnClaude` is mocked in `chat.test.ts` — no real CLI calls. Use `supertest` against `createApp()` (not the bound server).
 
+**jsproptest** is available for property-based unit tests alongside Vitest. Preferred for pure functions — good candidates in this package: `safeResolvePath()` (security boundary), `extractToolDetail()` (truncation/normalization), pagination logic, MIME type detection. Vitest is still the runner; jsproptest provides the generative layer on top.
+
 ## Critical Gotchas
 
 See root `CLAUDE.md` → "Claude CLI Gotchas" for the full list. The most dangerous: strip `CLAUDE*` env vars before spawning, set `CI=true`, use `res.on('close')`.
