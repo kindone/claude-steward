@@ -27,7 +27,9 @@ cd server && npx tsc --noEmit        # type-check only
 
 Each test file gets its own isolated SQLite DB via `server/src/__tests__/setup.ts` (temp file, cleaned up after). `spawnClaude` is mocked in `chat.test.ts` — no real CLI calls. Use `supertest` against `createApp()` (not the bound server).
 
-**jsproptest** is available for property-based unit tests alongside Vitest. Preferred for pure functions — good candidates in this package: `safeResolvePath()` (security boundary), `extractToolDetail()` (truncation/normalization), pagination logic, MIME type detection. Vitest is still the runner; jsproptest provides the generative layer on top.
+**jsproptest** is available for property-based tests alongside Vitest. Vitest is still the runner; jsproptest provides the generative layer on top. Two modes:
+- **Stateless**: pure functions — `safeResolvePath()` (security boundary), `extractToolDetail()` (truncation/normalization), pagination logic, MIME type detection
+- **Stateful**: model state machines with random command sequences — session lifecycle (create/message/rename/delete), worker job states (start/status/stop), auth flows (register/login/logout), file editor with optimistic locking
 
 ## Critical Gotchas
 

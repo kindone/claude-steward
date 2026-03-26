@@ -29,7 +29,10 @@ cd client && npx tsc --noEmit        # type-check only (run after every TS chang
 
 Vitest + React Testing Library + MSW (Mock Service Worker). Mock handlers in `client/src/__tests__/msw-server.ts`. Run `npm test --workspace=client` — no server needed.
 
-**jsproptest** is available for property-based tests alongside Vitest. Best used for pure utility functions and data transformations; React component tests are better handled with example-based RTL tests.
+**jsproptest** is available for property-based tests alongside Vitest. Two modes:
+- **Stateless**: pure utility functions and data transformations
+- **Stateful**: model UI state machines with random interaction sequences (e.g. project/session selection flows, dropdown open/close/select cycles)
+React component rendering and specific interaction scenarios are still better handled with example-based RTL tests.
 
 ## Build Output
 

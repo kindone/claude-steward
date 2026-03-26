@@ -12,7 +12,7 @@ For full details start with `docs/architecture.md`, then the relevant program do
 
 - **Design for testability first** — prefer pure functions over side effects, injectable dependencies over hard-coded ones, clear module boundaries over tangled internals. If something is hard to test, that's a design signal, not a test problem.
 - **No feature is done without tests** — new code ships with coverage. A working implementation without a test is a draft, not a deliverable.
-- **Property-based testing (jsproptest) for pure functions and data transformations** — generate inputs, assert invariants, explore edge cases the author didn't think of. Example-based tests (Vitest) for routes, components, and integration flows.
+- **Property-based testing (jsproptest) over example-based where possible** — jsproptest is not just for pure functions; it has a stateful testing framework too. Use it to model state machines (session lifecycle, worker job states, auth flows) and generate random command sequences to find invariant violations. Example-based tests (Vitest) for routes, components, and cases where specific scenarios matter more than exploration. See `/writing_test` for the full property-writing playbook.
 - **Tests pass before reload** — `npm test` must exit 0 before `POST /api/admin/reload`. A broken test suite means the build doesn't ship.
 - **Read before editing** — understand existing code before changing it. Don't propose modifications to files you haven't read.
 - **Minimal scope** — change only what the task requires. Don't refactor bystander code, add unsolicited features, or over-engineer. Three similar lines are better than a premature abstraction.
