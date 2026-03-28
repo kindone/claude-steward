@@ -5,6 +5,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
 import { projectQueries, type PermissionMode, type Project } from '../db/index.js'
+import { safeResolvePath } from '../lib/pathUtils.js'
 
 // Monorepo root — three directories up from server/src/routes/
 const APP_ROOT = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../..')
@@ -336,10 +337,5 @@ router.post('/:id/exec', (req, res) => {
   })
 })
 
-/** Resolve a user-supplied relative path against the project root, preventing traversal. */
-function safeResolvePath(root: string, rel: string): string | null {
-  const resolved = path.resolve(root, rel)
-  return resolved.startsWith(path.resolve(root)) ? resolved : null
-}
 
 export default router

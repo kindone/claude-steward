@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
+    include: ['src/**/*.{test,spec,prop}.ts'],
     environment: 'node',
     setupFiles: ['./src/__tests__/setup.ts'],
     pool: 'forks',   // full process isolation — each file gets a clean module graph
