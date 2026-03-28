@@ -9,10 +9,7 @@
 // @mode:       verification
 
 import { describe, it } from 'vitest'
-import {
-  Arbitrary, Shrinkable, SimpleAction, simpleStatefulProperty,
-  Gen,
-} from 'jsproptest'
+import { SimpleAction, simpleStatefulProperty, Gen } from 'jsproptest'
 import { v4 as uuidv4 } from 'uuid'
 import fs from 'node:fs'
 import os from 'node:os'
@@ -25,7 +22,7 @@ import type { Session } from '../../db/index.js'
 interface SessionState {
   projectId: string
   /** Session IDs created during this run (active = not yet deleted). */
-  activeIds: Set<string>
+  activeIds: string[]
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -34,9 +31,9 @@ function assertInvariants(state: SessionState): void {
   const rows = sessionQueries.listByProject(state.projectId) as Session[]
 
   // Count invariant
-  if (rows.length !== state.activeIds.size) {
+  if (rows.length !== state.activeIds.length) {
     throw new Error(
-      `Count mismatch: DB has ${rows.length}, model has ${state.activeIds.size}`
+      `Count mismatch: DB has ${rows.length}, model has ${state.activeIds.length}`
     )
   }
 
@@ -60,14 +57,14 @@ function assertInvariants(state: SessionState): void {
 const createAction = new SimpleAction<SessionState>((state) => {
   const id = uuidv4()
   sessionQueries.create(id, 'New Chat', state.projectId)
-  state.activeIds.add(id)
+  state.activeIds.push(id)
   assertInvariants(state)
 }, 'create')
 
 const deleteAction = new SimpleAction<SessionState>((state) => {
-  const id = [...state.activeIds][0]
+  const id = state.activeIds[0]
   sessionQueries.delete(id)
-  state.activeIds.delete(id)
+  state.activeIds.splice(0, 1)
   assertInvariants(state)
 }, 'delete-oldest')
 
@@ -78,11 +75,12 @@ describe('session lifecycle — stateful property', () => {
   it('count, scoping, and no-resurrection invariants hold across random create/delete sequences', () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-prop-'))
 
-    // initialGen: fresh isolated project for each test run
-    const initialGen = new Arbitrary<SessionState>((_rand) => {
+    // initialGen: fresh isolated project for each test run.
+    // Gen.lazy<T>(() => T) returns the value directly — no Generator wrapping needed.
+    const initialGen = Gen.lazy<SessionState>(() => {
       const projectId = uuidv4()
       projectQueries.create(projectId, 'prop-test', tmpDir)
-      return new Shrinkable<SessionState>({ projectId, activeIds: new Set() })
+      return { projectId, activeIds: [] }
     })
 
     simpleStatefulProperty<SessionState>(
@@ -91,7 +89,7 @@ describe('session lifecycle — stateful property', () => {
         (_state: SessionState) => Gen.just(createAction),
         // Only offer deleteAction when sessions exist; fall back to create otherwise
         (state: SessionState) => Gen.just(
-          state.activeIds.size > 0 ? deleteAction : createAction
+          state.activeIds.length > 0 ? deleteAction : createAction
         ),
       ),
     )
@@ -102,6 +100,7 @@ describe('session lifecycle — stateful property', () => {
         assertInvariants(state)
         // Cleanup: remove all sessions and the project for this run
         for (const id of state.activeIds) sessionQueries.delete(id)
+        state.activeIds.length = 0
         projectQueries.delete(state.projectId)
       })
       .go()
