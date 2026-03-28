@@ -1,3 +1,12 @@
+// Feature:     Project management, File browser
+// Arch/Design: safeResolvePath is the single containment boundary for all file access
+// Spec:        ∀ file path request: result is within project root OR request rejected
+//              ∀ path traversal attempt (../, encoded): 400 — never resolves outside root
+//              ∀ project CRUD: persisted fields match submitted; delete is clean
+// @quality:    security, correctness
+// @type:       example
+// @mode:       verification
+
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import fs from 'node:fs'

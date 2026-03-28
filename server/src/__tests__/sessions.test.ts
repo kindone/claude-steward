@@ -1,3 +1,11 @@
+// Feature:     Session management
+// Spec:        ∀ session: project_id always set; title defaults to 'New Chat'
+//              ∀ GET /sessions?projectId=X: every returned session belongs to X
+//              ∀ DELETE session: subsequent GET returns 404; messages are unreachable
+// @quality:    correctness
+// @type:       example
+// @mode:       verification
+
 import { describe, it, expect, beforeAll } from 'vitest'
 import request from 'supertest'
 import fs from 'node:fs'

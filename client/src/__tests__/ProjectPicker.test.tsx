@@ -1,3 +1,13 @@
+// Feature:     Project management
+// Spec:        ∀ render: shows active project name or placeholder when none selected
+//              ∀ trigger click: dropdown opens listing all projects
+//              ∀ project click: onSelect invoked with correct projectId
+//              ∀ form submit: onCreate invoked with (name, path); error shown on rejection
+//              ∀ delete confirm: onDelete invoked with active projectId
+// @quality:    correctness
+// @type:       example
+// @mode:       verification
+
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

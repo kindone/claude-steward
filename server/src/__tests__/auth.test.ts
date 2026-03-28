@@ -1,3 +1,10 @@
+// Feature:     Authentication
+// Arch/Design: requireAuth middleware is the single auth boundary for all /api routes
+// Spec:        ∀ request with missing/invalid session → 401; ∀ valid session → passes through
+// @quality:    security
+// @type:       example
+// @mode:       verification
+
 import { describe, it, expect } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../app.js'

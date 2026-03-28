@@ -1,11 +1,16 @@
-/**
- * End-to-end tests for the Claude worker process.
- * Spawns a real worker subprocess and drives it via the Unix socket protocol.
- * Uses the real Claude CLI — test sessions are created in /tmp and cleaned up after.
- *
- * These tests are slow (Claude round-trips ~10–30s). Run selectively:
- *   npx vitest run src/__tests__/worker.e2e.test.ts
- */
+// Feature:     Chat streaming (worker path)
+// Arch/Design: Worker runs as a separate PM2 process on a Unix socket so in-flight
+//              jobs survive HTTP server restarts
+// Spec:        ∀ job: emits session_id → chunks → done|error in order; content persisted to worker.db
+//              ∀ concurrent jobs: events never cross-contaminate between sessions
+//              ∀ client disconnect mid-stream: job continues; DB updated on completion
+//              ∀ stop command: job terminates; no further events after acknowledgement
+// @quality:    reliability, correctness
+// @type:       stateful, chaos
+// @mode:       verification
+//
+// Slow tests — real Claude CLI round-trips (~10–30s). Run selectively:
+//   npx vitest run src/__tests__/worker.e2e.test.ts
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { spawn } from 'node:child_process'

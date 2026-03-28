@@ -1,3 +1,14 @@
+// Feature:     Session management
+// Spec:        ∀ render: all session titles visible; active session marked
+//              ∀ session click: onSelectSession invoked with correct sessionId
+//              ∀ delete flow (click → confirm): onDeleteSession invoked; no call on cancel
+//              ∀ sessions=[]: empty placeholder shown
+//              ∀ loading=true: loading indicator shown
+//              ∀ activeProjectId set: file tree tab visible; null → placeholder shown
+// @quality:    correctness
+// @type:       example
+// @mode:       verification
+
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

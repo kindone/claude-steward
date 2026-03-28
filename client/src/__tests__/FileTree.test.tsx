@@ -1,3 +1,12 @@
+// Feature:     File browser
+// Spec:        ∀ render: toggle button present; tree collapsed by default
+//              ∀ expand click: file list loads async and becomes visible
+//              ∀ file click: viewer opens and renders content as markdown
+//              ∀ close click: viewer dismissed
+// @quality:    correctness
+// @type:       example
+// @mode:       verification
+
 import { describe, it, expect } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'

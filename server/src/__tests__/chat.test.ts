@@ -1,3 +1,11 @@
+// Feature:     Chat streaming
+// Arch/Design: POST /api/chat wraps Claude CLI subprocess; streams NDJSON output via SSE
+// Spec:        ∀ valid (sessionId, message): SSE emits title → chunks → done; messages persisted to DB
+//              ∀ invalid request (missing fields, unknown session): 400/404 with no side effects
+// @quality:    correctness, reliability
+// @type:       example
+// @mode:       verification
+
 import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest'
 import request from 'supertest'
 import { createApp } from '../app.js'
