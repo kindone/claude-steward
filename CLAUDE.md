@@ -63,7 +63,7 @@ When deploying changes: **build must succeed before reload**. Always verify `npm
 ## Hard Constraints
 
 - **`safe/` is frozen.** Never modify `safe/server.js`, `safe/index.html`, or `safe/package.json`. It's the emergency fallback that survives main app crashes; any npm dependency or code change breaks that guarantee.
-- **Do not commit autonomously.** Never run `git add + git commit` without explicit user request.
+- **Do not commit autonomously.** Never run `git add + git commit` without the user explicitly asking to commit in that specific message. Approval to do work is not approval to commit. A prior commit request does not carry forward — each commit requires its own explicit request.
 - **Update docs alongside code.** When a feature lands, update the relevant `docs/` file and `MEMORY.md` in the same working set before asking the user to commit.
 
 ---
