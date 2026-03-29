@@ -11,6 +11,7 @@ import projectsRouter from './routes/projects.js'
 import eventsRouter from './routes/events.js'
 import adminRouter from './routes/admin.js'
 import pushRouter, { vapidPublicKeyHandler } from './routes/push.js'
+import schedulesRouter from './routes/schedules.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Monorepo root — two levels up from server/src/
@@ -48,6 +49,7 @@ export function createApp() {
   app.use('/api/events', eventsRouter)
   app.use('/api/admin', adminRouter)
   app.use('/api/push', pushRouter)
+  app.use('/api/schedules', schedulesRouter)
 
   if (NODE_ENV === 'production') {
     const publicDir = path.join(__dirname, '../public')

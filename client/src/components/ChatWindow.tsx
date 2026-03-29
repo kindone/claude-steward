@@ -8,6 +8,7 @@ const MODES: { value: PermissionMode; label: string; title: string }[] = [
 ]
 import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
+import { SchedulePanel } from './SchedulePanel'
 
 type Message = {
   id: string
@@ -55,6 +56,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   const [promptDraft, setPromptDraft] = useState(systemPrompt ?? '')
   const [compacting, setCompacting] = useState(false)
   const [lastUsage, setLastUsage] = useState<UsageInfo | null>(null)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
   const [isAtBottom, setIsAtBottom] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -366,6 +368,15 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
           </button>
 
           <span className="flex items-center gap-2">
+            {/* Schedule button */}
+            <button
+              className={`bg-transparent border border-[#222] hover:border-[#444] rounded cursor-pointer text-xs px-2.5 py-1.5 transition-colors ${scheduleOpen ? 'text-blue-400 border-blue-500/40' : 'text-[#444] hover:text-[#888]'}`}
+              onClick={() => setScheduleOpen((o) => !o)}
+              title="Scheduled prompts"
+            >
+              ⏰ Schedule
+            </button>
+
             {/* Compact button */}
             <button
               className={`bg-transparent border border-[#222] hover:border-[#444] rounded text-[#444] hover:text-[#888] cursor-pointer text-xs px-2.5 py-1.5 transition-colors ${(compacting || streaming) ? 'opacity-40 cursor-default' : ''}`}
@@ -455,6 +466,10 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
               )}
             </div>
           </div>
+        )}
+
+        {scheduleOpen && (
+          <SchedulePanel sessionId={sessionId} />
         )}
       </div>
 

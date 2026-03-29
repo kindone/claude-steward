@@ -223,7 +223,7 @@ export async function getVapidPublicKey(): Promise<string> {
   return data.key
 }
 
-export async function savePushSubscription(sub: PushSubscription): Promise<void> {
+export async function savePushSubscription(sub: PushSubscription, sessionId?: string): Promise<void> {
   const json = sub.toJSON()
   const res = await fetch('/api/push/subscribe', {
     method: 'POST',
@@ -231,6 +231,7 @@ export async function savePushSubscription(sub: PushSubscription): Promise<void>
     body: JSON.stringify({
       endpoint: sub.endpoint,
       keys: { p256dh: json.keys?.p256dh, auth: json.keys?.auth },
+      sessionId,
     }),
     ...credentialsOpt,
   })
@@ -242,6 +243,68 @@ export async function deletePushSubscription(endpoint: string): Promise<void> {
     method: 'DELETE',
     headers: JSON_HEADERS,
     body: JSON.stringify({ endpoint }),
+    ...credentialsOpt,
+  })
+}
+
+// ── Schedules ─────────────────────────────────────────────────────────────────
+
+export type Schedule = {
+  id: string
+  session_id: string
+  cron: string
+  prompt: string
+  enabled: number
+  last_run_at: number | null
+  next_run_at: number | null
+  created_at: number
+  updated_at: number
+}
+
+export async function listSchedules(sessionId: string): Promise<Schedule[]> {
+  const res = await fetch(`/api/schedules?sessionId=${encodeURIComponent(sessionId)}`, credentialsOpt)
+  if (!res.ok) throw new Error('Failed to fetch schedules')
+  return res.json() as Promise<Schedule[]>
+}
+
+export async function createSchedule(sessionId: string, cronExpr: string, prompt: string): Promise<Schedule> {
+  const res = await fetch('/api/schedules', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ sessionId, cron: cronExpr, prompt }),
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(body.error ?? 'Failed to create schedule')
+  }
+  return res.json() as Promise<Schedule>
+}
+
+export async function updateSchedule(id: string, patch: { cron?: string; prompt?: string; enabled?: boolean }): Promise<Schedule> {
+  const res = await fetch(`/api/schedules/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(patch),
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(body.error ?? 'Failed to update schedule')
+  }
+  return res.json() as Promise<Schedule>
+}
+
+export async function deleteSchedule(id: string): Promise<void> {
+  await fetch(`/api/schedules/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    ...credentialsOpt,
+  })
+}
+
+export async function runScheduleNow(id: string): Promise<void> {
+  await fetch(`/api/schedules/${encodeURIComponent(id)}/run`, {
+    method: 'POST',
     ...credentialsOpt,
   })
 }

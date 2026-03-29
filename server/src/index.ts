@@ -6,6 +6,7 @@ import { createApp } from './app.js'
 import { projectQueries, migrateOrphanedSessions } from './db/index.js'
 import { workerClient } from './worker/client.js'
 import { recoverStreamingSessions } from './worker/recovery.js'
+import { startScheduler } from './lib/scheduler.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // .env lives in the monorepo root (two levels up from server/src/ or server/dist/)
@@ -47,6 +48,7 @@ migrateOrphanedSessions(APP_ROOT)
 // remaining streaming rows as interrupted.
 workerClient.onReconnected = recoverStreamingSessions
 workerClient.connect()
+startScheduler()
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
 

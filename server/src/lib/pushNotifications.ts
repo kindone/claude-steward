@@ -78,3 +78,17 @@ export async function notifyAll(payload: PushPayload): Promise<void> {
   const encoded = JSON.stringify(payload)
   await Promise.allSettled(subs.map((sub) => sendOne(sub, encoded)))
 }
+
+/**
+ * Send a push notification only to subscriptions tagged with the given session.
+ * Used by the scheduler so notifications are targeted to the right session's subscribers.
+ */
+export async function notifySession(sessionId: string, payload: PushPayload): Promise<void> {
+  if (!ensureVapid()) return
+
+  const subs = pushSubscriptionQueries.listBySession(sessionId)
+  if (subs.length === 0) return
+
+  const encoded = JSON.stringify(payload)
+  await Promise.allSettled(subs.map((sub) => sendOne(sub, encoded)))
+}

@@ -1,6 +1,6 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { sessionQueries, messageQueries, projectQueries, type PermissionMode } from '../db/index.js'
+import { sessionQueries, messageQueries, projectQueries, scheduleQueries, type PermissionMode } from '../db/index.js'
 import { addWatcher, removeWatcher, addSubscriber, removeSubscriber } from '../lib/sessionWatchers.js'
 import { runClaudePrompt } from '../claude/process.js'
 
@@ -220,6 +220,7 @@ router.delete('/:id', (req, res) => {
     res.status(404).json({ error: 'Session not found' })
     return
   }
+  scheduleQueries.deleteBySession(req.params.id)
   messageQueries.deleteBySessionId(req.params.id)
   sessionQueries.delete(req.params.id)
   res.status(204).end()

@@ -30,9 +30,10 @@ router.post('/subscribe', (req, res) => {
     return
   }
 
-  const { endpoint, keys } = req.body as {
+  const { endpoint, keys, sessionId } = req.body as {
     endpoint?: string
     keys?: { p256dh?: string; auth?: string }
+    sessionId?: string
   }
 
   if (!endpoint || !keys?.p256dh || !keys?.auth) {
@@ -40,7 +41,7 @@ router.post('/subscribe', (req, res) => {
     return
   }
 
-  pushSubscriptionQueries.upsert(uuidv4(), endpoint, keys.p256dh, keys.auth)
+  pushSubscriptionQueries.upsert(uuidv4(), endpoint, keys.p256dh, keys.auth, sessionId)
   res.status(201).json({ ok: true })
 })
 

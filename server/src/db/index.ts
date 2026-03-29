@@ -118,8 +118,37 @@ db.exec(`
     created_at INTEGER NOT NULL DEFAULT (unixepoch())
   )
 `)
+try {
+  db.exec(`ALTER TABLE push_subscriptions ADD COLUMN session_id TEXT REFERENCES sessions(id)`)
+} catch { /* already exists */ }
 
-// ── Types ────────────────────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS schedules (
+    id          TEXT PRIMARY KEY,
+    session_id  TEXT NOT NULL REFERENCES sessions(id),
+    cron        TEXT NOT NULL,
+    prompt      TEXT NOT NULL,
+    enabled     INTEGER NOT NULL DEFAULT 1,
+    last_run_at INTEGER,
+    next_run_at INTEGER,
+    created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
+  )
+`)
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export type Schedule = {
+  id: string
+  session_id: string
+  cron: string
+  prompt: string
+  enabled: number
+  last_run_at: number | null
+  next_run_at: number | null
+  created_at: number
+  updated_at: number
+}
 
 export type PermissionMode = 'default' | 'plan' | 'acceptEdits' | 'bypassPermissions'
 
@@ -393,14 +422,18 @@ export type PushSubscription = {
   endpoint: string
   p256dh: string
   auth: string
+  session_id: string | null
   created_at: number
 }
 
 const insertPushSubStmt = db.prepare(
-  `INSERT INTO push_subscriptions (id, endpoint, p256dh, auth) VALUES (?, ?, ?, ?)
-   ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh, auth=excluded.auth`
+  `INSERT INTO push_subscriptions (id, endpoint, p256dh, auth, session_id) VALUES (?, ?, ?, ?, ?)
+   ON CONFLICT(endpoint) DO UPDATE SET p256dh=excluded.p256dh, auth=excluded.auth, session_id=excluded.session_id`
 )
 const listPushSubsStmt = db.prepare(`SELECT * FROM push_subscriptions`)
+const listPushSubsBySessionStmt = db.prepare(
+  `SELECT * FROM push_subscriptions WHERE session_id = ?`
+)
 const deletePushSubByEndpointStmt = db.prepare(
   `DELETE FROM push_subscriptions WHERE endpoint = ?`
 )
@@ -409,11 +442,57 @@ const deletePushSubByIdStmt = db.prepare(
 )
 
 export const pushSubscriptionQueries = {
-  upsert: (id: string, endpoint: string, p256dh: string, auth: string) =>
-    insertPushSubStmt.run(id, endpoint, p256dh, auth),
+  upsert: (id: string, endpoint: string, p256dh: string, auth: string, sessionId?: string | null) =>
+    insertPushSubStmt.run(id, endpoint, p256dh, auth, sessionId ?? null),
   list: () => listPushSubsStmt.all() as PushSubscription[],
+  listBySession: (sessionId: string) => listPushSubsBySessionStmt.all(sessionId) as PushSubscription[],
   deleteByEndpoint: (endpoint: string) => deletePushSubByEndpointStmt.run(endpoint),
   deleteById: (id: string) => deletePushSubByIdStmt.run(id),
+}
+
+// ── Schedule queries ──────────────────────────────────────────────────────────
+
+const insertScheduleStmt = db.prepare(
+  `INSERT INTO schedules (id, session_id, cron, prompt, enabled, next_run_at)
+   VALUES (?, ?, ?, ?, 1, ?) RETURNING *`
+)
+const listSchedulesStmt = db.prepare(`SELECT * FROM schedules ORDER BY created_at ASC`)
+const listSchedulesBySessionStmt = db.prepare(
+  `SELECT * FROM schedules WHERE session_id = ? ORDER BY created_at ASC`
+)
+const findScheduleByIdStmt = db.prepare(`SELECT * FROM schedules WHERE id = ?`)
+const listDueSchedulesStmt = db.prepare(
+  `SELECT * FROM schedules WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ?`
+)
+const updateScheduleStmt = db.prepare(
+  `UPDATE schedules SET cron = COALESCE(?, cron), prompt = COALESCE(?, prompt),
+   enabled = COALESCE(?, enabled), next_run_at = COALESCE(?, next_run_at),
+   updated_at = unixepoch() WHERE id = ? RETURNING *`
+)
+const markScheduleRanStmt = db.prepare(
+  `UPDATE schedules SET last_run_at = ?, next_run_at = ?, updated_at = unixepoch() WHERE id = ?`
+)
+const deleteScheduleStmt = db.prepare(`DELETE FROM schedules WHERE id = ?`)
+const deleteSchedulesBySessionStmt = db.prepare(`DELETE FROM schedules WHERE session_id = ?`)
+
+export const scheduleQueries = {
+  create: (id: string, sessionId: string, cron: string, prompt: string, nextRunAt: number | null) =>
+    insertScheduleStmt.get(id, sessionId, cron, prompt, nextRunAt) as Schedule,
+  list: () => listSchedulesStmt.all() as Schedule[],
+  listBySession: (sessionId: string) => listSchedulesBySessionStmt.all(sessionId) as Schedule[],
+  findById: (id: string) => findScheduleByIdStmt.get(id) as Schedule | undefined,
+  listDue: (now: number) => listDueSchedulesStmt.all(now) as Schedule[],
+  update: (id: string, patch: { cron?: string; prompt?: string; enabled?: boolean; nextRunAt?: number | null }) =>
+    updateScheduleStmt.get(
+      patch.cron ?? null, patch.prompt ?? null,
+      patch.enabled !== undefined ? (patch.enabled ? 1 : 0) : null,
+      patch.nextRunAt !== undefined ? patch.nextRunAt : null,
+      id
+    ) as Schedule,
+  markRan: (id: string, ranAt: number, nextRunAt: number | null) =>
+    markScheduleRanStmt.run(ranAt, nextRunAt, id),
+  delete: (id: string) => deleteScheduleStmt.run(id),
+  deleteBySession: (sessionId: string) => deleteSchedulesBySessionStmt.run(sessionId),
 }
 
 /**

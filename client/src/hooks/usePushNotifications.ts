@@ -16,7 +16,7 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
  * - Checks existing subscription on mount
  * - Exposes subscribe() / unsubscribe() actions
  */
-export function usePushNotifications() {
+export function usePushNotifications(sessionId?: string) {
   const [state, setState] = useState<PushState>('loading')
 
   useEffect(() => {
@@ -45,7 +45,7 @@ export function usePushNotifications() {
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(vapidKey) as BufferSource,
       })
-      await savePushSubscription(sub)
+      await savePushSubscription(sub, sessionId)
       setState('granted')
     } catch (err) {
       const perm = Notification.permission
