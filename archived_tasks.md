@@ -53,6 +53,12 @@
 
 ---
 
+## Done
+
+- [x] **Multi-client session sync** — idle clients now receive finalized messages in real time via a persistent SSE subscription (`GET /api/sessions/:id/subscribe`). Server sends `event: updated` on every message finalization without closing the connection; `ChatWindow` subscribes on mount and re-fetches on each event. One-shot `watchSession` (recovery) and push notification count unchanged.
+
+---
+
 ## Fixed Bugs
 
 - [x] **Orphaned worker processes after abrupt e2e test exit** — `worker.e2e.test.ts` spawned `tsx src/worker/main.ts` but `afterAll` cleanup didn't run on abrupt exits (vitest timeout, SIGTERM), leaving orphan processes that spiked EC2 load to 50+. Fix: registered `process.on('exit'/'SIGTERM'/'SIGINT')` signal handlers in `beforeAll` to guarantee `workerProc.kill('SIGTERM')` even without `afterAll`. Mitigation: `ps aux | grep tsx | grep -v grep | awk '{print $2}' | xargs kill`.
