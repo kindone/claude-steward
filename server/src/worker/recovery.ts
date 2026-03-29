@@ -36,6 +36,12 @@ export function recoverStreamingSessions(): void {
     settled = true
     clearTimeout(fallback)
     markStaleStreamingMessages()
+    // Any sessions not explicitly resolved above are now interrupted by markStaleStreamingMessages.
+    // Notify their watchers so open tabs don't spin indefinitely.
+    // Sessions already resolved have empty watcher sets, so this is a no-op for them.
+    for (const msg of streaming) {
+      notifyWatchers(msg.session_id)
+    }
   }
 
   const done = () => {
