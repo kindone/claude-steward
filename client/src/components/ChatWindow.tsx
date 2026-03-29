@@ -174,6 +174,27 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
     }
   }, [sessionId])
 
+  // Re-fetch messages when the page becomes visible again (e.g. mobile app
+  // backgrounded and resumed, or tab switched away and back). Skipped while
+  // an active send is streaming so the optimistic bubble isn't overwritten.
+  useEffect(() => {
+    function handleVisibility() {
+      if (document.visibilityState !== 'visible') return
+      if (streamingFromSendRef.current) return
+      getMessages(sessionId).then((page) => {
+        setMessages((prev) => {
+          const lastPrevId = prev[prev.length - 1]?.id
+          const lastNewId = page.messages[page.messages.length - 1]?.id
+          if (lastNewId === lastPrevId) return prev  // nothing new — skip re-render
+          return page.messages.map(dbMessageToLocal)
+        })
+        setHasMore(page.hasMore)
+      }).catch(() => {})
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [sessionId])
+
   const loadOlder = useCallback(async () => {
     if (loadingOlder || !hasMore || messages.length === 0) return
     const oldestId = messages[0].id
