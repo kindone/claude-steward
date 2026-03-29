@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Component } from 'react'
+import type { ReactNode, ErrorInfo } from 'react'
 import {
   listProjects, createProject, deleteProject, fetchMeta, updatePermissionMode, updateProject,
   listSessions, createSession, deleteSession, renameSession,
@@ -57,6 +58,22 @@ function saveLastState(projectId: string | null, sessionId: string | null): void
   } catch { /* quota exceeded or private mode — ignore */ }
 }
 
+// ── Error Boundary ────────────────────────────────────────────────────────────
+
+type EBProps = { children: ReactNode; onError: (msg: string) => void }
+type EBState = { crashed: boolean }
+
+class ErrorBoundary extends Component<EBProps, EBState> {
+  state: EBState = { crashed: false }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    this.props.onError(`React render error: ${error.message} (${info.componentStack?.trim().split('\n')[0] ?? ''})`)
+  }
+  static getDerivedStateFromError() { return { crashed: false } }
+  render() { return this.props.children }
+}
+
+// ── App ───────────────────────────────────────────────────────────────────────
+
 export default function App() {
   const [authState, setAuthState] = useState<AuthState>('loading')
   const [hasCredentials, setHasCredentials] = useState(false)
@@ -68,6 +85,16 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [restarting, setRestarting] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [clientError, setClientError] = useState<string | null>(null)
+
+  // Capture unhandled JS errors and promise rejections for visibility
+  useEffect(() => {
+    const onError = (e: ErrorEvent) => setClientError(e.message ?? 'Unknown error')
+    const onUnhandled = (e: PromiseRejectionEvent) => setClientError(String(e.reason?.message ?? e.reason ?? 'Unhandled rejection'))
+    window.addEventListener('error', onError)
+    window.addEventListener('unhandledrejection', onUnhandled)
+    return () => { window.removeEventListener('error', onError); window.removeEventListener('unhandledrejection', onUnhandled) }
+  }, [])
 
   // Register service worker on mount so it's always available for push notifications,
   // regardless of whether a session/ChatWindow is open.
@@ -287,7 +314,16 @@ export default function App() {
   }
 
   return (
+    <ErrorBoundary onError={(msg) => setClientError(msg)}>
     <div className="flex h-dvh relative overflow-hidden bg-[#0d0d0d] text-[#e8e8e8]">
+      {/* Client error banner — unhandled JS exceptions and React render errors */}
+      {clientError && (
+        <div className="fixed top-0 inset-x-0 z-[9998] bg-red-900/90 border-b border-red-700 px-4 py-2 flex items-start gap-3 text-sm text-red-100">
+          <span className="flex-1 font-mono text-xs leading-relaxed break-all">{clientError}</span>
+          <button onClick={() => setClientError(null)} className="flex-shrink-0 text-red-300 hover:text-white leading-none text-lg">✕</button>
+        </div>
+      )}
+
       {/* Restart overlay */}
       {restarting && (
         <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] text-lg font-semibold text-[#e8e8e8] tracking-wide">
@@ -402,5 +438,6 @@ export default function App() {
         )}
       </main>
     </div>
+    </ErrorBoundary>
   )
 }
