@@ -3,6 +3,7 @@ import type { Session, Project } from '../lib/api'
 import { ProjectPicker } from './ProjectPicker'
 import { FileTree } from './FileTree'
 import { TerminalPanel } from './TerminalPanel'
+import { usePushNotifications } from '../hooks/usePushNotifications'
 
 type Props = {
   projects: Project[]
@@ -43,6 +44,7 @@ export function SessionSidebar({
   onClose,
   onLogout,
 }: Props) {
+  const { state: pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -135,7 +137,7 @@ export function SessionSidebar({
       </div>
 
       {/* Tab bar */}
-      <div className="flex border-b border-[#1f1f1f] flex-shrink-0">
+      <div className="flex items-stretch border-b border-[#1f1f1f] flex-shrink-0">
         {(['sessions', 'files', 'terminal'] as const).map((tab) => (
           <button
             key={tab}
@@ -157,6 +159,28 @@ export function SessionSidebar({
             ) : tab === 'terminal' ? 'Term' : 'Files'}
           </button>
         ))}
+        {/* Push notification bell — tab bar keeps it always visible on all screen sizes */}
+        {pushState !== 'unsupported' && (
+          <button
+            onClick={() => {
+              if (pushState === 'granted') pushUnsubscribe()
+              else if (pushState === 'default') pushSubscribe()
+            }}
+            disabled={pushState === 'loading' || pushState === 'denied'}
+            title={
+              pushState === 'granted' ? 'Notifications on — click to disable'
+                : pushState === 'denied' ? 'Notifications blocked in browser settings'
+                : pushState === 'loading' ? 'Loading…'
+                : 'Enable push notifications'
+            }
+            className={`px-3 border-b-2 border-transparent text-base leading-none transition-colors
+              ${pushState === 'granted' ? 'text-blue-400 hover:text-blue-300'
+                : pushState === 'denied' ? 'text-[#333] cursor-not-allowed'
+                : 'text-[#555] hover:text-[#888]'}`}
+          >
+            {pushState === 'granted' ? '🔔' : '🔕'}
+          </button>
+        )}
       </div>
 
       {/* Sessions tab */}

@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { sendMessage, stopChat, getMessages, watchSession, updateSystemPrompt, updatePermissionMode, compactSession, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
-import { usePushNotifications } from '../hooks/usePushNotifications'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
@@ -69,7 +68,6 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   const toolResultsRef = useRef<Map<string, { output: string; isError: boolean }>>(new Map())
   /** Live copy of toolUsesRef for rendering the streaming indicator. */
   const [streamingToolUses, setStreamingToolUses] = useState<ToolCall[]>([])
-  const { state: pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
 
   // Sync draft when switching sessions
   useEffect(() => {
@@ -366,30 +364,6 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
                 </button>
               ))}
             </span>
-
-            {/* Push notification bell */}
-            {pushState !== 'unsupported' && (
-              <button
-                className={`bg-transparent border-none cursor-pointer text-base leading-none transition-colors px-1
-                  ${pushState === 'granted' ? 'text-blue-400 hover:text-blue-300'
-                    : pushState === 'denied'  ? 'text-[#444] cursor-not-allowed'
-                    : pushState === 'loading' ? 'text-[#444]'
-                    : 'text-[#444] hover:text-[#888]'}`}
-                onClick={() => {
-                  if (pushState === 'granted') pushUnsubscribe()
-                  else if (pushState === 'default') pushSubscribe()
-                }}
-                title={
-                  pushState === 'granted' ? 'Notifications on — click to disable'
-                    : pushState === 'denied'  ? 'Notifications blocked in browser settings'
-                    : pushState === 'loading' ? 'Loading…'
-                    : 'Enable push notifications'
-                }
-                disabled={pushState === 'loading' || pushState === 'denied'}
-              >
-                {pushState === 'granted' ? '🔔' : '🔕'}
-              </button>
-            )}
           </span>
         </div>
 
