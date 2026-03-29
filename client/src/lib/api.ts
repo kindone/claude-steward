@@ -350,9 +350,12 @@ export function watchSession(
   onDone: () => void,
   onError?: () => void,
 ): () => void {
+  let doneFired = false
   const es = new EventSource(`/api/sessions/${sessionId}/watch`, { withCredentials: true })
-  es.addEventListener('done', () => { es.close(); onDone() })
-  es.onerror = () => { es.close(); onError?.() }
+  es.addEventListener('done', () => { doneFired = true; es.close(); onDone() })
+  // Ignore onerror if done already fired: the server closes the TCP connection immediately
+  // after sending the done event, which causes a spurious onerror in some browsers.
+  es.onerror = () => { if (!doneFired) { es.close(); onError?.() } }
   return () => es.close()
 }
 
