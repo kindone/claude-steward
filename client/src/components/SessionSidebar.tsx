@@ -4,6 +4,7 @@ import { ProjectPicker } from './ProjectPicker'
 import { FileTree } from './FileTree'
 import { TerminalPanel } from './TerminalPanel'
 import { usePushNotifications } from '../hooks/usePushNotifications'
+import type { ConnState } from '../hooks/useAppConnection'
 
 type Props = {
   projects: Project[]
@@ -23,6 +24,8 @@ type Props = {
   loading: boolean
   onClose?: () => void
   onLogout?: () => void
+  connState?: ConnState
+  lastSeenAt?: number | null
 }
 
 export function SessionSidebar({
@@ -43,6 +46,8 @@ export function SessionSidebar({
   loading,
   onClose,
   onLogout,
+  connState,
+  lastSeenAt,
 }: Props) {
   const { state: pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
@@ -293,20 +298,29 @@ export function SessionSidebar({
         }
       </div>
 
-      {/* Sign out — desktop only (mobile has it in the header bar) */}
-      {onLogout && (
-        <div className="hidden md:block border-t border-[#1f1f1f] p-2">
+      {/* Desktop footer: connection status + sign out */}
+      <div className="hidden md:flex items-center border-t border-[#1f1f1f] p-2 gap-1">
+        {connState && (
+          <span
+            className="flex items-center gap-1.5 px-2 py-2 text-xs text-[#444] cursor-default select-none flex-1 min-w-0"
+            title={`${connState === 'connected' ? 'Connected' : connState === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'} · last activity: ${lastSeenAt == null ? 'never' : (() => { const s = Math.floor((Date.now() - lastSeenAt) / 1000); return s < 5 ? 'just now' : s < 60 ? `${s}s ago` : `${Math.floor(s / 60)}m ago` })()}`}
+          >
+            <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${connState === 'connected' ? 'bg-green-500' : connState === 'reconnecting' ? 'bg-amber-400 animate-pulse' : 'bg-[#444]'}`} />
+            <span className="truncate">{connState === 'connected' ? 'Connected' : connState === 'reconnecting' ? 'Reconnecting…' : 'Connecting…'}</span>
+          </span>
+        )}
+        {onLogout && (
           <button
             onClick={onLogout}
-            className="flex w-full items-center gap-2 px-2 py-2 rounded text-xs text-[#555] hover:text-[#aaa] hover:bg-[#1a1a1a] transition-colors"
+            className="flex items-center justify-center w-8 h-8 rounded text-[#555] hover:text-[#aaa] hover:bg-[#1a1a1a] transition-colors flex-shrink-0"
+            title="Sign out"
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
             </svg>
-            Sign out
           </button>
-        </div>
-      )}
+        )}
+      </div>
     </aside>
   )
 }

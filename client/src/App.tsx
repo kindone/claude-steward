@@ -1,15 +1,44 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   listProjects, createProject, deleteProject, fetchMeta, updatePermissionMode, updateProject,
   listSessions, createSession, deleteSession, renameSession,
-  subscribeToAppEvents, getAuthStatus, logout,
+  getAuthStatus, logout,
   type Project, type Session,
 } from './lib/api'
 import { SessionSidebar } from './components/SessionSidebar'
 import { ChatWindow } from './components/ChatWindow'
 import AuthPage from './components/AuthPage'
+import { useAppConnection, type ConnState } from './hooks/useAppConnection'
 
 type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
+
+function formatLastSeen(ts: number | null): string {
+  if (ts === null) return 'never'
+  const s = Math.floor((Date.now() - ts) / 1000)
+  if (s < 5) return 'just now'
+  if (s < 60) return `${s}s ago`
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`
+  return `${Math.floor(s / 3600)}h ago`
+}
+
+function ConnectionDot({ state, lastSeenAt }: { state: ConnState; lastSeenAt: number | null }) {
+  const dot =
+    state === 'connected'    ? 'bg-green-500' :
+    state === 'reconnecting' ? 'bg-amber-400 animate-pulse' :
+                               'bg-[#444]'
+  const label =
+    state === 'connected'    ? 'Connected' :
+    state === 'reconnecting' ? 'Reconnecting…' :
+                               'Connecting…'
+  return (
+    <span
+      className="flex items-center gap-1.5 px-1 cursor-default select-none"
+      title={`${label} · last activity: ${formatLastSeen(lastSeenAt)}`}
+    >
+      <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
+    </span>
+  )
+}
 
 const LAST_STATE_KEY = 'steward:lastState'
 
@@ -72,15 +101,13 @@ export default function App() {
     setActiveSessionId(null)
   }
 
-  useEffect(() => {
-    if (authState !== 'authenticated') return
-    return subscribeToAppEvents({
-      onReload: () => {
-        setRestarting(true)
-        setTimeout(() => window.location.reload(), 1500)
-      },
-    })
+  const handleReload = useCallback(() => {
+    setRestarting(true)
+    setTimeout(() => window.location.reload(), 1500)
   }, [])
+  const { state: connState, lastSeenAt } = useAppConnection(
+    authState === 'authenticated' ? handleReload : undefined
+  )
 
   // Load projects and meta once authenticated; restore last-used project if it still exists
   useEffect(() => {
@@ -299,6 +326,8 @@ export default function App() {
           loading={loading}
           onClose={() => setSidebarOpen(false)}
           onLogout={handleLogout}
+          connState={connState}
+          lastSeenAt={lastSeenAt}
         />
       </div>
 
@@ -313,6 +342,7 @@ export default function App() {
           >
             ☰
           </button>
+          <ConnectionDot state={connState} lastSeenAt={lastSeenAt} />
           <span className="flex-1 text-sm text-[#888] truncate text-center">
             {mobileTitle}
           </span>

@@ -403,6 +403,12 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 export type AppEventHandlers = {
   onReload?: () => void
+  /** Fired when the SSE connection is established (initial + every reconnect). */
+  onConnect?: () => void
+  /** Fired when the SSE connection drops unexpectedly (before the reconnect delay). */
+  onDisconnect?: () => void
+  /** Fired on every received SSE data line — useful for tracking last-activity time. */
+  onActivity?: () => void
 }
 
 // Connect to the app-level SSE stream. Reconnects automatically on drop.
@@ -421,6 +427,8 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
         ...credentialsOpt,
       })
 
+      handlers.onConnect?.()
+
       const reader = res.body!.getReader()
       const decoder = new TextDecoder()
       let buffer = ''
@@ -436,6 +444,7 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
         for (const line of lines) {
           if (line.startsWith('event: ')) { pendingEvent = line.slice(7).trim(); continue }
           if (line.startsWith('data: ')) {
+            handlers.onActivity?.()
             if (pendingEvent === 'reload') handlers.onReload?.()
             pendingEvent = ''
           }
@@ -445,7 +454,10 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
       if ((err as Error).name === 'AbortError') return
     }
     // Reconnect after 3s on unexpected drop
-    if (!cancelled) setTimeout(connect, 3000)
+    if (!cancelled) {
+      handlers.onDisconnect?.()
+      setTimeout(connect, 3000)
+    }
   }
 
   connect()
