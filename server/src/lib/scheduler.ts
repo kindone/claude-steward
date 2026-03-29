@@ -29,10 +29,10 @@ async function runSchedule(schedule: Schedule): Promise<void> {
   // Advance next_run_at immediately to prevent double-fire if the tick is slow
   scheduleQueries.markRan(schedule.id, now, nextRun)
 
-  // Auto-disable if explicitly marked as once — fire once, then done.
+  // Auto-delete if explicitly marked as once — fire once, then gone.
   if (schedule.once) {
-    scheduleQueries.update(schedule.id, { enabled: false })
-    console.log(`[scheduler] auto-disabled one-shot schedule ${schedule.id}`)
+    scheduleQueries.delete(schedule.id)
+    console.log(`[scheduler] deleted one-shot schedule ${schedule.id}`)
   }
 
   const session = sessionQueries.findById(schedule.session_id)

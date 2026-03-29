@@ -60,6 +60,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   const [compacting, setCompacting] = useState(false)
   const [lastUsage, setLastUsage] = useState<UsageInfo | null>(null)
   const [scheduleOpen, setScheduleOpen] = useState(false)
+  const [scheduleTick, setScheduleTick] = useState(0)
   const [isAtBottom, setIsAtBottom] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -171,6 +172,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         const fresh = await getMessages(sessionId)
         setMessages(fresh.messages.map(dbMessageToLocal))
         setHasMore(fresh.hasMore)
+        setScheduleTick((t) => t + 1)
       } catch { /* ignore */ }
     })
 
@@ -480,7 +482,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         )}
 
         {scheduleOpen && (
-          <SchedulePanel sessionId={sessionId} timezone={timezone} />
+          <SchedulePanel sessionId={sessionId} timezone={timezone} refreshTick={scheduleTick} />
         )}
       </div>
 

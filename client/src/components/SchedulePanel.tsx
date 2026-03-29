@@ -4,6 +4,7 @@ import { listSchedules, updateSchedule, deleteSchedule, runScheduleNow, type Sch
 type Props = {
   sessionId: string
   timezone?: string | null
+  refreshTick?: number
 }
 
 function formatNextRun(nextRunAt: number | null): string {
@@ -11,7 +12,7 @@ function formatNextRun(nextRunAt: number | null): string {
   return new Date(nextRunAt * 1000).toLocaleString()
 }
 
-export function SchedulePanel({ sessionId, timezone }: Props) {
+export function SchedulePanel({ sessionId, timezone, refreshTick }: Props) {
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -21,7 +22,7 @@ export function SchedulePanel({ sessionId, timezone }: Props) {
       .then(setSchedules)
       .catch(() => setSchedules([]))
       .finally(() => setLoading(false))
-  }, [sessionId])
+  }, [sessionId, refreshTick])
 
   async function handleToggle(s: Schedule) {
     try {
@@ -71,7 +72,7 @@ export function SchedulePanel({ sessionId, timezone }: Props) {
                   title={s.enabled ? 'Disable' : 'Enable'}
                   className={`w-8 h-4 rounded-full flex-shrink-0 transition-colors relative ${s.enabled ? 'bg-blue-600' : 'bg-[#333]'}`}
                 >
-                  <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${s.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  <span className={`absolute top-0.5 left-0 w-3 h-3 rounded-full bg-white transition-transform ${s.enabled ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
                 </button>
                 <code className="text-[11px] text-blue-400 font-mono flex-shrink-0">{s.cron}</code>
                 {s.once === 1 && (
