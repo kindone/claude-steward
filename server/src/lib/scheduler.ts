@@ -29,6 +29,14 @@ async function runSchedule(schedule: Schedule): Promise<void> {
   // Advance next_run_at immediately to prevent double-fire if the tick is slow
   scheduleQueries.markRan(schedule.id, now, nextRun)
 
+  // Auto-disable one-shot schedules: if the next fire is more than 35 days away
+  // (or null), the cron has a specific date/month and won't recur meaningfully.
+  const THIRTY_FIVE_DAYS = 35 * 24 * 60 * 60
+  if (!nextRun || nextRun - now > THIRTY_FIVE_DAYS) {
+    scheduleQueries.update(schedule.id, { enabled: false })
+    console.log(`[scheduler] auto-disabled one-shot schedule ${schedule.id} (next run > 35 days or never)`)
+  }
+
   const session = sessionQueries.findById(schedule.session_id)
   if (!session) {
     console.warn(`[scheduler] session ${schedule.session_id} not found for schedule ${schedule.id} — skipping`)
