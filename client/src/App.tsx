@@ -317,6 +317,16 @@ export default function App() {
             {mobileTitle}
           </span>
           <button
+            onClick={() => window.location.reload()}
+            className="w-11 h-11 flex items-center justify-center text-[#555] hover:text-[#aaa] flex-shrink-0"
+            title="Refresh"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+          </button>
+          <button
             onClick={handleLogout}
             className="w-11 h-11 flex items-center justify-center text-[#555] hover:text-[#aaa] flex-shrink-0"
             title="Sign out"
