@@ -9,7 +9,8 @@ import { CronExpressionParser } from 'cron-parser'
 import { scheduleQueries, sessionQueries, type Schedule } from '../db/index.js'
 import { sendToSession } from './sendToSession.js'
 import { notifyWatchers, notifySubscribers } from './sessionWatchers.js'
-import { notifySession } from './pushNotifications.js'
+import { notifySession, notifyAll } from './pushNotifications.js'
+import { pushSubscriptionQueries } from '../db/index.js'
 
 /** Compute the next UTC unix timestamp (seconds) for a cron expression. Returns null on parse error. */
 export function nextFireAt(cronExpr: string): number | null {
@@ -52,11 +53,18 @@ async function runSchedule(schedule: Schedule): Promise<void> {
   // Only push if no watcher tab already has the session open
   if (notified === 0 && result.content) {
     const preview = result.content.replace(/\s+/g, ' ').trim()
-    void notifySession(schedule.session_id, {
+    const payload = {
       title: session.title === 'New Chat' ? 'Claude replied' : session.title,
       body: preview.slice(0, 80) + (preview.length > 80 ? '…' : ''),
       url: `/?session=${schedule.session_id}`,
-    })
+    }
+    // Try session-targeted subs first; fall back to all global (untagged) subs
+    const sessionSubs = pushSubscriptionQueries.listBySession(schedule.session_id)
+    if (sessionSubs.length > 0) {
+      void notifySession(schedule.session_id, payload)
+    } else {
+      void notifyAll(payload)
+    }
   }
 }
 

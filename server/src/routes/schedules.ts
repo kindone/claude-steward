@@ -1,11 +1,11 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import cron from 'node-cron'
-import { scheduleQueries, sessionQueries } from '../db/index.js'
+import { scheduleQueries, sessionQueries, pushSubscriptionQueries } from '../db/index.js'
 import { nextFireAt } from '../lib/scheduler.js'
 import { sendToSession } from '../lib/sendToSession.js'
 import { notifyWatchers, notifySubscribers } from '../lib/sessionWatchers.js'
-import { notifySession } from '../lib/pushNotifications.js'
+import { notifySession, notifyAll } from '../lib/pushNotifications.js'
 
 const router = Router()
 
@@ -120,11 +120,17 @@ router.post('/:id/run', async (req, res) => {
     notifySubscribers(schedule.session_id)
     if (notified === 0 && result.content) {
       const preview = result.content.replace(/\s+/g, ' ').trim()
-      void notifySession(schedule.session_id, {
+      const payload = {
         title: session.title === 'New Chat' ? 'Claude replied' : session.title,
         body: preview.slice(0, 80) + (preview.length > 80 ? '…' : ''),
         url: `/?session=${schedule.session_id}`,
-      })
+      }
+      const sessionSubs = pushSubscriptionQueries.listBySession(schedule.session_id)
+      if (sessionSubs.length > 0) {
+        void notifySession(schedule.session_id, payload)
+      } else {
+        void notifyAll(payload)
+      }
     }
   } catch (err) {
     console.error(`[schedules] manual run failed for schedule ${schedule.id}:`, err)
