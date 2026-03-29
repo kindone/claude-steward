@@ -113,9 +113,22 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       scrollBehaviorRef.current = 'smooth'
       return
     }
-    bottomRef.current?.scrollIntoView({ behavior })
-    // After initial snap, switch to smooth for streaming deltas
-    if (behavior === 'instant') scrollBehaviorRef.current = 'smooth'
+    if (behavior === 'instant') {
+      // Initial load: snap to bottom unconditionally
+      bottomRef.current?.scrollIntoView({ behavior: 'instant' })
+      scrollBehaviorRef.current = 'smooth'
+    } else {
+      // Streaming delta: avoid repeated smooth-scroll calls which stutter by interrupting
+      // each other. Instead, only scroll if the user is already near the bottom (respects
+      // deliberate scroll-up to re-read), and use direct scrollTop assignment (no animation).
+      const container = scrollContainerRef.current
+      if (container) {
+        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+        if (distanceFromBottom < 100) {
+          container.scrollTop = container.scrollHeight
+        }
+      }
+    }
   }, [messages])
 
   useEffect(() => {
