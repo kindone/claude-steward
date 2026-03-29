@@ -59,6 +59,9 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   /** 'instant' on first load, 'smooth' during streaming, 'none' when prepending older messages. */
   const scrollBehaviorRef = useRef<'instant' | 'smooth' | 'none'>('instant')
+  /** Tracks whether the scroll container was at the bottom before the last messages update.
+   *  Updated by a scroll listener so it reflects pre-render state, not post-render distance. */
+  const wasAtBottomRef = useRef(true)
   const cancelRef = useRef<(() => void) | null>(null)
   /** True while we have an active sendMessage() — poll must not overwrite the optimistic assistant bubble. */
   const streamingFromSendRef = useRef(false)
@@ -103,6 +106,20 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
     }
   }
 
+  // Track whether the user was at the bottom before each render so the scroll
+  // effect can use the pre-render position (post-render scrollHeight is larger
+  // after a new message lands, making the naive distanceFromBottom check fail).
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    const onScroll = () => {
+      wasAtBottomRef.current =
+        container.scrollHeight - container.scrollTop - container.clientHeight < 50
+    }
+    container.addEventListener('scroll', onScroll, { passive: true })
+    return () => container.removeEventListener('scroll', onScroll)
+  }, [])
+
   useEffect(() => {
     if (messages.length === 0) return
     const behavior = scrollBehaviorRef.current
@@ -116,15 +133,12 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       bottomRef.current?.scrollIntoView({ behavior: 'instant' })
       scrollBehaviorRef.current = 'smooth'
     } else {
-      // Streaming delta: avoid repeated smooth-scroll calls which stutter by interrupting
-      // each other. Instead, only scroll if the user is already near the bottom (respects
-      // deliberate scroll-up to re-read), and use direct scrollTop assignment (no animation).
-      const container = scrollContainerRef.current
-      if (container) {
-        const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
-        if (distanceFromBottom < 100) {
-          container.scrollTop = container.scrollHeight
-        }
+      // New content (streaming delta or subscription re-fetch): scroll to bottom only if
+      // the user was already at the bottom before this render (wasAtBottomRef is updated
+      // by the scroll listener and reflects pre-render position, not post-render distance).
+      if (wasAtBottomRef.current) {
+        const container = scrollContainerRef.current
+        if (container) container.scrollTop = container.scrollHeight
       }
     }
   }, [messages])
