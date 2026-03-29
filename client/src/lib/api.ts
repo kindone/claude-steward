@@ -359,6 +359,22 @@ export function watchSession(
   return () => es.close()
 }
 
+/**
+ * Persistent subscription to a session's message updates.
+ * Fires `onUpdate` every time any message is finalized for this session —
+ * enabling multi-client sync without polling. The connection stays open until
+ * the returned cancel function is called.
+ */
+export function subscribeToSession(
+  sessionId: string,
+  onUpdate: () => void,
+): () => void {
+  const es = new EventSource(`/api/sessions/${sessionId}/subscribe`, { withCredentials: true })
+  es.addEventListener('updated', () => onUpdate())
+  es.onerror = () => { /* auto-reconnects — no action needed */ }
+  return () => es.close()
+}
+
 export async function renameSession(sessionId: string, title: string): Promise<Session> {
   const res = await fetch(`/api/sessions/${sessionId}`, {
     method: 'PATCH',

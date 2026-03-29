@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { sessionQueries, messageQueries, projectQueries, type PermissionMode } from '../db/index.js'
-import { addWatcher, removeWatcher } from '../lib/sessionWatchers.js'
+import { addWatcher, removeWatcher, addSubscriber, removeSubscriber } from '../lib/sessionWatchers.js'
 import { runClaudePrompt } from '../claude/process.js'
 
 const VALID_MODES = new Set<PermissionMode>(['default', 'plan', 'acceptEdits', 'bypassPermissions'])
@@ -71,6 +71,36 @@ router.get('/:id/watch', (req, res) => {
   res.on('close', () => {
     clearInterval(keepalive)
     removeWatcher(req.params.id, res)
+    if (!res.writableEnded) res.end()
+  })
+})
+
+// GET /api/sessions/:id/subscribe
+// Persistent SSE subscription for multi-client sync. Stays open indefinitely and fires
+// `event: updated` whenever any message is finalized for this session, so all open tabs
+// can re-fetch and stay in sync without polling.
+router.get('/:id/subscribe', (req, res) => {
+  const session = sessionQueries.findById(req.params.id)
+  if (!session) {
+    res.status(404).json({ error: 'Session not found' })
+    return
+  }
+
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders()
+
+  addSubscriber(req.params.id, res)
+
+  const keepalive = setInterval(() => {
+    if (!res.writableEnded) res.write(': ping\n\n')
+  }, 30_000)
+
+  res.on('close', () => {
+    clearInterval(keepalive)
+    removeSubscriber(req.params.id, res)
     if (!res.writableEnded) res.end()
   })
 })

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, updateSystemPrompt, updatePermissionMode, compactSession, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, compactSession, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
@@ -134,6 +134,17 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
     let cancelled = false
     let cancelWatch: (() => void) | null = null
 
+    // Persistent subscription: re-fetch whenever another client finalizes a message.
+    // Skipped while this client's own sendMessage is streaming (optimistic bubble must not be overwritten).
+    const cancelSubscription = subscribeToSession(sessionId, async () => {
+      if (cancelled || streamingFromSendRef.current) return
+      try {
+        const fresh = await getMessages(sessionId)
+        setMessages(fresh.messages.map(dbMessageToLocal))
+        setHasMore(fresh.hasMore)
+      } catch { /* ignore */ }
+    })
+
     getMessages(sessionId).then((page) => {
       if (cancelled) return
       setMessages(page.messages.map(dbMessageToLocal))
@@ -169,6 +180,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       cancelled = true
       cancelRef.current?.()
       cancelWatch?.()
+      cancelSubscription()
     }
   }, [sessionId])
 

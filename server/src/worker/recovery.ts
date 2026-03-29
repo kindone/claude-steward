@@ -12,7 +12,7 @@
 
 import { extractToolDetail } from '../claude/toolDetail.js'
 import { messageQueries, markStaleStreamingMessages } from '../db/index.js'
-import { notifyWatchers } from '../lib/sessionWatchers.js'
+import { notifyWatchers, notifySubscribers } from '../lib/sessionWatchers.js'
 import { workerClient } from './client.js'
 import type { WorkerEvent } from './protocol.js'
 
@@ -41,6 +41,7 @@ export function recoverStreamingSessions(): void {
     // Sessions already resolved have empty watcher sets, so this is a no-op for them.
     for (const msg of streaming) {
       notifyWatchers(msg.session_id)
+      notifySubscribers(msg.session_id)
     }
   }
 
@@ -106,6 +107,7 @@ export function recoverStreamingSessions(): void {
           workerClient.unsubscribe(msg.session_id)
           messageQueries.finalizeMessage(msg.id, event.content || streamingContent, false, undefined, toolCallsJson())
           notifyWatchers(msg.session_id)
+          notifySubscribers(msg.session_id)
           console.log(`[recovery] session ${msg.session_id} completed`)
           done()
           break
@@ -113,6 +115,7 @@ export function recoverStreamingSessions(): void {
           workerClient.unsubscribe(msg.session_id)
           messageQueries.finalizeMessage(msg.id, event.content || streamingContent, true, event.errorCode, toolCallsJson())
           notifyWatchers(msg.session_id)
+          notifySubscribers(msg.session_id)
           console.log(`[recovery] session ${msg.session_id} errored: ${event.errorCode}`)
           done()
           break
@@ -123,10 +126,12 @@ export function recoverStreamingSessions(): void {
           if (event.status === 'complete') {
             messageQueries.finalizeMessage(msg.id, event.content || streamingContent, false, undefined, mergedTools)
             notifyWatchers(msg.session_id)
+            notifySubscribers(msg.session_id)
             console.log(`[recovery] session ${msg.session_id} recovered from worker DB`)
           } else if (event.status === 'interrupted') {
             messageQueries.finalizeMessage(msg.id, event.content || streamingContent, true, event.errorCode ?? 'process_error', mergedTools)
             notifyWatchers(msg.session_id)
+            notifySubscribers(msg.session_id)
             console.log(`[recovery] session ${msg.session_id} interrupted in worker DB`)
           }
           // not_found: leave as streaming — settle() via markStaleStreamingMessages will interrupt it

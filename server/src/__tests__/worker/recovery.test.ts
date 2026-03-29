@@ -27,6 +27,7 @@ vi.mock('../../worker/client.js', () => ({
 
 vi.mock('../../lib/sessionWatchers.js', () => ({
   notifyWatchers: vi.fn(() => 0),
+  notifySubscribers: vi.fn(),
   addWatcher: vi.fn(),
   removeWatcher: vi.fn(),
 }))

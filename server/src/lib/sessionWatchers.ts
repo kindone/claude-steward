@@ -1,11 +1,18 @@
 import type { Response } from 'express'
 
 /**
- * Registry of SSE response objects waiting for a session's Claude response to complete.
- * When `notifyWatchers` is called the server pushes `event: done` to all parked clients
- * and they immediately re-fetch the final message — no polling ceiling needed.
+ * One-shot watchers — parked clients waiting for a streaming job to complete.
+ * `notifyWatchers` sends `event: done`, closes their connections, and clears the set.
+ * The return count is used to decide whether to send a push notification.
  */
 const watchers = new Map<string, Set<Response>>()
+
+/**
+ * Persistent subscribers — clients subscribed for the lifetime of a session view.
+ * `notifySubscribers` sends `event: updated` without closing connections, enabling
+ * multi-client sync: every open tab re-fetches messages whenever any client causes a change.
+ */
+const subscribers = new Map<string, Set<Response>>()
 
 export function addWatcher(sessionId: string, res: Response): void {
   if (!watchers.has(sessionId)) watchers.set(sessionId, new Set())
@@ -20,8 +27,8 @@ export function removeWatcher(sessionId: string, res: Response): void {
 }
 
 /**
- * Send `event: done` to every client watching this session, then clear the set.
- * Returns the number of clients that were notified (0 means no tab was open).
+ * Send `event: done` to every one-shot watcher, close their connections, clear the set.
+ * Returns the count of notified clients (0 = no tab open → trigger push notification).
  */
 export function notifyWatchers(sessionId: string): number {
   const set = watchers.get(sessionId)
@@ -36,4 +43,28 @@ export function notifyWatchers(sessionId: string): number {
   }
   watchers.delete(sessionId)
   return count
+}
+
+export function addSubscriber(sessionId: string, res: Response): void {
+  if (!subscribers.has(sessionId)) subscribers.set(sessionId, new Set())
+  subscribers.get(sessionId)!.add(res)
+}
+
+export function removeSubscriber(sessionId: string, res: Response): void {
+  const set = subscribers.get(sessionId)
+  if (!set) return
+  set.delete(res)
+  if (set.size === 0) subscribers.delete(sessionId)
+}
+
+/**
+ * Send `event: updated` to all persistent subscribers for this session.
+ * Connections stay open — subscribers re-fetch messages and remain subscribed.
+ */
+export function notifySubscribers(sessionId: string): void {
+  const set = subscribers.get(sessionId)
+  if (!set) return
+  for (const res of set) {
+    if (!res.writableEnded) res.write('event: updated\ndata: {}\n\n')
+  }
 }

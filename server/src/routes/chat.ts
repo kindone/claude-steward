@@ -3,7 +3,7 @@ import type { Response } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { sessionQueries, messageQueries, projectQueries } from '../db/index.js'
 import { spawnClaude } from '../claude/process.js'
-import { notifyWatchers } from '../lib/sessionWatchers.js'
+import { notifyWatchers, notifySubscribers } from '../lib/sessionWatchers.js'
 import { registerChat, unregisterChat, abortChat } from '../lib/activeChats.js'
 import { notifyAll } from '../lib/pushNotifications.js'
 import { extractToolDetail } from '../claude/toolDetail.js'
@@ -79,6 +79,7 @@ router.post('/', (req, res) => {
       messageQueries.insert(uuidv4(), sessionId, 'assistant', assistantText)
     }
     const notified = notifyWatchers(sessionId)
+    notifySubscribers(sessionId)
     if (notified === 0 && clientDisconnectedEarly && assistantText) {
       const preview = assistantText.replace(/\s+/g, ' ').trim().slice(0, 80)
       void notifyAll({
@@ -99,6 +100,7 @@ router.post('/', (req, res) => {
     // Direct-spawn path has no streaming row, so we insert here.
     if (persistMsg) messageQueries.insert(uuidv4(), sessionId, 'assistant', message, true, code)
     notifyWatchers(sessionId)
+    notifySubscribers(sessionId)
     sendSseEvent(res, 'error', { message, code })
     if (!res.writableEnded) res.end()
   }
