@@ -103,7 +103,7 @@ describe('session lifecycle — stateful property', () => {
         state.activeIds.length = 0
         projectQueries.delete(state.projectId)
       })
-      .go()
+      .run()
   })
 
 })
