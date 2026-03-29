@@ -28,7 +28,7 @@ function processScheduleBlocks(text: string, sessionId: string): string {
   for (const s of schedules) {
     try {
       const nextRun = nextFireAt(s.cron)
-      scheduleQueries.create(uuidv4ForSchedule(), sessionId, s.cron, s.prompt, nextRun)
+      scheduleQueries.create(uuidv4ForSchedule(), sessionId, s.cron, s.prompt, nextRun, s.once)
       console.log(`[scheduler] created schedule for session ${sessionId}: ${s.label} (${s.cron})`)
     } catch (err) {
       console.error('[scheduler] failed to create schedule from response block:', err)

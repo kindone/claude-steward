@@ -24,6 +24,7 @@ Rules:
 - cron field must be valid 5-field cron syntax in UTC
 - prompt is the task context injected at fire time — write it as a clear instruction to yourself
 - label is a short human-readable name shown in the schedule list
+- once: true means the schedule fires exactly once then disables itself — use this for specific one-time reminders (e.g. "remind me on June 15th"). Omit or set false for recurring schedules.
 - Current UTC time: ${utcStr}
 - ${tzLine}
 ---`

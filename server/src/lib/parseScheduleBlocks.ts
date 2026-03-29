@@ -11,6 +11,7 @@ export type ParsedSchedule = {
   cron: string
   prompt: string
   label: string
+  once: boolean
 }
 
 const SCHEDULE_BLOCK_RE = /<schedule>([\s\S]*?)<\/schedule>/g
@@ -31,11 +32,12 @@ export function extractScheduleBlocks(text: string): {
       const cronExpr = typeof parsed.cron === 'string' ? parsed.cron.trim() : ''
       const prompt = typeof parsed.prompt === 'string' ? parsed.prompt.trim() : ''
       const label = typeof parsed.label === 'string' ? parsed.label.trim() : prompt.slice(0, 60)
+      const once = parsed.once === true
 
       if (!cronExpr || !prompt) return ''
       if (!cron.validate(cronExpr)) return ''
 
-      schedules.push({ cron: cronExpr, prompt, label })
+      schedules.push({ cron: cronExpr, prompt, label, once })
     } catch {
       // Malformed JSON — strip the block silently
     }

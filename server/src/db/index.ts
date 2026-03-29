@@ -135,12 +135,16 @@ db.exec(`
     cron        TEXT NOT NULL,
     prompt      TEXT NOT NULL,
     enabled     INTEGER NOT NULL DEFAULT 1,
+    once        INTEGER NOT NULL DEFAULT 0,
     last_run_at INTEGER,
     next_run_at INTEGER,
     created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
     updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
   )
 `)
+try {
+  db.exec(`ALTER TABLE schedules ADD COLUMN once INTEGER NOT NULL DEFAULT 0`)
+} catch { /* already exists */ }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -150,6 +154,7 @@ export type Schedule = {
   cron: string
   prompt: string
   enabled: number
+  once: number   // 1 = disable after first fire, 0 = recurring
   last_run_at: number | null
   next_run_at: number | null
   created_at: number
@@ -466,8 +471,8 @@ export const pushSubscriptionQueries = {
 // ── Schedule queries ──────────────────────────────────────────────────────────
 
 const insertScheduleStmt = db.prepare(
-  `INSERT INTO schedules (id, session_id, cron, prompt, enabled, next_run_at)
-   VALUES (?, ?, ?, ?, 1, ?) RETURNING *`
+  `INSERT INTO schedules (id, session_id, cron, prompt, enabled, once, next_run_at)
+   VALUES (?, ?, ?, ?, 1, ?, ?) RETURNING *`
 )
 const listSchedulesStmt = db.prepare(`SELECT * FROM schedules ORDER BY created_at ASC`)
 const listSchedulesBySessionStmt = db.prepare(
@@ -489,8 +494,8 @@ const deleteScheduleStmt = db.prepare(`DELETE FROM schedules WHERE id = ?`)
 const deleteSchedulesBySessionStmt = db.prepare(`DELETE FROM schedules WHERE session_id = ?`)
 
 export const scheduleQueries = {
-  create: (id: string, sessionId: string, cron: string, prompt: string, nextRunAt: number | null) =>
-    insertScheduleStmt.get(id, sessionId, cron, prompt, nextRunAt) as Schedule,
+  create: (id: string, sessionId: string, cron: string, prompt: string, nextRunAt: number | null, once = false) =>
+    insertScheduleStmt.get(id, sessionId, cron, prompt, once ? 1 : 0, nextRunAt) as Schedule,
   list: () => listSchedulesStmt.all() as Schedule[],
   listBySession: (sessionId: string) => listSchedulesBySessionStmt.all(sessionId) as Schedule[],
   findById: (id: string) => findScheduleByIdStmt.get(id) as Schedule | undefined,

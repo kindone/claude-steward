@@ -257,6 +257,7 @@ export type Schedule = {
   cron: string
   prompt: string
   enabled: number
+  once: number   // 1 = fires once then disables, 0 = recurring
   last_run_at: number | null
   next_run_at: number | null
   created_at: number

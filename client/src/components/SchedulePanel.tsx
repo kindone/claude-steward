@@ -74,6 +74,9 @@ export function SchedulePanel({ sessionId, timezone }: Props) {
                   <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-transform ${s.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
                 </button>
                 <code className="text-[11px] text-blue-400 font-mono flex-shrink-0">{s.cron}</code>
+                {s.once === 1 && (
+                  <span className="text-[10px] text-[#555] border border-[#2a2a2a] rounded px-1 py-px flex-shrink-0">once</span>
+                )}
                 <span className="flex-1 text-[11px] text-[#888] truncate" title={s.prompt}>{s.prompt}</span>
                 <button
                   onClick={() => handleRunNow(s.id)}
