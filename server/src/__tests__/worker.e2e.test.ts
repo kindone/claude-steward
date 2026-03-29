@@ -163,6 +163,13 @@ beforeAll(async () => {
   workerProc.stderr?.on('data', (d: Buffer) => process.stderr.write(`[worker:err] ${d}`))
   workerProc.on('error', (err) => console.error('[worker] failed to start:', err.message))
 
+  // Guarantee cleanup even on abrupt process exit (vitest timeout, SIGTERM from background
+  // task runner, etc.) — without this, tsx worker processes are left as orphans.
+  const killWorker = () => workerProc?.kill('SIGTERM')
+  process.on('exit', killWorker)
+  process.on('SIGTERM', () => { killWorker(); process.exit(0) })
+  process.on('SIGINT',  () => { killWorker(); process.exit(0) })
+
   await waitForSocket(SOCKET_PATH)
   console.log('[e2e] worker ready')
 }, 20_000)

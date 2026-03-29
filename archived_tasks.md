@@ -55,6 +55,7 @@
 
 ## Fixed Bugs
 
+- [x] **Orphaned worker processes after abrupt e2e test exit** — `worker.e2e.test.ts` spawned `tsx src/worker/main.ts` but `afterAll` cleanup didn't run on abrupt exits (vitest timeout, SIGTERM), leaving orphan processes that spiked EC2 load to 50+. Fix: registered `process.on('exit'/'SIGTERM'/'SIGINT')` signal handlers in `beforeAll` to guarantee `workerProc.kill('SIGTERM')` even without `afterAll`. Mitigation: `ps aux | grep tsx | grep -v grep | awk '{print $2}' | xargs kill`.
 - [x] **Graceful context limit / error UX** — added `context_limit` error code detected from Claude CLI result text; friendly yellow banners per error type (`context_limit`, `session_expired`, `process_error`, `http_error`) replacing the raw CLI error string; partial streamed content now preserved above the error banner rather than overwritten.
 - [x] **Push fires on active sender** — `notifyWatchers` only tracks `watchSession` connections, not active `sendMessage` SSEs, so `notified === 0` was always true during live sends and push fired unconditionally. Fixed by also checking `res.writableEnded` — push now only fires when the sending client has disconnected.
 - [x] **VapidPkHashMismatch subscription not cleaned up** — Apple APNs 400 `VapidPkHashMismatch` (stale subscription from a previous VAPID key rotation) was logged but the subscription was never deleted, causing every send to fail permanently. Now treated as permanent like 410/404 and auto-deleted.
