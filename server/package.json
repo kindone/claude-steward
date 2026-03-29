@@ -10,7 +10,7 @@
     "worker": "tsx src/worker/main.ts",
     "worker:test": "tsx src/worker/test-client.ts",
     "test": "vitest run",
-    "test:e2e": "vitest run src/__tests__/worker.e2e.test.ts",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "test:all": "npm test && npm run test:e2e",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"
