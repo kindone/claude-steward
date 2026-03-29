@@ -3,6 +3,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   test: {
     include: ['src/**/*.{test,spec,prop}.ts'],
+    exclude: ['src/**/*.e2e.test.ts'],    // e2e tests use real Claude CLI — run separately via test:e2e
     environment: 'node',
     setupFiles: ['./src/__tests__/setup.ts'],
     pool: 'forks',   // full process isolation — each file gets a clean module graph

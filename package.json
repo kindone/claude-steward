@@ -25,7 +25,7 @@
     "logs:dev": "node scripts/tier.js logs dev",
     "logs:safe": "node scripts/tier.js logs safe",
     "test": "npm test --workspace=server && npm test --workspace=client",
-    "test:e2e": "playwright test",
+    "test:e2e": "npm run test:e2e --workspace=server && playwright test",
     "test:all": "npm test && npm run test:e2e",
     "status": "node scripts/status.js"
   },

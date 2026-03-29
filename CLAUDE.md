@@ -39,11 +39,12 @@ cd client && npx tsc --noEmit
 cd server && npx tsc --noEmit
 
 # Test
-npm test                             # server Vitest + client Vitest (~4s, no servers needed)
-npm run test:e2e                     # Playwright smoke tests (auto-starts dev servers)
-npm run test:all                     # everything
-npm test --workspace=server          # server only
-npm test --workspace=client          # client only
+npm test                             # fast: server unit/prop/contract + client component (~10s, no servers, no Claude)
+npm run test:e2e                     # slow: worker e2e (real Claude CLI) + Playwright smoke tests
+npm run test:all                     # everything: npm test + npm run test:e2e
+npm test --workspace=server          # server fast tests only
+npm test --workspace=client          # client tests only
+npm run test:e2e --workspace=server  # worker e2e only (real Claude CLI, ~90s per test)
 
 # Operations
 npm run status                       # health-check all ports
