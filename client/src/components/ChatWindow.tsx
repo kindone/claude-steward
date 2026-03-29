@@ -55,6 +55,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
   const [promptDraft, setPromptDraft] = useState(systemPrompt ?? '')
   const [compacting, setCompacting] = useState(false)
   const [lastUsage, setLastUsage] = useState<UsageInfo | null>(null)
+  const [isAtBottom, setIsAtBottom] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   /** 'instant' on first load, 'smooth' during streaming, 'none' when prepending older messages. */
@@ -113,8 +114,9 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
     const container = scrollContainerRef.current
     if (!container) return
     const onScroll = () => {
-      wasAtBottomRef.current =
-        container.scrollHeight - container.scrollTop - container.clientHeight < 50
+      const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50
+      wasAtBottomRef.current = atBottom
+      setIsAtBottom(atBottom)
     }
     container.addEventListener('scroll', onScroll, { passive: true })
     return () => container.removeEventListener('scroll', onScroll)
@@ -457,7 +459,20 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
       </div>
 
       {/* Messages */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-6 md:px-6 md:py-8 flex flex-col gap-5">
+      <div className="relative flex-1 min-h-0">
+      {!isAtBottom && (
+        <button
+          onClick={() => {
+            const container = scrollContainerRef.current
+            if (container) container.scrollTop = container.scrollHeight
+          }}
+          className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-[#1a1a1a] border border-[#333] hover:border-[#555] rounded-full text-[#888] hover:text-[#ccc] text-xs px-3 py-1.5 cursor-pointer transition-colors shadow-lg"
+          title="Scroll to bottom"
+        >
+          ↓ Scroll to bottom
+        </button>
+      )}
+      <div ref={scrollContainerRef} className="h-full overflow-y-auto px-4 py-6 md:px-6 md:py-8 flex flex-col gap-5">
         {hasMore && (
           <div className="flex justify-center flex-shrink-0">
             <button
@@ -506,6 +521,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
           </div>
         )}
         <div ref={bottomRef} />
+      </div>
       </div>
 
       <MessageInput
