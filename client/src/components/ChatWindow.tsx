@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, compactSession, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, compactSession, updateSessionTimezone, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
@@ -16,6 +16,7 @@ type Message = {
   content: string
   streaming: boolean
   errorCode?: ClaudeErrorCode
+  source?: string | null
   /** Tool calls made while generating this message, in invocation order. */
   toolUses?: ToolCall[]
 }
@@ -31,6 +32,7 @@ function dbMessageToLocal(m: ApiMessage): Message {
     errorCode: m.status === 'interrupted'
       ? (m.error_code as ClaudeErrorCode ?? 'process_error')
       : m.is_error ? (m.error_code as ClaudeErrorCode ?? 'process_error') : undefined,
+    source: m.source,
     toolUses,
   }
 }
@@ -39,6 +41,7 @@ type Props = {
   sessionId: string
   systemPrompt: string | null
   permissionMode: PermissionMode
+  timezone?: string | null
   onTitle?: (title: string) => void
   onActivity?: () => void
   onSystemPromptChange?: (prompt: string | null) => void
@@ -46,7 +49,7 @@ type Props = {
   onCompact?: (newSessionId: string) => void
 }
 
-export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onCompact }: Props) {
+export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onCompact }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -80,6 +83,14 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
     setPromptDraft(systemPrompt ?? '')
     setPromptOpen(false)
   }, [sessionId, systemPrompt])
+
+  // Send browser timezone to server on session open so Claude can use it for scheduling
+  useEffect(() => {
+    try {
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
+      if (tz) updateSessionTimezone(sessionId, tz).catch(() => {})
+    } catch { /* ignore */ }
+  }, [sessionId])
 
   async function handlePromptSave() {
     const value = promptDraft.trim() || null
@@ -469,7 +480,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
         )}
 
         {scheduleOpen && (
-          <SchedulePanel sessionId={sessionId} />
+          <SchedulePanel sessionId={sessionId} timezone={timezone} />
         )}
       </div>
 
@@ -511,6 +522,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, onTitle, o
             content={m.content}
             streaming={m.streaming}
             errorCode={m.errorCode}
+            source={m.source}
             toolUses={m.toolUses}
             onCompact={m.errorCode === 'context_limit' ? handleCompact : undefined}
           />

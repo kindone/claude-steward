@@ -115,7 +115,7 @@ router.post('/:id/run', async (req, res) => {
   res.json({ ok: true, message: 'Schedule triggered' })
 
   try {
-    const result = await sendToSession(schedule.session_id, schedule.prompt)
+    const result = await sendToSession(schedule.session_id, schedule.prompt, { source: 'scheduler' })
     const notified = notifyWatchers(schedule.session_id)
     notifySubscribers(schedule.session_id)
     if (notified === 0 && result.content) {

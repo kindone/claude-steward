@@ -1,7 +1,11 @@
 /**
  * Headless send: inject a message into a session without an HTTP response object.
  * Used by the scheduler. Prefers the worker path; falls back to direct spawn.
- * Does NOT call notifyWatchers/notifySubscribers/push — caller handles that.
+ *
+ * When source='scheduler':
+ * - Does NOT insert a user message row — the trigger is invisible in chat
+ * - Builds a rich context injection (datetime + recent conversation + task)
+ * - Saves the assistant response with source='scheduler'
  */
 
 import { v4 as uuidv4 } from 'uuid'
@@ -10,18 +14,62 @@ import { sessionQueries, messageQueries, projectQueries } from '../db/index.js'
 import { spawnClaude } from '../claude/process.js'
 import { workerClient } from '../worker/client.js'
 import { extractToolDetail } from '../claude/toolDetail.js'
+import { buildEffectiveSystemPrompt } from './schedulePrompt.js'
 
 export type SendResult = {
   content: string
   errorCode?: string
 }
 
+export type SendOptions = {
+  /** 'scheduler' = agent-initiated; no user message inserted, assistant saved with source */
+  source?: string
+}
+
+/**
+ * Build the rich context string injected as the internal user turn when firing a schedule.
+ * Not saved to the DB — only passed to Claude so it knows what to do.
+ */
+function buildSchedulerContext(sessionId: string, task: string): string {
+  const session = sessionQueries.findById(sessionId)
+  const nowUtc = new Date()
+
+  const utcStr = nowUtc.toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
+  let localStr = ''
+  if (session?.timezone) {
+    try {
+      localStr = nowUtc.toLocaleString('en-US', {
+        timeZone: session.timezone,
+        dateStyle: 'full',
+        timeStyle: 'short',
+      }) + ` (${session.timezone})`
+    } catch { /* ignore invalid timezone */ }
+  }
+
+  const timeBlock = localStr
+    ? `Current time: ${localStr} / ${utcStr}`
+    : `Current time: ${utcStr}`
+
+  // Include last 6 messages for context
+  const recent = messageQueries.listPaged(sessionId, 6)
+  let contextBlock = ''
+  if (recent.length > 0) {
+    const lines = recent
+      .filter((m) => m.source !== 'scheduler' || m.role === 'assistant') // include past scheduled responses
+      .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim().slice(0, 300)}`)
+      .join('\n')
+    contextBlock = `\nRecent conversation:\n${lines}\n`
+  }
+
+  return `[Scheduled trigger]\n${timeBlock}\n${contextBlock}\nTask: ${task}`
+}
+
 /**
  * Send a message to a session and wait for the response.
  * Returns the assistant's final text (or errorCode on failure).
- * Throws if the session does not exist.
+ * Throws if the session does not exist or is already streaming.
  */
-export async function sendToSession(sessionId: string, message: string): Promise<SendResult> {
+export async function sendToSession(sessionId: string, message: string, opts: SendOptions = {}): Promise<SendResult> {
   const session = sessionQueries.findById(sessionId)
   if (!session) throw new Error(`Session not found: ${sessionId}`)
 
@@ -32,19 +80,31 @@ export async function sendToSession(sessionId: string, message: string): Promise
     throw new Error(`Session ${sessionId} is already streaming — skipping scheduled send`)
   }
 
-  messageQueries.insert(uuidv4(), sessionId, 'user', message)
+  const isScheduler = opts.source === 'scheduler'
+
+  // For scheduler: build context injection instead of a plain user message
+  const effectivePrompt = isScheduler
+    ? buildSchedulerContext(sessionId, message)
+    : message
+
+  // Only insert a user message for user-initiated sends
+  if (!isScheduler) {
+    messageQueries.insert(uuidv4(), sessionId, 'user', message)
+  }
+
   const project = session.project_id ? projectQueries.findById(session.project_id) : undefined
 
   if (workerClient.isConnected()) {
-    return sendViaWorker(session, message, project?.path)
+    return sendViaWorker(session, effectivePrompt, project?.path, opts.source)
   }
-  return sendViaDirect(session, message, project?.path)
+  return sendViaDirect(session, effectivePrompt, project?.path, opts.source)
 }
 
 function sendViaWorker(
   session: ReturnType<typeof sessionQueries.findById> & object,
-  message: string,
+  prompt: string,
   projectPath?: string,
+  source?: string,
 ): Promise<SendResult> {
   return new Promise((resolve) => {
     const streamingMsgId = uuidv4()
@@ -60,7 +120,7 @@ function sendViaWorker(
     const finalize = (content: string, isError: boolean, errorCode?: string) => {
       clearInterval(flushTimer)
       const toolCallsJson = toolCallsMap.size > 0 ? JSON.stringify([...toolCallsMap.values()]) : undefined
-      messageQueries.finalizeMessage(streamingMsgId, content, isError, errorCode, toolCallsJson)
+      messageQueries.finalizeMessage(streamingMsgId, content, isError, errorCode, toolCallsJson, source)
     }
 
     workerClient.subscribe(session.id, (event) => {
@@ -119,19 +179,20 @@ function sendViaWorker(
     workerClient.send({
       type: 'start',
       sessionId: session.id,
-      prompt: message,
+      prompt,
       claudeSessionId: session.claude_session_id,
       projectPath: projectPath ?? process.cwd(),
       permissionMode: session.permission_mode,
-      systemPrompt: session.system_prompt,
+      systemPrompt: buildEffectiveSystemPrompt(session),
     })
   })
 }
 
 function sendViaDirect(
   session: ReturnType<typeof sessionQueries.findById> & object,
-  message: string,
+  prompt: string,
   projectPath?: string,
+  source?: string,
 ): Promise<SendResult> {
   return new Promise((resolve) => {
     // Minimal res shim — spawnClaude uses it only for SSE writes which we discard
@@ -142,9 +203,9 @@ function sendViaDirect(
     } as unknown as Response
 
     spawnClaude({
-      message,
+      message: prompt,
       claudeSessionId: session.claude_session_id,
-      systemPrompt: session.system_prompt,
+      systemPrompt: buildEffectiveSystemPrompt(session),
       permissionMode: session.permission_mode,
       res: nullRes,
       cwd: projectPath,
@@ -155,7 +216,7 @@ function sendViaDirect(
         }
       },
       onComplete: (text) => {
-        messageQueries.insert(uuidv4(), session.id, 'assistant', text)
+        messageQueries.insert(uuidv4(), session.id, 'assistant', text, false, undefined, source)
         resolve({ content: text })
       },
       onError: (err) => {

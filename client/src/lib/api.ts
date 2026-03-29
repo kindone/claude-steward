@@ -97,6 +97,7 @@ export type Session = {
   project_id: string | null
   system_prompt: string | null
   permission_mode: PermissionMode
+  timezone: string | null
   created_at: number
   updated_at: number
 }
@@ -110,6 +111,7 @@ export type Message = {
   error_code: string | null
   status: 'complete' | 'streaming' | 'interrupted'
   tool_calls: string | null  // JSON-encoded ToolCall array, null if none
+  source: string | null      // null = user-initiated, 'scheduler' = agent-initiated scheduled message
   created_at: number
 }
 
@@ -469,6 +471,15 @@ export async function updatePermissionMode(sessionId: string, permissionMode: Pe
   })
   if (!res.ok) throw new Error('Failed to update permission mode')
   return res.json() as Promise<Session>
+}
+
+export async function updateSessionTimezone(sessionId: string, timezone: string): Promise<void> {
+  await fetch(`/api/sessions/${sessionId}`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ timezone }),
+    ...credentialsOpt,
+  })
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {

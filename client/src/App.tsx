@@ -409,6 +409,7 @@ export default function App() {
             sessionId={activeSessionId}
             systemPrompt={sessions.find((s) => s.id === activeSessionId)?.system_prompt ?? null}
             permissionMode={sessions.find((s) => s.id === activeSessionId)?.permission_mode ?? 'acceptEdits'}
+            timezone={sessions.find((s) => s.id === activeSessionId)?.timezone ?? null}
             onTitle={(title) => handleTitleUpdate(activeSessionId, title)}
             onActivity={() => handleSessionActivity(activeSessionId)}
             onSystemPromptChange={(prompt) =>

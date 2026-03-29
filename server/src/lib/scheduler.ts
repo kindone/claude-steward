@@ -36,7 +36,7 @@ async function runSchedule(schedule: Schedule): Promise<void> {
 
   let result: { content: string; errorCode?: string }
   try {
-    result = await sendToSession(schedule.session_id, schedule.prompt)
+    result = await sendToSession(schedule.session_id, schedule.prompt, { source: 'scheduler' })
   } catch (err) {
     console.error(`[scheduler] schedule ${schedule.id} send failed:`, err)
     return

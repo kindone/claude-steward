@@ -9,16 +9,26 @@ marked.use({
   breaks: true,
 })
 
+const SCHEDULE_BLOCK_RE = /<schedule>[\s\S]*?<\/schedule>/g
+
+/** Strip <schedule> blocks from content before rendering — they're processed server-side. */
+function stripScheduleBlocks(text: string): string {
+  return text.replace(SCHEDULE_BLOCK_RE, '').trim()
+}
+
 type Props = {
   role: 'user' | 'assistant'
   content: string
   streaming?: boolean
   errorCode?: ClaudeErrorCode
+  source?: string | null
   toolUses?: ToolCall[]
   onCompact?: () => void
 }
 
-export function MessageBubble({ role, content, streaming = false, errorCode, toolUses, onCompact }: Props) {
+export function MessageBubble({ role, content, streaming = false, errorCode, source, toolUses, onCompact }: Props) {
+  const displayContent = role === 'assistant' ? stripScheduleBlocks(content) : content
+  const isScheduled = source === 'scheduler'
   const contentRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
@@ -29,10 +39,10 @@ export function MessageBubble({ role, content, streaming = false, errorCode, too
         hljs.highlightElement(block as HTMLElement)
       })
     }
-  }, [content, role, errorCode])
+  }, [displayContent, role, errorCode])
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(content)
+    await navigator.clipboard.writeText(displayContent)
     setCopied(true)
     setTimeout(() => setCopied(false), 1500)
   }
@@ -61,14 +71,14 @@ export function MessageBubble({ role, content, streaming = false, errorCode, too
       },
     }
     const { icon, style, message } = errorMeta[errorCode] ?? errorMeta.process_error
-    const hasPartialContent = content && errorCode !== 'process_error' && errorCode !== 'http_error'
+    const hasPartialContent = displayContent && errorCode !== 'process_error' && errorCode !== 'http_error'
     return (
       <div className="max-w-[820px] w-full flex flex-col gap-2 self-start items-start">
         {hasPartialContent && (
           <div
             ref={contentRef}
             className="prose text-sm leading-[1.65] break-words w-full"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(content) as string) }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(displayContent) as string) }}
           />
         )}
         <div className={`flex items-start gap-2 px-3.5 py-2.5 rounded-lg text-sm leading-relaxed border w-full ${style}`}>
@@ -95,17 +105,23 @@ export function MessageBubble({ role, content, streaming = false, errorCode, too
     >
       {role === 'user' ? (
         <p className="bg-[#1e3a5f] px-3.5 py-2.5 rounded-[14px_14px_2px_14px] whitespace-pre-wrap break-words text-sm leading-relaxed max-w-[600px]">
-          {content}
+          {displayContent}
         </p>
       ) : (
         <>
+          {isScheduled && (
+            <div className="flex items-center gap-1.5 text-[11px] text-[#555] mb-1.5 select-none">
+              <span>⏰</span>
+              <span>Scheduled</span>
+            </div>
+          )}
           <div className="group relative w-full">
             <div
               ref={contentRef}
               className={`prose text-sm leading-[1.65] break-words w-full${streaming ? ' streaming-cursor' : ''}`}
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(content) as string) }}
+              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(displayContent) as string) }}
             />
-            {!streaming && content && (
+            {!streaming && displayContent && (
               <button
                 className={`absolute top-1 right-1 bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]
                   rounded cursor-pointer text-[13px] leading-none px-1.5 py-0.5 transition-[opacity,color,border-color]

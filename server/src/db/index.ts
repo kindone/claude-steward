@@ -119,6 +119,12 @@ db.exec(`
   )
 `)
 try {
+  db.exec(`ALTER TABLE sessions ADD COLUMN timezone TEXT`)
+} catch { /* already exists */ }
+try {
+  db.exec(`ALTER TABLE messages ADD COLUMN source TEXT`)
+} catch { /* already exists */ }
+try {
   db.exec(`ALTER TABLE push_subscriptions ADD COLUMN session_id TEXT REFERENCES sessions(id)`)
 } catch { /* already exists */ }
 
@@ -169,6 +175,7 @@ export type Session = {
   project_id: string | null
   system_prompt: string | null
   permission_mode: PermissionMode
+  timezone: string | null
   created_at: number
   updated_at: number
 }
@@ -182,6 +189,7 @@ export type Message = {
   error_code: string | null
   status: 'complete' | 'streaming' | 'interrupted'
   tool_calls: string | null  // JSON array of ToolCall objects, null if none
+  source: string | null      // null = user-initiated, 'scheduler' = agent-initiated scheduled message
   created_at: number
 }
 
@@ -245,6 +253,9 @@ const updateSystemPromptStmt = db.prepare(
 const updatePermissionModeSessionStmt = db.prepare(
   `UPDATE sessions SET permission_mode = ?, updated_at = unixepoch() WHERE id = ?`
 )
+const updateTimezoneStmt = db.prepare(
+  `UPDATE sessions SET timezone = ?, updated_at = unixepoch() WHERE id = ?`
+)
 const deleteSessionStmt = db.prepare(`DELETE FROM sessions WHERE id = ?`)
 
 export const sessionQueries = {
@@ -263,13 +274,15 @@ export const sessionQueries = {
     updateSystemPromptStmt.run(systemPrompt, id),
   updatePermissionMode: (mode: PermissionMode, id: string) =>
     updatePermissionModeSessionStmt.run(mode, id),
+  updateTimezone: (timezone: string, id: string) =>
+    updateTimezoneStmt.run(timezone, id),
   delete: (id: string) => deleteSessionStmt.run(id),
 }
 
 // ── Message queries ───────────────────────────────────────────────────────────
 
 const insertMessageStmt = db.prepare(
-  `INSERT INTO messages (id, session_id, role, content, is_error, error_code, status) VALUES (?, ?, ?, ?, ?, ?, ?)`
+  `INSERT INTO messages (id, session_id, role, content, is_error, error_code, status, source) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 )
 const insertStreamingMessageStmt = db.prepare(
   `INSERT INTO messages (id, session_id, role, content, is_error, error_code, status) VALUES (?, ?, 'assistant', '', 0, NULL, 'streaming')`
@@ -278,7 +291,7 @@ const updateStreamingContentStmt = db.prepare(
   `UPDATE messages SET content = ? WHERE id = ? AND status = 'streaming'`
 )
 const finalizeMessageStmt = db.prepare(
-  `UPDATE messages SET content = ?, status = ?, is_error = ?, error_code = ?, tool_calls = ? WHERE id = ?`
+  `UPDATE messages SET content = ?, status = ?, is_error = ?, error_code = ?, tool_calls = ?, source = COALESCE(source, ?) WHERE id = ?`
 )
 const listMessagesBySessionStmt = db.prepare(
   `SELECT * FROM messages WHERE session_id = ? ORDER BY created_at ASC`
@@ -307,8 +320,8 @@ export function markStaleStreamingMessages(): void {
 }
 
 export const messageQueries = {
-  insert: (id: string, sessionId: string, role: 'user' | 'assistant', content: string, isError = false, errorCode?: string) =>
-    insertMessageStmt.run(id, sessionId, role, content, isError ? 1 : 0, errorCode ?? null, 'complete'),
+  insert: (id: string, sessionId: string, role: 'user' | 'assistant', content: string, isError = false, errorCode?: string, source?: string | null) =>
+    insertMessageStmt.run(id, sessionId, role, content, isError ? 1 : 0, errorCode ?? null, 'complete', source ?? null),
   /** Insert an empty assistant message that will be filled in as streaming progresses. */
   insertStreaming: (id: string, sessionId: string) =>
     insertStreamingMessageStmt.run(id, sessionId),
@@ -316,8 +329,8 @@ export const messageQueries = {
   updateStreamingContent: (id: string, content: string) =>
     updateStreamingContentStmt.run(content, id),
   /** Finalize a streaming message on completion or error. */
-  finalizeMessage: (id: string, content: string, isError: boolean, errorCode?: string, toolCalls?: string) =>
-    finalizeMessageStmt.run(content, 'complete', isError ? 1 : 0, errorCode ?? null, toolCalls ?? null, id),
+  finalizeMessage: (id: string, content: string, isError: boolean, errorCode?: string, toolCalls?: string, source?: string | null) =>
+    finalizeMessageStmt.run(content, 'complete', isError ? 1 : 0, errorCode ?? null, toolCalls ?? null, source ?? null, id),
   listBySessionId: (sessionId: string) =>
     listMessagesBySessionStmt.all(sessionId) as Message[],
   /**

@@ -133,7 +133,7 @@ router.patch('/:id', (req, res) => {
     res.status(404).json({ error: 'Session not found' })
     return
   }
-  const { title, systemPrompt, permissionMode } = req.body as { title?: string; systemPrompt?: string | null; permissionMode?: string }
+  const { title, systemPrompt, permissionMode, timezone } = req.body as { title?: string; systemPrompt?: string | null; permissionMode?: string; timezone?: string }
 
   if (title !== undefined) {
     if (!title || typeof title !== 'string' || !title.trim()) {
@@ -159,6 +159,11 @@ router.patch('/:id', (req, res) => {
     }
     sessionQueries.updatePermissionMode(permissionMode as PermissionMode, req.params.id)
     session.permission_mode = permissionMode as PermissionMode
+  }
+
+  if (timezone !== undefined && typeof timezone === 'string' && timezone.trim()) {
+    sessionQueries.updateTimezone(timezone.trim(), req.params.id)
+    session.timezone = timezone.trim()
   }
 
   res.json(session)

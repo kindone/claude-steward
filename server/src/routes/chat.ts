@@ -8,10 +8,33 @@ import { registerChat, unregisterChat, abortChat } from '../lib/activeChats.js'
 import { notifyAll } from '../lib/pushNotifications.js'
 import { extractToolDetail } from '../claude/toolDetail.js'
 import { workerClient } from '../worker/client.js'
+import { buildEffectiveSystemPrompt } from '../lib/schedulePrompt.js'
+import { extractScheduleBlocks } from '../lib/parseScheduleBlocks.js'
+import { scheduleQueries } from '../db/index.js'
+import { nextFireAt } from '../lib/scheduler.js'
+import { v4 as uuidv4ForSchedule } from 'uuid'
 
 function sendSseEvent(res: Response, event: string, data: unknown): void {
   if (res.writableEnded) return
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
+}
+
+/**
+ * Parse <schedule> blocks from assistant text, create the schedules, and return stripped text.
+ * Called after every assistant response so natural-language scheduling works.
+ */
+function processScheduleBlocks(text: string, sessionId: string): string {
+  const { schedules, strippedText } = extractScheduleBlocks(text)
+  for (const s of schedules) {
+    try {
+      const nextRun = nextFireAt(s.cron)
+      scheduleQueries.create(uuidv4ForSchedule(), sessionId, s.cron, s.prompt, nextRun)
+      console.log(`[scheduler] created schedule for session ${sessionId}: ${s.label} (${s.cron})`)
+    } catch (err) {
+      console.error('[scheduler] failed to create schedule from response block:', err)
+    }
+  }
+  return strippedText
 }
 
 /** Truncate the first message to a readable title (max 40 chars, breaks on word boundary). */
@@ -75,16 +98,17 @@ router.post('/', (req, res) => {
   // persistMsg=true (default) for the direct-spawn path (no streaming row, insert here).
   const onComplete = (assistantText: string, persistMsg = true) => {
     unregisterChat(sessionId)
-    if (assistantText && persistMsg) {
-      messageQueries.insert(uuidv4(), sessionId, 'assistant', assistantText)
+    const cleanText = processScheduleBlocks(assistantText, sessionId)
+    if (cleanText && persistMsg) {
+      messageQueries.insert(uuidv4(), sessionId, 'assistant', cleanText)
     }
     const notified = notifyWatchers(sessionId)
     notifySubscribers(sessionId)
-    if (notified === 0 && clientDisconnectedEarly && assistantText) {
-      const preview = assistantText.replace(/\s+/g, ' ').trim().slice(0, 80)
+    if (notified === 0 && clientDisconnectedEarly && cleanText) {
+      const preview = cleanText.replace(/\s+/g, ' ').trim().slice(0, 80)
       void notifyAll({
         title: session.title === 'New Chat' ? 'Claude replied' : session.title,
-        body: preview + (assistantText.length > 80 ? '…' : ''),
+        body: preview + (cleanText.length > 80 ? '…' : ''),
         url: `/?session=${sessionId}`,
       })
     }
@@ -170,13 +194,15 @@ router.post('/', (req, res) => {
             session.claude_session_id = event.claudeSessionId
           }
           break
-        case 'done':
+        case 'done': {
           workerClient.unsubscribe(sessionId)
-          finalize(event.content, false)
+          const cleanContent = processScheduleBlocks(event.content, sessionId)
+          finalize(cleanContent, false)
           sendSseEvent(res, 'done', { session_id: event.claudeSessionId })
           if (!res.writableEnded) res.end()
-          onComplete(event.content, false)
+          onComplete(cleanContent, false)
           break
+        }
         case 'error':
           workerClient.unsubscribe(sessionId)
           finalize(event.message, true, event.errorCode)
@@ -192,7 +218,7 @@ router.post('/', (req, res) => {
       claudeSessionId: session.claude_session_id,
       projectPath: project?.path ?? process.cwd(),
       permissionMode: session.permission_mode,
-      systemPrompt: session.system_prompt,
+      systemPrompt: buildEffectiveSystemPrompt(session),
     })
 
     res.on('close', () => {
@@ -215,7 +241,7 @@ router.post('/', (req, res) => {
   spawnClaude({
     message,
     claudeSessionId: session.claude_session_id,
-    systemPrompt: session.system_prompt,
+    systemPrompt: buildEffectiveSystemPrompt(session),
     permissionMode: session.permission_mode,
     res,
     signal: controller.signal,
