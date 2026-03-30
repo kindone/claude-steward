@@ -12,6 +12,7 @@ import eventsRouter from './routes/events.js'
 import adminRouter from './routes/admin.js'
 import pushRouter, { vapidPublicKeyHandler } from './routes/push.js'
 import schedulesRouter from './routes/schedules.js'
+import evalRouter from './routes/eval.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Monorepo root — two levels up from server/src/
@@ -41,6 +42,10 @@ export function createApp() {
 
   // Public: VAPID public key only (required for push subscription; not a secret).
   app.get('/api/push/vapid-public-key', vapidPublicKeyHandler)
+
+  // Eval relay — has its own auth (API key OR session cookie) so Claude can call it
+  // with just a Bearer token without going through the login flow.
+  app.use('/api/eval', evalRouter)
 
   app.use('/api', requireAuth)
   app.use('/api/chat', chatRouter)

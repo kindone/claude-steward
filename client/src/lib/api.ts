@@ -529,6 +529,58 @@ export type AppEventHandlers = {
   onActivity?: () => void
 }
 
+/**
+ * Execute JS sent via the eval SSE event and POST the result back to the server.
+ * Called internally by subscribeToAppEvents — not exported.
+ *
+ * Serialisation rules:
+ *   - Primitives and plain objects → JSON.stringify
+ *   - Promises → awaited (up to 8 s), then serialised
+ *   - Errors → { error: message }
+ *   - Unserializable values (DOM nodes, functions…) → String(value)
+ */
+async function handleEval(raw: string): Promise<void> {
+  let id: string
+  let code: string
+  try {
+    const payload = JSON.parse(raw) as { id: string; code: string }
+    id = payload.id
+    code = payload.code
+  } catch {
+    return // malformed payload — ignore
+  }
+
+  let resultStr: string | undefined
+  let errorStr: string | undefined
+
+  try {
+    // eslint-disable-next-line no-eval
+    let value: unknown = eval(code) // intentional — this is the whole point
+    // Await promises with a generous timeout
+    if (value instanceof Promise) {
+      value = await Promise.race([
+        value,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('eval promise timed out')), 8_000)),
+      ])
+    }
+    try {
+      resultStr = JSON.stringify(value, null, 2)
+    } catch {
+      resultStr = String(value)
+    }
+  } catch (err) {
+    errorStr = err instanceof Error ? err.message : String(err)
+  }
+
+  // Fire-and-forget — don't let a network failure here crash the SSE listener
+  fetch(`/api/eval/${encodeURIComponent(id)}/result`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ result: resultStr, error: errorStr }),
+    ...credentialsOpt,
+  }).catch(() => { /* ignore */ })
+}
+
 // Connect to the app-level SSE stream. Reconnects automatically on drop.
 // Returns a cancel function to close the connection.
 export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
@@ -562,8 +614,10 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
         for (const line of lines) {
           if (line.startsWith('event: ')) { pendingEvent = line.slice(7).trim(); continue }
           if (line.startsWith('data: ')) {
+            const raw = line.slice(6)
             handlers.onActivity?.()
             if (pendingEvent === 'reload') handlers.onReload?.()
+            if (pendingEvent === 'eval') void handleEval(raw)
             pendingEvent = ''
           }
         }
