@@ -13,11 +13,17 @@ export function buildScheduleFragment(session: Session): string {
   let currentTimeLine: string
   let tzLine: string
   if (session.timezone) {
-    const localStr = nowUtc.toLocaleString('en-US', {
-      timeZone: session.timezone,
-      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: false,
-    })
+    let localStr: string
+    try {
+      localStr = nowUtc.toLocaleString('en-US', {
+        timeZone: session.timezone,
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      })
+    } catch {
+      // Invalid IANA timezone stored — fall back to UTC display
+      localStr = utcStr
+    }
     currentTimeLine = `Current time: ${localStr} (${session.timezone}) / ${utcStr}`
     tzLine = `When confirming schedules to the user, always show times in their local timezone (${session.timezone}), not UTC. Convert requested local times to UTC when writing cron expressions.`
   } else {

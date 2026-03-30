@@ -15,18 +15,34 @@ export type ParsedSchedule = {
 }
 
 const SCHEDULE_BLOCK_RE = /<schedule>([\s\S]*?)<\/schedule>/g
+// Matches fenced code blocks (``` ... ```) and inline code (` ... `) to exclude them from parsing
+const CODE_FENCE_RE = /```[\s\S]*?```|`[^`\n]+`/g
 
 /**
  * Extract all valid <schedule> blocks from text.
  * Returns the parsed schedules and the text with all blocks stripped.
+ * Blocks inside markdown code fences (``` or `) are ignored — they are
+ * documentation examples, not real schedule requests.
  */
 export function extractScheduleBlocks(text: string): {
   schedules: ParsedSchedule[]
   strippedText: string
 } {
+  // Pre-compute ranges of code blocks so we can skip matches inside them
+  const codeRanges: Array<[number, number]> = []
+  for (const m of text.matchAll(CODE_FENCE_RE)) {
+    codeRanges.push([m.index, m.index + m[0].length])
+  }
+
+  const insideCode = (start: number, end: number): boolean =>
+    codeRanges.some(([cs, ce]) => start >= cs && end <= ce)
+
   const schedules: ParsedSchedule[] = []
 
-  const strippedText = text.replace(SCHEDULE_BLOCK_RE, (_, json: string) => {
+  // Replacer receives (fullMatch, captureGroup, matchOffset)
+  const strippedText = text.replace(SCHEDULE_BLOCK_RE, (full, json: string, matchOffset: number) => {
+    if (insideCode(matchOffset, matchOffset + full.length)) return full // leave code examples intact
+
     try {
       const parsed = JSON.parse(json.trim()) as Record<string, unknown>
       const cronExpr = typeof parsed.cron === 'string' ? parsed.cron.trim() : ''
