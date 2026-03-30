@@ -10,9 +10,20 @@ export function buildScheduleFragment(session: Session): string {
   const nowUtc = new Date()
   const utcStr = nowUtc.toISOString().replace('T', ' ').slice(0, 16) + ' UTC'
 
-  const tzLine = session.timezone
-    ? `User's timezone: ${session.timezone}. Convert their requested local times to UTC when writing cron expressions.`
-    : `User's timezone is not yet known. If they ask you to schedule something, ask them to confirm their timezone (or refresh the browser) before creating the schedule.`
+  let currentTimeLine: string
+  let tzLine: string
+  if (session.timezone) {
+    const localStr = nowUtc.toLocaleString('en-US', {
+      timeZone: session.timezone,
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    })
+    currentTimeLine = `Current time: ${localStr} (${session.timezone}) / ${utcStr}`
+    tzLine = `When confirming schedules to the user, always show times in their local timezone (${session.timezone}), not UTC. Convert requested local times to UTC when writing cron expressions.`
+  } else {
+    currentTimeLine = `Current UTC time: ${utcStr}`
+    tzLine = `User's timezone is not yet known. If they ask you to schedule something, ask them to confirm their timezone (or refresh the browser) before creating the schedule.`
+  }
 
   return `
 ---
@@ -25,7 +36,8 @@ Rules:
 - prompt is the task context injected at fire time — write it as a clear instruction to yourself
 - label is a short human-readable name shown in the schedule list
 - once: true means the schedule fires exactly once then disables itself — use this for specific one-time reminders (e.g. "remind me on June 15th"). Omit or set false for recurring schedules.
-- Current UTC time: ${utcStr}
+- Relative time baseline: treat "later", "from now", "in X minutes/hours" as relative to the current time unless the user explicitly states a different reference point (e.g. "30 minutes after that" or "an hour since the last reminder"). When in doubt, assume now.
+- ${currentTimeLine}
 - ${tzLine}
 
 Cron limitations — handle these gracefully by explaining to the user rather than producing a wrong schedule:
