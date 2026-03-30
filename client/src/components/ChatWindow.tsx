@@ -377,17 +377,17 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             onClick={() => setPromptOpen((o) => !o)}
             title="System prompt"
           >
-            {systemPrompt ? '⚙ Prompt set' : '⚙ Prompt'}
+            ⚙<span className="hidden sm:inline"> {systemPrompt ? 'Prompt set' : 'Prompt'}</span>
           </button>
 
-          <span className="flex items-center gap-2">
+          <span className="flex items-center gap-1 sm:gap-2">
             {/* Schedule button */}
             <button
               className={`bg-transparent border border-[#222] hover:border-[#444] rounded cursor-pointer text-xs px-2.5 py-1.5 transition-colors ${scheduleOpen ? 'text-blue-400 border-blue-500/40' : 'text-[#444] hover:text-[#888]'}`}
               onClick={() => setScheduleOpen((o) => !o)}
               title="Scheduled prompts"
             >
-              ⏰ Schedule
+              ⏰<span className="hidden sm:inline"> Schedule</span>
             </button>
 
             {/* Compact button */}
@@ -397,7 +397,8 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
               disabled={compacting || streaming}
               title="Summarize this session and start fresh — resets the context window"
             >
-              {compacting ? 'Compacting…' : '⊡ Compact'}
+              <span className="sm:hidden">⊡</span>
+              <span className="hidden sm:inline">{compacting ? 'Compacting…' : '⊡ Compact'}</span>
             </button>
 
             {/* Permission mode segmented control */}
