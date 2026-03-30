@@ -20,9 +20,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 - [ ] **Claude as app maker** — scaffold new mini-apps via chat, modify files, trigger live-reload via sidecar manager
 
 ### Scheduler
-- [ ] **Scheduled conversation resume** — `schedules` table (`id`, `session_id`, `cron`, `prompt_context`, `enabled`); `node-cron` runner injects context-aware wake messages ("would you like to resume the conversation about X?")
-- [ ] **Push notifications (scheduler)** — extend the existing push infrastructure to fire when a scheduled session produces output; also consider a per-session opt-in so Claude reply notifications can be toggled per session rather than globally
-- [ ] **Scheduler UI** — list/create/toggle schedules; associate with a session; set reminder text
+- [ ] **Complex schedule support** — 5-field cron cannot express biweekly, "last day of month", "Nth weekday", or exclusions natively. Two approaches to explore: (a) **schedule groups** — a named group of N cron entries that fire together, letting biweekly be expressed as two alternating weekly schedules with a shared label and toggle; (b) **condition field** — a lightweight filter evaluated at fire time (e.g. `{"type": "biweekly", "ref": "<ISO date>"}`) that skips the run if the condition isn't met, keeping the cron wakeup cheap and the logic in the scheduler. Trade-off: groups are simpler and composable; conditions are more expressive but require a small DSL and per-type evaluators. Claude's prompt fragment already gracefully explains the limitation and enumerates workarounds — any implementation should align with that UX.
 
 ### Auth
 - [ ] **New device passkey login** — new-device bootstrapping: a device with no registered passkey and no iCloud/Google sync has no way to authenticate; needs a one-time invite link or similar mechanism. (RP ID mismatch fixed; "user verification required" error tracked in `BUGS.md`.)

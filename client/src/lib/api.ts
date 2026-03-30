@@ -16,10 +16,12 @@ export async function getAuthStatus(): Promise<AuthStatus> {
   return res.json() as Promise<AuthStatus>
 }
 
-export async function startRegistration(): Promise<unknown> {
+export async function startRegistration(opts?: { bootstrapKey?: string }): Promise<unknown> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (opts?.bootstrapKey) headers['X-Bootstrap-Key'] = opts.bootstrapKey
   const res = await fetch('/api/auth/register/start', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     ...credentialsOpt,
   })
   if (!res.ok) {

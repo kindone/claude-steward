@@ -27,11 +27,15 @@ router.post('/register/start', async (req, res) => {
     const { rpID, rpName } = getWebAuthnConfig()
     const existing = credentialQueries.list()
 
-    // If credentials already exist, only allow registration from an authenticated session.
+    // If credentials already exist, require either an authenticated session or the server
+    // API key (bootstrap path for registering a new device without an existing passkey).
     if (existing.length > 0) {
       const token = getValidSessionToken(req.cookies ?? {})
-      if (!token) {
-        res.status(401).json({ error: 'Already registered — authenticate first to add another device' })
+      const bootstrapKey = req.headers['x-bootstrap-key']
+      const apiKey = process.env.API_KEY
+      const validApiKey = apiKey && bootstrapKey === apiKey
+      if (!token && !validApiKey) {
+        res.status(401).json({ error: 'Already registered — authenticate first or provide the server API key to register a new device' })
         return
       }
     }

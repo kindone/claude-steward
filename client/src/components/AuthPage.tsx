@@ -21,19 +21,22 @@ type Props = {
 export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Bootstrap: register a new device using the server API key instead of an existing session
+  const [showBootstrap, setShowBootstrap] = useState(false)
+  const [bootstrapKey, setBootstrapKey] = useState('')
 
-  async function handleRegister() {
+  async function handleRegister(apiKey?: string) {
     setBusy(true)
     setError(null)
     try {
-      const options = await apiStartReg() as PublicKeyCredentialCreationOptionsJSON
+      const options = await apiStartReg(apiKey ? { bootstrapKey: apiKey } : undefined) as PublicKeyCredentialCreationOptionsJSON
       const credential = await startRegistration({ optionsJSON: options })
       await finishRegistration(credential)
       onAuthenticated()
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      if (msg.includes('authenticate first')) {
-        setError('To register a new device, sign in on an existing device first — your passkey must be available here via iCloud Keychain or Google Password Manager sync.')
+      if (msg.includes('server API key') || msg.includes('authenticate first')) {
+        setError('Invalid API key — check the API_KEY value in your server .env file.')
       } else if (!msg.includes('cancelled') && !msg.includes('NotAllowedError')) {
         setError(msg)
       }
@@ -88,7 +91,7 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
             disabled={busy}
             className="flex w-full items-center justify-center gap-3 rounded-xl bg-blue-600 px-5 py-4 text-base font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
           >
-            {busy ? (
+            {busy && !showBootstrap ? (
               <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
             ) : (
               <PasskeyIcon />
@@ -97,7 +100,7 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
           </button>
         ) : (
           <button
-            onClick={handleRegister}
+            onClick={() => handleRegister()}
             disabled={busy}
             className="flex w-full items-center justify-center gap-3 rounded-xl bg-blue-600 px-5 py-4 text-base font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
           >
@@ -110,18 +113,58 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
           </button>
         )}
 
-        {/* Secondary: add device after login */}
+        {/* Bootstrap: register new device with API key */}
         {hasCredentials && (
-          <p className="mt-4 text-center text-xs text-[#555]">
-            New device? Your passkey should sync via iCloud or Google Password Manager.{' '}
-            <button
-              onClick={handleRegister}
-              disabled={busy}
-              className="text-[#888] underline hover:text-white disabled:opacity-50"
-            >
-              Try registering this device
-            </button>
-          </p>
+          <div className="mt-5">
+            {!showBootstrap ? (
+              <p className="text-center text-xs text-[#555]">
+                No passkey on this device?{' '}
+                <button
+                  onClick={() => { setShowBootstrap(true); setError(null) }}
+                  className="text-[#888] underline hover:text-white"
+                >
+                  Register with API key
+                </button>
+              </p>
+            ) : (
+              <div className="rounded-xl border border-[#2a2a2a] bg-[#111] p-4">
+                <p className="mb-3 text-xs text-[#888]">
+                  Enter the <code className="text-[#aaa]">API_KEY</code> from your server's{' '}
+                  <code className="text-[#aaa]">.env</code> file to register this device.
+                </p>
+                <input
+                  type="password"
+                  value={bootstrapKey}
+                  onChange={(e) => setBootstrapKey(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' && bootstrapKey) handleRegister(bootstrapKey) }}
+                  placeholder="API key"
+                  autoFocus
+                  className="w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 py-2.5 text-sm text-white placeholder-[#555] outline-none focus:border-[#555] mb-3"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleRegister(bootstrapKey)}
+                    disabled={busy || !bootstrapKey}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-500 disabled:opacity-50"
+                  >
+                    {busy ? (
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                    ) : (
+                      <PasskeyIcon />
+                    )}
+                    Register this device
+                  </button>
+                  <button
+                    onClick={() => { setShowBootstrap(false); setBootstrapKey(''); setError(null) }}
+                    disabled={busy}
+                    className="rounded-lg border border-[#333] px-4 py-2.5 text-sm text-[#666] transition hover:text-white disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         <p className="mt-8 text-center text-xs text-[#444]">
