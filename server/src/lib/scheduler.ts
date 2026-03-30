@@ -12,8 +12,15 @@ import { notifyWatchers, notifySubscribers } from './sessionWatchers.js'
 import { notifySession, notifyAll } from './pushNotifications.js'
 import { pushSubscriptionQueries } from '../db/index.js'
 
-/** Compute the next UTC unix timestamp (seconds) for a cron expression. Returns null on parse error. */
+/**
+ * Compute the next UTC unix timestamp (seconds) for a cron expression.
+ * Returns null if the expression is invalid or unparseable.
+ * Uses node-cron to validate first (strict), then cron-parser to compute the
+ * next fire time — cron-parser alone is too lenient (accepts empty strings,
+ * out-of-range values, etc.) and would silently produce nonsensical schedules.
+ */
 export function nextFireAt(cronExpr: string): number | null {
+  if (!cronExpr || !cron.validate(cronExpr)) return null
   try {
     const interval = CronExpressionParser.parse(cronExpr, { tz: 'UTC' })
     return Math.floor(interval.next().getTime() / 1000)
