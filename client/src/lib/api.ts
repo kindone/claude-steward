@@ -790,7 +790,10 @@ export function sendMessage(
     })
     .catch((err: Error) => {
       if (err.name !== 'AbortError') {
-        handlers.onError(err.message)
+        // fetch() itself rejected — network failure before any response (e.g. DNS error,
+        // offline, connection refused).  Pass http_error so the assistant bubble shows the
+        // "Connection error" banner instead of silently staying empty with no spinner.
+        handlers.onError(err.message, 'http_error')
       }
     })
 
