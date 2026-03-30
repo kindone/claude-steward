@@ -7,15 +7,15 @@ const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'bypassPermissions', label: 'Full', title: 'Claude can run any tool including shell commands' },
 ]
 
-/** Curated model list — the first entry is the default (null = server default) */
+/** Curated model list — the first entry is the default (null = server default).
+ *  Names verified against the installed claude CLI. */
 const MODEL_OPTIONS: { value: string | null; label: string }[] = [
-  { value: null,                        label: 'Default' },
-  { value: 'claude-opus-4-5',           label: 'Opus 4.5' },
-  { value: 'claude-sonnet-4-5',         label: 'Sonnet 4.5' },
-  { value: 'claude-haiku-4-5',          label: 'Haiku 4.5' },
-  { value: 'claude-opus-4',             label: 'Opus 4' },
-  { value: 'claude-sonnet-4',           label: 'Sonnet 4' },
-  { value: 'claude-haiku-3-5',          label: 'Haiku 3.5' },
+  { value: null,                 label: 'Default' },
+  { value: 'claude-opus-4-6',   label: 'Opus 4.6' },
+  { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+  { value: 'claude-opus-4-5',   label: 'Opus 4.5' },
+  { value: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
+  { value: 'claude-haiku-4-5',  label: 'Haiku 4.5' },
 ]
 import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
