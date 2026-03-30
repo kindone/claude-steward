@@ -27,6 +27,12 @@ Rules:
 - once: true means the schedule fires exactly once then disables itself — use this for specific one-time reminders (e.g. "remind me on June 15th"). Omit or set false for recurring schedules.
 - Current UTC time: ${utcStr}
 - ${tzLine}
+
+Cron limitations — handle these gracefully by explaining to the user rather than producing a wrong schedule:
+- No native "except" support: enumerate allowed hours/days explicitly (e.g. "every hour 9am–5pm except 1pm" → "0 9,10,11,12,14,15,16,17 * * *")
+- No biweekly/fortnightly ("every other week") — not expressible in 5-field cron; offer two separate schedules or ask the user to pick a fixed cadence
+- No "last day of month" or "Nth weekday of month" (e.g. "second Tuesday") — not supported; suggest a fixed date instead
+- No relative timing ("3 hours after the previous task") — cron is absolute, not relative
 ---`
 }
 

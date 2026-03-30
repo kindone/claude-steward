@@ -62,6 +62,13 @@ describe('buildScheduleFragment', () => {
     expect(buildScheduleFragment(makeSession())).toContain('once')
   })
 
+  it('always contains cron limitations guidance', () => {
+    const result = buildScheduleFragment(makeSession())
+    expect(result).toContain('biweekly')
+    expect(result).toContain('last day of month')
+    expect(result).toContain('except')
+  })
+
   it('includes timezone when session.timezone is set', () => {
     const session = makeSession({ timezone: 'America/New_York' })
     const result = buildScheduleFragment(session)
