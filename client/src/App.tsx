@@ -474,6 +474,8 @@ export default function App() {
             systemPrompt={sessions.find((s) => s.id === activeSessionId)?.system_prompt ?? null}
             permissionMode={sessions.find((s) => s.id === activeSessionId)?.permission_mode ?? 'acceptEdits'}
             timezone={sessions.find((s) => s.id === activeSessionId)?.timezone ?? null}
+            model={sessions.find((s) => s.id === activeSessionId)?.model ?? null}
+            claudeSessionId={sessions.find((s) => s.id === activeSessionId)?.claude_session_id ?? null}
             onTitle={(title) => handleTitleUpdate(activeSessionId, title)}
             onActivity={() => handleSessionActivity(activeSessionId)}
             onSystemPromptChange={(prompt) =>
@@ -482,6 +484,11 @@ export default function App() {
               )
             }
             onPermissionModeChange={(mode) => handlePermissionModeChange(activeSessionId, mode)}
+            onModelChange={(newModel) =>
+              setSessions((prev) =>
+                prev.map((s) => s.id === activeSessionId ? { ...s, model: newModel } : s)
+              )
+            }
             onCompact={handleCompact}
           />
         ) : (

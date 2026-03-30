@@ -219,6 +219,7 @@ router.post('/', (req, res) => {
       projectPath: project?.path ?? process.cwd(),
       permissionMode: session.permission_mode,
       systemPrompt: buildEffectiveSystemPrompt(session),
+      model: session.model,
     })
 
     res.on('close', () => {
@@ -243,6 +244,7 @@ router.post('/', (req, res) => {
     claudeSessionId: session.claude_session_id,
     systemPrompt: buildEffectiveSystemPrompt(session),
     permissionMode: session.permission_mode,
+    model: session.model,
     res,
     signal: controller.signal,
     cwd: project?.path,

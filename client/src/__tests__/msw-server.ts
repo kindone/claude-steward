@@ -8,8 +8,8 @@ export const mockProjects: Project[] = [
 ]
 
 export const mockSessions: Session[] = [
-  { id: 'ses-1', title: 'First chat', claude_session_id: null, project_id: 'proj-1', system_prompt: null, permission_mode: 'acceptEdits', timezone: null, created_at: 1000, updated_at: 1000 },
-  { id: 'ses-2', title: 'Second chat', claude_session_id: null, project_id: 'proj-1', system_prompt: null, permission_mode: 'acceptEdits', timezone: null, created_at: 2000, updated_at: 2000 },
+  { id: 'ses-1', title: 'First chat', claude_session_id: null, project_id: 'proj-1', system_prompt: null, permission_mode: 'acceptEdits', timezone: null, model: null, created_at: 1000, updated_at: 1000 },
+  { id: 'ses-2', title: 'Second chat', claude_session_id: null, project_id: 'proj-1', system_prompt: null, permission_mode: 'acceptEdits', timezone: null, model: null, created_at: 2000, updated_at: 2000 },
 ]
 
 export const mockFiles: FileEntry[] = [
@@ -48,6 +48,7 @@ export const handlers = [
       system_prompt: null,
       permission_mode: 'acceptEdits',
       timezone: null,
+      model: null,
       created_at: Date.now(),
       updated_at: Date.now(),
     }

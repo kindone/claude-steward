@@ -15,13 +15,16 @@ export type ParsedSchedule = {
 }
 
 const SCHEDULE_BLOCK_RE = /<schedule>([\s\S]*?)<\/schedule>/g
-// Matches fenced code blocks (``` ... ```) and inline code (` ... `) to exclude them from parsing
-const CODE_FENCE_RE = /```[\s\S]*?```|`[^`\n]+`/g
+// Matches only triple-backtick fenced code blocks — the context where Claude writes schedule
+// syntax as a documentation example rather than an actual scheduling request.
+// Single-backtick inline code is deliberately excluded: it appears far more commonly in
+// surrounding text (e.g. `done`) and cannot be reliably bounded without false positives.
+const CODE_FENCE_RE = /```[\s\S]*?```/g
 
 /**
  * Extract all valid <schedule> blocks from text.
  * Returns the parsed schedules and the text with all blocks stripped.
- * Blocks inside markdown code fences (``` or `) are ignored — they are
+ * Blocks inside triple-backtick markdown code fences are ignored — they are
  * documentation examples, not real schedule requests.
  */
 export function extractScheduleBlocks(text: string): {

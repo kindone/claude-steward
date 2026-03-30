@@ -133,7 +133,7 @@ router.patch('/:id', (req, res) => {
     res.status(404).json({ error: 'Session not found' })
     return
   }
-  const { title, systemPrompt, permissionMode, timezone } = req.body as { title?: string; systemPrompt?: string | null; permissionMode?: string; timezone?: string }
+  const { title, systemPrompt, permissionMode, timezone, model } = req.body as { title?: string; systemPrompt?: string | null; permissionMode?: string; timezone?: string; model?: string | null }
 
   if (title !== undefined) {
     if (!title || typeof title !== 'string' || !title.trim()) {
@@ -164,6 +164,12 @@ router.patch('/:id', (req, res) => {
   if (timezone !== undefined && typeof timezone === 'string' && timezone.trim()) {
     sessionQueries.updateTimezone(timezone.trim(), req.params.id)
     session.timezone = timezone.trim()
+  }
+
+  if (model !== undefined) {
+    const value = typeof model === 'string' && model.trim() ? model.trim() : null
+    sessionQueries.updateModel(value, req.params.id)
+    session.model = value
   }
 
   res.json(session)

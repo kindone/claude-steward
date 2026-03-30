@@ -16,6 +16,7 @@ export type StartCmd = {
   projectPath: string
   permissionMode: string | null
   systemPrompt: string | null
+  model?: string | null
 }
 
 export type StopCmd = {

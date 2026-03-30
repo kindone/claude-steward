@@ -145,6 +145,9 @@ db.exec(`
 try {
   db.exec(`ALTER TABLE schedules ADD COLUMN once INTEGER NOT NULL DEFAULT 0`)
 } catch { /* already exists */ }
+try {
+  db.exec(`ALTER TABLE sessions ADD COLUMN model TEXT`)
+} catch { /* already exists */ }
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -181,6 +184,7 @@ export type Session = {
   system_prompt: string | null
   permission_mode: PermissionMode
   timezone: string | null
+  model: string | null
   created_at: number
   updated_at: number
 }
@@ -261,6 +265,9 @@ const updatePermissionModeSessionStmt = db.prepare(
 const updateTimezoneStmt = db.prepare(
   `UPDATE sessions SET timezone = ?, updated_at = unixepoch() WHERE id = ?`
 )
+const updateModelStmt = db.prepare(
+  `UPDATE sessions SET model = ?, updated_at = unixepoch() WHERE id = ?`
+)
 const deleteSessionStmt = db.prepare(`DELETE FROM sessions WHERE id = ?`)
 
 export const sessionQueries = {
@@ -281,6 +288,8 @@ export const sessionQueries = {
     updatePermissionModeSessionStmt.run(mode, id),
   updateTimezone: (timezone: string, id: string) =>
     updateTimezoneStmt.run(timezone, id),
+  updateModel: (model: string | null, id: string) =>
+    updateModelStmt.run(model, id),
   delete: (id: string) => deleteSessionStmt.run(id),
 }
 

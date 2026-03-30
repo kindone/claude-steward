@@ -100,6 +100,7 @@ export type Session = {
   system_prompt: string | null
   permission_mode: PermissionMode
   timezone: string | null
+  model: string | null
   created_at: number
   updated_at: number
 }
@@ -483,6 +484,17 @@ export async function updateSessionTimezone(sessionId: string, timezone: string)
     body: JSON.stringify({ timezone }),
     ...credentialsOpt,
   })
+}
+
+export async function updateSessionModel(sessionId: string, model: string | null): Promise<Session> {
+  const res = await fetch(`/api/sessions/${sessionId}`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ model }),
+    ...credentialsOpt,
+  })
+  if (!res.ok) throw new Error('Failed to update model')
+  return res.json() as Promise<Session>
 }
 
 export async function deleteSession(sessionId: string): Promise<void> {

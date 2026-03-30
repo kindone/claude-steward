@@ -23,6 +23,7 @@ type JobOptions = {
   projectPath: string
   permissionMode: string | null
   systemPrompt: string | null
+  model?: string | null
 }
 
 type ActiveJob = {
@@ -37,7 +38,7 @@ export class JobManager {
   onEvent: (event: WorkerEvent) => void = () => {}
 
   start(opts: JobOptions): void {
-    const { sessionId, prompt, claudeSessionId, projectPath, permissionMode, systemPrompt } = opts
+    const { sessionId, prompt, claudeSessionId, projectPath, permissionMode, systemPrompt, model } = opts
 
     if (this.jobs.has(sessionId)) {
       console.warn(`[worker] job already running for session ${sessionId}, ignoring start`)
@@ -80,6 +81,7 @@ export class JobManager {
     if (permissionMode && permissionMode !== 'default') {
       args.push('--permission-mode', permissionMode)
     }
+    if (model) args.push('--model', model)
 
     // Strip all Claude Code session vars to prevent sub-agent IPC hang
     const cleanEnv: NodeJS.ProcessEnv = {}

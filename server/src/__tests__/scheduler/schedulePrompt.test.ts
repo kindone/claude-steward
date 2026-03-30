@@ -29,6 +29,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     created_at: 1_700_000_000,
     updated_at: 1_700_000_000,
     timezone: null,
+    model: null,
     ...overrides,
   }
 }

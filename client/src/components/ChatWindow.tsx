@@ -1,10 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, compactSession, updateSessionTimezone, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, updateSessionTimezone, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
   { value: 'acceptEdits',       label: 'Edit', title: 'Claude can read and write files but not run shell commands' },
   { value: 'bypassPermissions', label: 'Full', title: 'Claude can run any tool including shell commands' },
+]
+
+/** Curated model list — the first entry is the default (null = server default) */
+const MODEL_OPTIONS: { value: string | null; label: string }[] = [
+  { value: null,                        label: 'Default' },
+  { value: 'claude-opus-4-5',           label: 'Opus 4.5' },
+  { value: 'claude-sonnet-4-5',         label: 'Sonnet 4.5' },
+  { value: 'claude-haiku-4-5',          label: 'Haiku 4.5' },
+  { value: 'claude-opus-4',             label: 'Opus 4' },
+  { value: 'claude-sonnet-4',           label: 'Sonnet 4' },
+  { value: 'claude-haiku-3-5',          label: 'Haiku 3.5' },
 ]
 import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
@@ -37,19 +48,39 @@ function dbMessageToLocal(m: ApiMessage): Message {
   }
 }
 
+/** Small inline component: shows a monospace ID with a copy button. */
+function CopyableId({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <span className="flex items-center gap-1">
+      <code className="text-[11px] font-mono text-[#666] bg-[#111] px-1.5 py-0.5 rounded select-all">{value}</code>
+      <button
+        className="bg-transparent border-none cursor-pointer text-[#444] hover:text-[#888] text-[11px] px-1 transition-colors"
+        onClick={() => { void navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
+        title="Copy"
+      >
+        {copied ? '✓' : '⎘'}
+      </button>
+    </span>
+  )
+}
+
 type Props = {
   sessionId: string
   systemPrompt: string | null
   permissionMode: PermissionMode
   timezone?: string | null
+  model?: string | null
+  claudeSessionId?: string | null
   onTitle?: (title: string) => void
   onActivity?: () => void
   onSystemPromptChange?: (prompt: string | null) => void
   onPermissionModeChange?: (mode: PermissionMode) => void
+  onModelChange?: (model: string | null) => void
   onCompact?: (newSessionId: string) => void
 }
 
-export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onCompact }: Props) {
+export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, claudeSessionId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -61,6 +92,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   const [lastUsage, setLastUsage] = useState<UsageInfo | null>(null)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [scheduleTick, setScheduleTick] = useState(0)
+  const [debugOpen, setDebugOpen] = useState(false)
   const [isAtBottom, setIsAtBottom] = useState(true)
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -103,6 +135,11 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   async function handleModeChange(mode: PermissionMode) {
     await updatePermissionMode(sessionId, mode)
     onPermissionModeChange?.(mode)
+  }
+
+  async function handleModelChange(value: string | null) {
+    await updateSessionModel(sessionId, value)
+    onModelChange?.(value)
   }
 
   function handlePromptKeyDown(e: React.KeyboardEvent) {
@@ -371,14 +408,23 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
       {/* Session header: system prompt toggle + permission mode selector */}
       <div className="flex-shrink-0 border-b border-[#1a1a1a]">
         <div className="flex items-center justify-between px-2">
-          <button
-            className={`bg-transparent border-none cursor-pointer text-xs py-1.5 px-1.5 text-left transition-colors flex-shrink-0
-              ${systemPrompt ? 'text-blue-500 hover:text-blue-400' : 'text-[#444] hover:text-[#888]'}`}
-            onClick={() => setPromptOpen((o) => !o)}
-            title="System prompt"
-          >
-            ⚙<span className="hidden sm:inline"> {systemPrompt ? 'Prompt set' : 'Prompt'}</span>
-          </button>
+          <span className="flex items-center gap-1">
+            <button
+              className={`bg-transparent border-none cursor-pointer text-xs py-1.5 px-1.5 text-left transition-colors flex-shrink-0
+                ${systemPrompt ? 'text-blue-500 hover:text-blue-400' : 'text-[#444] hover:text-[#888]'}`}
+              onClick={() => setPromptOpen((o) => !o)}
+              title="System prompt"
+            >
+              ⚙<span className="hidden sm:inline"> {systemPrompt ? 'Prompt set' : 'Prompt'}</span>
+            </button>
+            <button
+              className={`bg-transparent border-none cursor-pointer text-xs py-1.5 px-1 transition-colors flex-shrink-0 ${debugOpen ? 'text-[#666]' : 'text-[#333] hover:text-[#555]'}`}
+              onClick={() => setDebugOpen((o) => !o)}
+              title="Session debug info"
+            >
+              ℹ
+            </button>
+          </span>
 
           <span className="flex items-center gap-1 sm:gap-2">
             {/* Schedule button */}
@@ -442,6 +488,32 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             </div>
           )
         })()}
+
+        {debugOpen && (
+          <div className="px-3 pb-2 flex flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-[#444] w-28 flex-shrink-0">claude_session_id</span>
+              {claudeSessionId ? (
+                <CopyableId value={claudeSessionId} />
+              ) : (
+                <span className="text-[11px] text-[#333] italic">none (not yet sent)</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-[#444] w-28 flex-shrink-0">model</span>
+              <select
+                className="bg-[#0d0d0d] border border-[#222] hover:border-[#444] rounded text-[#888] cursor-pointer text-xs px-2 py-1 transition-colors outline-none"
+                value={model ?? ''}
+                onChange={(e) => handleModelChange(e.target.value || null)}
+                title="Model for this session"
+              >
+                {MODEL_OPTIONS.map((opt) => (
+                  <option key={opt.value ?? ''} value={opt.value ?? ''}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
 
         {promptOpen && (
           <div className="px-3 pb-3 flex flex-col gap-2">
