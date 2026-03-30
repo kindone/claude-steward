@@ -69,7 +69,7 @@ async function runSchedule(schedule: Schedule): Promise<void> {
     const payload = {
       title: session.title === 'New Chat' ? 'Claude replied' : session.title,
       body: preview.slice(0, 80) + (preview.length > 80 ? '…' : ''),
-      url: `/?session=${schedule.session_id}`,
+      url: `/?session=${schedule.session_id}${session.project_id ? `&project=${session.project_id}` : ''}`,
     }
     // Try session-targeted subs first; fall back to all global (untagged) subs
     const sessionSubs = pushSubscriptionQueries.listBySession(schedule.session_id)

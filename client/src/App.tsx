@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, Component } from 'react'
+import { useState, useEffect, useRef, useCallback, Component } from 'react'
 import type { ReactNode, ErrorInfo } from 'react'
 import {
   listProjects, createProject, deleteProject, fetchMeta, updatePermissionMode, updateProject,
@@ -81,6 +81,18 @@ export default function App() {
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  // Ref so the SW message handler always sees the latest sessions without re-registering
+  const sessionsRef = useRef<Session[]>([])
+  // Read ?session= and ?project= URL params once on mount (set by push notification tap via
+  // openWindow). Stored in refs so they survive multiple effect re-runs: the project load
+  // triggers a second sessions-effect run that would otherwise overwrite the correct selection.
+  const pendingSessionIdRef = useRef<string | null>(
+    new URLSearchParams(window.location.search).get('session')
+  )
+  // ?project= lets us select the right project immediately instead of falling back to localStorage
+  const pendingProjectIdRef = useRef<string | null>(
+    new URLSearchParams(window.location.search).get('project')
+  )
   const [appRoot, setAppRoot] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [restarting, setRestarting] = useState(false)
@@ -96,12 +108,44 @@ export default function App() {
     return () => { window.removeEventListener('error', onError); window.removeEventListener('unhandledrejection', onUnhandled) }
   }, [])
 
+  // Keep sessionsRef in sync so the SW message handler always has the latest list
+  useEffect(() => { sessionsRef.current = sessions }, [sessions])
+
+  // Clear ?session= / ?project= URL params immediately so they don't persist in browser history
+  useEffect(() => {
+    if (pendingSessionIdRef.current || pendingProjectIdRef.current) {
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
   // Register service worker on mount so it's always available for push notifications,
   // regardless of whether a session/ChatWindow is open.
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {})
     }
+  }, [])
+
+  // Handle push notification taps: SW sends { type: 'switchSession', sessionId, url }
+  // postMessage works on all platforms (iOS/Android) unlike client.navigate().
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data?.type !== 'switchSession') return
+      const targetId = event.data.sessionId as string | undefined
+      const targetUrl = event.data.url as string | undefined
+      if (!targetId) return
+      // If session is in the current project's list, switch directly (no reload)
+      if (sessionsRef.current.some((s) => s.id === targetId)) {
+        setActiveSessionId(targetId)
+      } else {
+        // Session is in a different project — fall back to full navigation
+        // which triggers the ?session= URL param handling on mount
+        window.location.href = targetUrl ?? `/?session=${targetId}`
+      }
+    }
+    navigator.serviceWorker.addEventListener('message', handleMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', handleMessage)
   }, [])
 
   // Check auth on mount
@@ -136,21 +180,29 @@ export default function App() {
     authState === 'authenticated' ? handleReload : undefined
   )
 
-  // Load projects and meta once authenticated; restore last-used project if it still exists
+  // Load projects and meta once authenticated; restore last-used project if it still exists.
+  // If a push notification tap supplied ?project=<id>, prefer that over localStorage so the
+  // right project is active before the sessions effect runs.
   useEffect(() => {
     if (authState !== 'authenticated') return
     listProjects().then((loaded) => {
       setProjects(loaded)
       if (loaded.length > 0) {
+        const pendingProjectId = pendingProjectIdRef.current
         const { projectId } = readLastState()
-        const restored = loaded.find((p) => p.id === projectId)
+        const targetProjectId = pendingProjectId ?? projectId
+        const restored = loaded.find((p) => p.id === targetProjectId)
         setActiveProjectId(restored ? restored.id : loaded[0].id)
       }
     }).catch(console.error)
     fetchMeta().then((m) => setAppRoot(m.appRoot)).catch(console.error)
   }, [authState])
 
-  // Load sessions whenever the active project changes; restore last-used session if it still exists
+  // Load sessions whenever the active project changes; restore last-used session if it still exists.
+  // pendingSessionIdRef holds a ?session= param from a push notification tap — it takes priority
+  // over localStorage. We only consume (clear) the ref once we have a real project context so that
+  // the null-project run (which fetches all sessions as a loading placeholder) doesn't steal the
+  // ref before the correct project's sessions are loaded.
   useEffect(() => {
     setLoading(true)
     setActiveSessionId(null)
@@ -158,9 +210,21 @@ export default function App() {
       .then((data) => {
         setSessions(data)
         if (data.length > 0) {
+          const pendingId = pendingSessionIdRef.current
           const { sessionId } = readLastState()
-          const restored = data.find((s) => s.id === sessionId)
-          setActiveSessionId(restored ? restored.id : data[0].id)
+          const targetId = pendingId ?? sessionId
+          const restored = data.find((s) => s.id === targetId)
+          if (restored) {
+            setActiveSessionId(restored.id)
+            // Only consume the ref when we have a real project context — the null-project run
+            // fetches all sessions so it finds the session too, but we must not clear the ref
+            // there or the subsequent real-project run won't know which session to restore.
+            if (activeProjectId !== null) {
+              pendingSessionIdRef.current = null
+            }
+          } else {
+            setActiveSessionId(data[0].id)
+          }
         }
       })
       .catch(console.error)
