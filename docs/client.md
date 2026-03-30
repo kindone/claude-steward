@@ -10,7 +10,7 @@ Vite 6 + React 19 + TypeScript. A single-page app served at `:5173` in developme
 client/src/
 ├── main.tsx              ← React root mount
 ├── index.css             ← dark theme, all styles (single file)
-├── App.tsx               ← root component: global state, session/project handlers
+├── App.tsx               ← root component: global state, session/project handlers, SW message handler
 ├── lib/
 │   └── api.ts            ← fetch wrappers, SSE client, type definitions
 └── components/
@@ -18,12 +18,15 @@ client/src/
     ├── ProjectPicker.tsx  ← dropdown: select/create/delete projects
     ├── FileTree.tsx       ← collapsible file browser; openFile() → FileViewer portal
     ├── TerminalPanel.tsx  ← xterm.js terminal; runs commands via POST /exec SSE
-    ├── ChatWindow.tsx     ← message history, streaming deltas, stop button, 🔔 push toggle
-    ├── MessageBubble.tsx  ← markdown (marked) + syntax highlight (hljs) + error states
+    ├── ChatWindow.tsx     ← message history, streaming, stop, 🔔 push toggle, 🕐 schedule panel, ↓ scroll button
+    ├── MessageBubble.tsx  ← markdown (marked) + syntax highlight (hljs) + error states + ⏰ scheduler indicator
     └── MessageInput.tsx   ← textarea, Send / Stop button
 
 hooks/
 └── usePushNotifications.ts ← SW registration, subscribe/unsubscribe, PushState machine
+
+client/public/
+└── sw.js                 ← service worker: push → showNotification; notificationclick → postMessage or openWindow
 ```
 
 ---
@@ -53,14 +56,17 @@ App
 │       └── TerminalPanel    (xterm.js viewport + input bar + history)
 │
 └── ChatWindow  (keyed on sessionId — remounts on session switch)
-    ├── session header bar   (always visible: ⚙ Prompt toggle left, ⊡ Compact button + Plan/Edit/Full mode selector right)
+    ├── session header bar   (always visible: ⚙ Prompt toggle left, ⊡ Compact + 🔔 Push + 🕐 Schedules + Plan/Edit/Full right)
     │   ├── token usage row  (shown after first response: "N ctx · M out · $X.XXXX"; ctx = input + cache_read + cache_creation; hover for breakdown)
-    │   └── system prompt editor  (collapsible; textarea + Save/Cancel/Clear + char counter, turns yellow above 2 000)
+    │   ├── system prompt editor  (collapsible; textarea + Save/Cancel/Clear + char counter, turns yellow above 2 000)
+    │   └── schedule panel   (collapsible; list schedules with toggle/delete; next-fire display; "Times are in: {tz}" note)
     ├── "↑ Load older messages" button  (shown when hasMore=true; fetches cursor page)
     ├── MessageBubble[]      (one per message; streaming + error states + copy button)
     │   ├── tool history strip   (collapsed by default; ▶ Bash · Read · Edit; click to expand with full command detail)
+    │   ├── ⏰ Scheduled indicator  (shown above bubbles where messages.source = 'scheduler')
     │   └── "Compact & Continue" button  (shown only on context_limit error bubbles)
     ├── streaming indicator  (pulsing dots; assembled calls shown as "Bash: git log …"; active tool shown in blue)
+    ├── ↓ scroll-to-bottom button  (floating; appears when scrolled >100px from bottom; hidden during streaming if already at bottom)
     └── MessageInput         (textarea + Send/Stop)
 ```
 
@@ -80,6 +86,14 @@ All global state lives in `App.tsx`. No external store.
 | `sessions[].permission_mode` | `PermissionMode` | Per-session; controls `--permission-mode` passed to Claude CLI |
 | `loading` | `boolean` | Session list loading indicator |
 | `restarting` | `boolean` | Overlay shown during app-level reload |
+
+Key refs (not state, so they don't trigger re-renders):
+
+| Ref | Description |
+|---|---|
+| `sessionsRef` | Mirror of `sessions` state; used by the SW `message` handler so it always reads the latest list without re-registering the listener |
+| `pendingSessionIdRef` | Reads `?session=` URL param once on mount (set by push notification tap); persists across multiple sessions-effect runs until the target session is confirmed active |
+| `pendingProjectIdRef` | Reads `?project=` URL param once on mount; used in the projects-loading effect to prefer the notification's project over localStorage |
 
 `ChatWindow` manages its own local state (messages, streaming flag, active tool name, accumulated tool calls) and is fully reset on session switch via React's `key` prop.
 
@@ -215,9 +229,15 @@ All functions accept/return typed objects and throw on non-OK responses.
 | `stopChat(sessionId)` | `DELETE /api/chat/:id` — kills the subprocess; fire-and-forget |
 | `compactSession(sessionId)` | `POST /api/sessions/:id/compact` — summarizes session via Claude, forks new session primed with summary; returns `{ sessionId: string }` |
 | `getVapidPublicKey()` | `GET /api/push/vapid-public-key` → `string` |
-| `savePushSubscription(sub)` | `POST /api/push/subscribe` with `PushSubscription` object |
+| `savePushSubscription(sub, sessionId?)` | `POST /api/push/subscribe` with `PushSubscription` + optional session scope |
 | `deletePushSubscription(endpoint)` | `DELETE /api/push/subscribe` |
+| `listSchedules(sessionId)` | `GET /api/schedules?sessionId=` → `Schedule[]` |
+| `createSchedule(opts)` | `POST /api/schedules` — `{ sessionId, cron, prompt, label?, once? }` |
+| `updateSchedule(id, patch)` | `PATCH /api/schedules/:id` — `{ enabled?, cron?, prompt?, label? }` |
+| `deleteSchedule(id)` | `DELETE /api/schedules/:id` |
+| `runSchedule(id)` | `POST /api/schedules/:id/run` — manual fire |
 | `subscribeToAppEvents(handlers)` | Starts events SSE; returns cancel fn |
+| `startRegistration(opts?)` | `POST /api/auth/register/start`; optional `{ bootstrapKey }` sends `X-Bootstrap-Key` header |
 
 **Key exported types**
 

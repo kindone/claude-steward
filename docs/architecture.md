@@ -6,12 +6,13 @@ This document covers the overall system structure, how the three programs relate
 |---|---|
 | [Server](server.md) | Express routes, session lifecycle, SSE protocol, Claude subprocess |
 | [Client](client.md) | React components, state, SSE client, Vite config |
+| [Scheduler](scheduler.md) | Scheduled messages, cron runner, push-on-fire, timezone, SW navigation |
 | [File Browser](file-browser.md) | File listing, viewer, editor, optimistic locking, binary/raw endpoint |
 | [Terminal Panel](terminal.md) | Exec endpoint, xterm.js rendering, SSE streaming, node-pty rationale |
 | [Safe-Mode Core](safe.md) | Emergency terminal internals and freeze policy |
 | [Self-Management](self-management.md) | In-app upgrade flow, PM2 process management, nginx dev/prod switching |
 | [Worker protocol](worker-protocol.md) | Claude worker process, Unix socket IPC, `worker.db`, recovery flow |
-| [Roadmap](roadmap.md) | Planned features |
+| [Roadmap](roadmap.md) | Shipped milestones and planned features |
 
 ---
 
@@ -44,16 +45,18 @@ claude-steward/               ← npm workspace root
 |---|---|---|
 | `80` | nginx | Redirects → HTTPS |
 | `443` | nginx | TLS termination; routes by domain (see below) |
-| `3001` | Main server | API + static files in production |
+| `3001` | Main server (prod) | API + static files in production |
+| `3002` | Main server (dev) | `tsx watch`; separate DB (`steward-dev.db`) |
 | `3003` | Safe-mode core | Always-on, independent PM2 process |
-| `5173` | Client dev server | Vite; proxies `/api` → `:3001`. Not present in production |
+| `5173` | Client dev server | Vite HMR; proxies `/api` → `:3002`. Not present in production |
+| `/tmp/claude-worker.sock` | Claude worker | Unix socket; always-on; survives HTTP restarts |
 
 ### Domain routing (nginx)
 
 | Domain | nginx upstream | When |
 |---|---|---|
-| `steward.jradoo.com` | `127.0.0.1:5173` | Dev mode |
-| `steward.jradoo.com` | `127.0.0.1:3001` | Production mode |
+| `steward.jradoo.com` | `127.0.0.1:3001` | Production |
+| `dev.steward.jradoo.com` | `127.0.0.1:5173` | Dev (Vite HMR) |
 | `safe.steward.jradoo.com` | `127.0.0.1:3003` | Always |
 
 Switching between dev and production requires one `proxy_pass` line change in `/etc/nginx/sites-available/steward`. See [Self-Management](self-management.md) for the exact steps.
@@ -87,13 +90,20 @@ nginx
   │  GET/POST/PATCH/DELETE /api/sessions      session CRUD      │
   │  GET  /api/sessions/:id/messages          paginated history │
   │  GET  /api/sessions/:id/watch             SSE completion ping│
+  │  GET  /api/sessions/:id/subscribe         SSE multi-client sync│
+  │  POST /api/sessions/:id/compact           summarise + fork  │
+  │  GET/POST/PATCH/DELETE /api/schedules     schedule CRUD     │
+  │  POST /api/schedules/:id/run              manual fire       │
   │  POST /api/chat                           SSE chat stream   │
+  │  DELETE /api/chat/:sessionId              stop job          │
   │  GET  /api/events                         SSE app events    │
   │  GET  /api/projects/:id/files             directory listing │
   │  GET  /api/projects/:id/files/content     file content      │
   │  GET  /api/projects/:id/files/raw         binary file       │
   │  PATCH /api/projects/:id/files            atomic file write │
   │  POST /api/projects/:id/exec              SSE exec stream   │
+  │  GET  /api/push/vapid-public-key                            │
+  │  POST/DELETE /api/push/subscribe                            │
   │  GET  /api/admin/version                                    │
   │  POST /api/admin/reload                   → PM2 restart    │
   │       │                                                 │
@@ -131,10 +141,11 @@ Uses **Passkeys (WebAuthn)**. The full flow:
 2. If `authenticated: false` → show `AuthPage`
    - **First visit** (`hasCredentials: false`): "Register this device" → calls `/api/auth/register/start` + `/api/auth/register/finish`
    - **Returning device** (`hasCredentials: true`): "Sign in with Passkey" → calls `/api/auth/login/start` + `/api/auth/login/finish`
+   - **New device, no sync** (`hasCredentials: true`, no passkey available): "Register with API key" → enter `API_KEY` from `.env`; server accepts it via `X-Bootstrap-Key` header on `register/start`; full WebAuthn biometric ceremony still runs
 3. On success the server issues a `sid` cookie (`HttpOnly; Secure; SameSite=Strict; Max-Age=30d`)
 4. All subsequent `/api/*` requests include `credentials: 'include'`; the server validates the cookie in `requireAuth`
 
-The server also accepts a `Authorization: Bearer <API_KEY>` header as a fallback — kept for the transition period until all devices are registered, after which `VITE_API_KEY` will be removed from the build.
+The server also accepts `Authorization: Bearer <API_KEY>` as a fallback for the `requireAuth` middleware.
 
 Auth-related routes (`/api/auth/*`) are mounted **before** the `requireAuth` middleware and are fully public.
 
@@ -195,9 +206,10 @@ CREATE TABLE sessions (
   id                TEXT PRIMARY KEY, -- server UUID, exposed to client
   title             TEXT NOT NULL DEFAULT 'New Chat',
   claude_session_id TEXT,             -- CLI handle; set after first message; used for --resume
-  project_id        TEXT NOT NULL REFERENCES projects(id),  -- required since v2; orphans migrated on startup
+  project_id        TEXT NOT NULL REFERENCES projects(id),  -- required; orphans migrated on startup
   system_prompt     TEXT,             -- optional; passed as --system-prompt on every spawn
   permission_mode   TEXT NOT NULL DEFAULT 'acceptEdits',    -- plan | acceptEdits | bypassPermissions
+  timezone          TEXT,             -- IANA tz string e.g. 'Europe/Paris'; set by client on mount
   created_at        INTEGER NOT NULL DEFAULT (unixepoch()),
   updated_at        INTEGER NOT NULL DEFAULT (unixepoch())
 )
@@ -211,7 +223,31 @@ CREATE TABLE messages (
   is_error   INTEGER NOT NULL DEFAULT 0,
   error_code TEXT,
   status     TEXT NOT NULL DEFAULT 'complete',  -- complete | streaming | interrupted
-  tool_calls TEXT                              -- JSON array of tool pill metadata (worker path + recovery)
+  tool_calls TEXT,                             -- JSON array of tool pill metadata (worker path + recovery)
+  source     TEXT                              -- null = user-initiated; 'scheduler' = scheduled trigger
+)
+
+CREATE TABLE push_subscriptions (
+  id         TEXT PRIMARY KEY,
+  endpoint   TEXT NOT NULL UNIQUE,
+  p256dh     TEXT NOT NULL,
+  auth       TEXT NOT NULL,
+  session_id TEXT REFERENCES sessions(id),  -- null = global; non-null = session-scoped opt-in
+  created_at INTEGER NOT NULL DEFAULT (unixepoch())
+)
+
+CREATE TABLE schedules (
+  id          TEXT PRIMARY KEY,
+  session_id  TEXT NOT NULL REFERENCES sessions(id),
+  cron        TEXT NOT NULL,         -- 5-field UTC cron expression
+  prompt      TEXT NOT NULL,         -- injected as task context at fire time
+  label       TEXT,                  -- human-readable name shown in UI
+  enabled     INTEGER NOT NULL DEFAULT 1,
+  once        INTEGER NOT NULL DEFAULT 0,  -- 1 = auto-delete after first fire
+  last_run_at INTEGER,
+  next_run_at INTEGER,               -- pre-computed next UTC unix timestamp
+  created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at  INTEGER NOT NULL DEFAULT (unixepoch())
 )
 ```
 

@@ -8,20 +8,26 @@ Node.js 23 + TypeScript (ESM) + Express 5. Serves the REST/SSE API and, in produ
 
 ```
 server/src/
-├── index.ts          ← entry point: dotenv, validateEnv(), workerClient.connect(), recover hook, listen
+├── index.ts          ← entry point: dotenv, validateEnv(), workerClient.connect(), startScheduler(), recover hook, listen
 ├── app.ts            ← createApp() factory (exported for tests)
 ├── auth/
-│   └── middleware.ts ← requireApiKey — Bearer token check on all /api routes
+│   ├── middleware.ts ← requireAuth — cookie-first, Bearer API_KEY fallback
+│   ├── session.ts    ← createSessionCookie / clearSessionCookie / getValidSessionToken
+│   └── webauthn.ts   ← getWebAuthnConfig(), storeChallenge(), consumeChallenge()
 ├── claude/
 │   ├── process.ts    ← spawnClaude(): direct CLI spawn (fallback when worker unavailable)
 │   └── toolDetail.ts ← extractToolDetail() — shared tool pill metadata (chat route, worker, recovery)
 ├── db/
-│   └── index.ts      ← schema, migrations, projectQueries/sessionQueries/messageQueries
+│   └── index.ts      ← schema, migrations, all query objects
 ├── lib/
-│   ├── connections.ts     ← global Set<Response> for app-level SSE fan-out
-│   ├── sessionWatchers.ts ← Map<sessionId, Set<Response>> for session completion watch
-│   ├── activeChats.ts     ← Map<sessionId, AbortController> for direct-spawn stop
-│   └── pushNotifications.ts
+│   ├── connections.ts      ← global Set<Response> for app-level SSE fan-out
+│   ├── sessionWatchers.ts  ← Map<sessionId, Set<Response>> for session completion watch + multi-client subscribe
+│   ├── activeChats.ts      ← Map<sessionId, AbortController> for direct-spawn stop
+│   ├── pushNotifications.ts← notifyAll() / notifySession(); VAPID init; stale-sub cleanup
+│   ├── scheduler.ts        ← startScheduler(); node-cron tick; nextFireAt(); runSchedule()
+│   ├── schedulePrompt.ts   ← buildScheduleFragment(session) — injected into every chat system prompt
+│   ├── sendToSession.ts    ← headless Claude invocation used by scheduler and manual run
+│   └── pathUtils.ts        ← safeResolvePath() — directory traversal guard
 ├── worker/           ← Claude worker IPC (see [worker-protocol](worker-protocol.md))
 │   ├── main.ts       ← Unix socket server; get_result / status / start / stop
 │   ├── job-manager.ts← spawn Claude; accumulate text + tool_calls → worker.db
@@ -30,9 +36,12 @@ server/src/
 │   ├── db.ts         ← worker.db jobs table (content, tool_calls, status)
 │   └── protocol.ts   ← WorkerCommand / WorkerEvent types
 └── routes/
+    ├── auth.ts       ← /api/auth/* (register/login/logout/status; X-Bootstrap-Key path)
     ├── chat.ts       ← POST /api/chat (worker path + direct-spawn fallback)
-    ├── sessions.ts   ← CRUD + GET /:id/messages (paginated) + GET /:id/watch (SSE)
+    ├── sessions.ts   ← CRUD + messages (paginated) + watch + subscribe (SSE) + compact
+    ├── schedules.ts  ← CRUD + manual run for /api/schedules
     ├── projects.ts
+    ├── push.ts       ← /api/push/vapid-public-key + subscribe/unsubscribe
     ├── events.ts
     └── admin.ts
 ```
@@ -63,9 +72,16 @@ The `createApp()` / `listen` split exists so tests can import `createApp()` with
 | `GET` | `/api/projects/:id/files/raw` | ✓ | Binary file with detected MIME type (images, pdf) |
 | `PATCH` | `/api/projects/:id/files` | ✓ | Atomic file write with optimistic locking |
 | `POST` | `/api/projects/:id/exec` | ✓ | SSE; streams shell command output (see [Terminal](terminal.md)) |
-| `GET` | `/api/events` | ✓ | App-level SSE (reload, future notifications) |
+| `GET` | `/api/sessions/:id/subscribe` | ✓ | SSE; persistent multi-client sync — sends `event: updated` on every message finalize; used by idle tabs to stay in sync without polling |
+| `POST` | `/api/sessions/:id/compact` | ✓ | Summarise session via Claude, fork new session with summary as system prompt; returns `{ sessionId }` |
+| `GET` | `/api/schedules` | ✓ | List schedules; `?sessionId=` filter |
+| `POST` | `/api/schedules` | ✓ | Create schedule `{ sessionId, cron, prompt, label?, once? }` |
+| `PATCH` | `/api/schedules/:id` | ✓ | Update `{ cron?, prompt?, label?, enabled? }` |
+| `DELETE` | `/api/schedules/:id` | ✓ | Delete schedule |
+| `POST` | `/api/schedules/:id/run` | ✓ | Manually fire a schedule immediately |
+| `GET` | `/api/events` | ✓ | App-level SSE (reload event → PM2 restart) |
 | `GET` | `/api/push/vapid-public-key` | ✓ | Returns `{ key }` for client subscription setup |
-| `POST` | `/api/push/subscribe` | ✓ | Upsert push subscription `{ endpoint, keys: { p256dh, auth } }` |
+| `POST` | `/api/push/subscribe` | ✓ | Upsert push subscription `{ endpoint, keys, sessionId? }` |
 | `DELETE` | `/api/push/subscribe` | ✓ | Remove subscription by `{ endpoint }` |
 | `GET` | `/api/admin/version` | ✓ | Package version |
 | `POST` | `/api/admin/reload` | ✓ | Broadcast reload event then `process.exit(0)` |
@@ -258,10 +274,11 @@ VAPID_SUBJECT=mailto:admin@example.com
 
 ### Flow
 
-1. Client registers `sw.js` on app load; `usePushNotifications` hook calls `POST /api/push/subscribe` with `{ endpoint, keys }` → stored in `push_subscriptions` table
-2. On `onComplete` in `chat.ts`: if `notifyWatchers()` returns 0 (no browser tab open), `notifyAll()` fans out a push to all stored subscriptions
-3. `sw.js` `push` event fires → `showNotification()`; `notificationclick` → focuses existing tab or `openWindow('/?session=...')`
-4. Stale subscriptions (HTTP 410/404 from push service) are auto-deleted
+1. Client registers `sw.js` on app load; `usePushNotifications` hook calls `POST /api/push/subscribe` with `{ endpoint, keys, sessionId }` → stored in `push_subscriptions` (session-scoped if `sessionId` provided, global otherwise)
+2. On `onComplete` in `chat.ts` or after a scheduled message in `sendToSession.ts`: if `notifyWatchers()` returns 0 (no browser tab open), push fires — session-targeted subscriptions tried first, global subscriptions as fallback
+3. Push payload includes `url: '/?session=<id>&project=<id>'` for reliable mobile navigation
+4. `sw.js` `notificationclick`: if app is open → `postMessage({ type: 'switchSession', sessionId, url })` to existing tab + `client.focus()`; if app is closed → `clients.openWindow(url)`
+5. Stale subscriptions (HTTP 410/404 from push service, or `VapidPkHashMismatch`) are auto-deleted
 
 ---
 
