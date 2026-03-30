@@ -72,6 +72,7 @@ type Props = {
   timezone?: string | null
   model?: string | null
   claudeSessionId?: string | null
+  projectId?: string | null
   onTitle?: (title: string) => void
   onActivity?: () => void
   onSystemPromptChange?: (prompt: string | null) => void
@@ -80,7 +81,7 @@ type Props = {
   onCompact?: (newSessionId: string) => void
 }
 
-export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, claudeSessionId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact }: Props) {
+export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -600,6 +601,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             source={m.source}
             toolUses={m.toolUses}
             onCompact={m.errorCode === 'context_limit' ? handleCompact : undefined}
+            projectId={projectId}
           />
         ))}
         {streaming && (

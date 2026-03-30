@@ -25,11 +25,7 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 ### Core UX
 - [ ] **`after=<id>` message fetch endpoint** — `GET /api/sessions/:id/messages?after=<messageId>` returns only messages newer than the given ID; client uses it on visibility-change to append new messages without replacing the full view. Currently the visibility-change re-fetch loads the latest 50 and replaces state, which loses scroll position if the user had paged into older messages. Low priority — >50 new messages while backgrounded is practically impossible in a chat app.
 - [ ] **Client-side JS console for AI** — a browser-side REPL that Claude can interact with via a tool or SSE channel. Lets Claude evaluate JS expressions in the live page context (DOM queries, state inspection, exception capture) without relying on the user to relay errors. Useful for debugging rendering issues (e.g. swallowed exceptions, layout problems) and verifying UI changes. Possible approach: a `POST /api/projects/:id/eval` endpoint that pushes JS to the client via SSE, executes it via `eval()` in a sandboxed scope, and returns the result/exception back to the server.
-- [ ] **Rich chat content rendering** — several rendering gaps to close (XSS sanitization tracked separately in `BUGS.md`):
-  - **Mermaid diagrams**: detect fenced ` ```mermaid ` blocks and render via `mermaid.js`; Claude generates these frequently
-  - **Image rendering**: project-relative image paths in markdown (e.g. `![](./output.png)`) should resolve via the file binary endpoint so Claude-generated images display inline
-  - **Sandboxed HTML preview**: when Claude produces a standalone HTML artifact, render in a sandboxed `<iframe srcdoc>` with source/preview toggle
-  - **Math / LaTeX** (lower priority): KaTeX rendering for `$...$` and `$$...$$` blocks
+- [x] **Rich chat content rendering** — ` ```mermaid ` → SVG via mermaid.js (dark theme; SVG cache survives React re-renders/scroll); ` ```html ` → sandboxed `<iframe srcdoc>` with source/preview toggle; relative image paths rewritten to `/api/projects/:id/files/raw`; `$...$` / `$$...$$` → KaTeX; implemented in `client/src/lib/markdownRenderer.ts` + `HtmlPreview.tsx`
 
 ### Push Notifications (hardening)
 - [ ] **Push notification improvements** — (send bugs tracked in `BUGS.md`); remaining feature gaps:

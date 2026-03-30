@@ -12,14 +12,16 @@ client/src/
 ├── index.css             ← dark theme, all styles (single file)
 ├── App.tsx               ← root component: global state, session/project handlers, SW message handler
 ├── lib/
-│   └── api.ts            ← fetch wrappers, SSE client, type definitions
+│   ├── api.ts            ← fetch wrappers, SSE client, type definitions
+│   └── markdownRenderer.ts ← splitContent, buildMarkedOptions, preprocessKaTeX (pure, tested)
 └── components/
     ├── SessionSidebar.tsx ← project switcher + 3-tab bar (Sessions/Files/Term)
     ├── ProjectPicker.tsx  ← dropdown: select/create/delete projects
     ├── FileTree.tsx       ← collapsible file browser; openFile() → FileViewer portal
     ├── TerminalPanel.tsx  ← xterm.js terminal; runs commands via POST /exec SSE
     ├── ChatWindow.tsx     ← message history, streaming, stop, 🔔 push toggle, 🕐 schedule panel, ↓ scroll button
-    ├── MessageBubble.tsx  ← markdown (marked) + syntax highlight (hljs) + error states + ⏰ scheduler indicator
+    ├── HtmlPreview.tsx    ← sandboxed <iframe srcdoc> with Source/Preview tab toggle; auto-sizes to content
+    ├── MessageBubble.tsx  ← rich rendering: markdown + hljs + mermaid + KaTeX + HTML preview + image rewriting
     └── MessageInput.tsx   ← textarea, Send / Stop button
 
 hooks/
@@ -62,6 +64,7 @@ App
     │   └── schedule panel   (collapsible; list schedules with toggle/delete; next-fire display; "Times are in: {tz}" note)
     ├── "↑ Load older messages" button  (shown when hasMore=true; fetches cursor page)
     ├── MessageBubble[]      (one per message; streaming + error states + copy button)
+    │   ├── rich content rendering  (mermaid SVG, KaTeX math, sandboxed HTML preview, inline images)
     │   ├── tool history strip   (collapsed by default; ▶ Bash · Read · Edit; click to expand with full command detail)
     │   ├── ⏰ Scheduled indicator  (shown above bubbles where messages.source = 'scheduler')
     │   └── "Compact & Continue" button  (shown only on context_limit error bubbles)
@@ -177,6 +180,56 @@ Claude errors carry a `code` field:
 | `connection_lost` | *(special)* — not a red banner; triggers **`watchSession`** recovery path | SSE closed without terminal event (often `tsx watch` / HTTP restart mid-stream) |
 
 `MessageBubble` renders errors as styled banners rather than attempting markdown parsing. **`connection_lost`** is handled in **`handleSend`** before the generic error styling.
+
+---
+
+## Rich Content Rendering
+
+`MessageBubble` supports four content types beyond basic markdown, orchestrated by helpers in `client/src/lib/markdownRenderer.ts`.
+
+### Pipeline
+
+```
+raw content string
+  │
+  ├─ stripScheduleBlocks()         strip <schedule>…</schedule> tags
+  ├─ splitContent()                split out standalone ```html fences → HtmlPreview segments
+  │
+  └─ per markdown segment:
+       preprocessKaTeX()           replace $…$ / $$…$$ with KaTeX HTML
+       marked.parse(buildMarkedOptions(projectId))
+         │  ├─ mermaid renderer    ```mermaid → <div class="mermaid-placeholder" data-graph="…">
+         │  └─ image renderer      ./relative.png → /api/projects/:id/files/raw?path=…
+       DOMPurify.sanitize()        ADD_ATTR: ['data-graph', 'style']
+```
+
+### Mermaid
+
+- ` ```mermaid ` blocks are converted to placeholder divs by the `marked` renderer.
+- A `useEffect` with **no dependency array** runs after every render to find un-rendered placeholders and call `mermaid.render(id, graph)` (async).
+- Rendered SVGs are cached in a `useRef<Map<string, string>>` keyed by graph source. Cache hits are synchronous, so re-renders caused by scroll or parent state changes restore the SVG instantly without a second `mermaid.render()` call.
+- New diagrams are only rendered after `streaming` is false, avoiding a race where rapid DOM resets (one per streaming chunk) keep wiping partially-injected SVGs.
+
+### HTML Preview (`HtmlPreview.tsx`)
+
+- `splitContent()` extracts top-level ` ```html ` fences into `HtmlPreviewSegment` values before markdown parsing.
+- Each segment renders as `<HtmlPreview html={content} />` — a tabbed widget with **Preview** (`<iframe srcdoc sandbox="allow-scripts">`) and **Source** (`<pre>`) views.
+- The iframe auto-sizes to `body.scrollHeight` (capped at 600 px) on load.
+- `sandbox="allow-scripts"` permits JS execution within the iframe but denies DOM access to the parent.
+
+### KaTeX
+
+- `preprocessKaTeX()` runs before `marked.parse()` and replaces `$$…$$` (display) and `$…$` (inline) with KaTeX-rendered HTML.
+- Content inside triple-backtick fences and inline code spans is excluded to avoid false positives on literal `$` characters.
+- KaTeX output uses `style` attributes for sizing; DOMPurify is configured with `ADD_ATTR: ['style']` to preserve them.
+
+### Image rewriting
+
+- The `image` renderer in `buildMarkedOptions(projectId)` intercepts relative paths (anything that doesn't start with `https?:`, `data:`, or `/`) and rewrites them to `/api/projects/:id/files/raw?path=<encoded>`.
+- Absolute URLs and data URIs pass through unchanged.
+- When `projectId` is null (no active project) no rewriting happens.
+
+---
 
 ### Copy button
 

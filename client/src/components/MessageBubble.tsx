@@ -2,18 +2,33 @@ import { useEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
+import mermaid from 'mermaid'
 import 'highlight.js/styles/github-dark.css'
+import 'katex/dist/katex.min.css'
 import type { ClaudeErrorCode, ToolCall } from '../lib/api'
+import { splitContent, buildMarkedOptions, preprocessKaTeX } from '../lib/markdownRenderer'
+import { HtmlPreview } from './HtmlPreview'
 
-marked.use({
-  breaks: true,
-})
+// Mermaid is initialized once at module level with a dark theme.
+mermaid.initialize({ startOnLoad: false, theme: 'dark' })
+
+marked.use({ breaks: true })
 
 const SCHEDULE_BLOCK_RE = /<schedule>[\s\S]*?<\/schedule>/g
 
 /** Strip <schedule> blocks from content before rendering — they're processed server-side. */
 function stripScheduleBlocks(text: string): string {
   return text.replace(SCHEDULE_BLOCK_RE, '').trim()
+}
+
+/** Render a markdown segment to sanitized HTML. */
+function renderMarkdown(content: string, projectId: string | null): string {
+  const withKatex = preprocessKaTeX(content)
+  const { renderer } = buildMarkedOptions(projectId)
+  const html = marked.parse(withKatex, { renderer }) as string
+  return DOMPurify.sanitize(html, {
+    ADD_ATTR: ['data-graph', 'style'],
+  })
 }
 
 type Props = {
@@ -24,15 +39,19 @@ type Props = {
   source?: string | null
   toolUses?: ToolCall[]
   onCompact?: () => void
+  projectId?: string | null
 }
 
-export function MessageBubble({ role, content, streaming = false, errorCode, source, toolUses, onCompact }: Props) {
+export function MessageBubble({ role, content, streaming = false, errorCode, source, toolUses, onCompact, projectId = null }: Props) {
   const displayContent = role === 'assistant' ? stripScheduleBlocks(content) : content
   const isScheduled = source === 'scheduler'
   const contentRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
+  /** Per-message SVG cache: graph source → rendered SVG string. */
+  const mermaidCache = useRef<Map<string, string>>(new Map())
 
+  // Syntax-highlight code blocks after render
   useEffect(() => {
     if (contentRef.current && role === 'assistant' && !errorCode) {
       contentRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
@@ -40,6 +59,52 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       })
     }
   }, [displayContent, role, errorCode])
+
+  // Re-apply Mermaid SVGs after every render.
+  //
+  // dangerouslySetInnerHTML resets innerHTML whenever React reconciles
+  // (e.g. parent state change from the scroll listener), which wipes any SVG
+  // previously injected by mermaid.  Running this effect without a dependency
+  // array means it runs after every render; cached hits are synchronous so the
+  // fix is instantaneous.  New graphs (not yet cached) are only rendered once
+  // streaming has finished to avoid the race where rapid DOM resets keep wiping
+  // in-progress renders.
+  useEffect(() => {
+    if (!contentRef.current || role !== 'assistant' || errorCode) return
+    const placeholders = contentRef.current.querySelectorAll<HTMLDivElement>(
+      '.mermaid-placeholder:not(.mermaid-rendered)'
+    )
+    if (placeholders.length === 0) return
+
+    placeholders.forEach((el) => {
+      const graph = decodeURIComponent(el.getAttribute('data-graph') ?? '')
+      if (!graph) return
+
+      // Fast path: restore from cache (handles DOM resets without async round-trip)
+      const cached = mermaidCache.current.get(graph)
+      if (cached) {
+        el.innerHTML = cached
+        el.classList.add('mermaid-rendered')
+        return
+      }
+
+      // Slow path: first render — wait until streaming is done
+      if (streaming) return
+
+      const id = `mermaid-${Math.random().toString(36).slice(2)}`
+      mermaid.render(id, graph).then(({ svg }) => {
+        mermaidCache.current.set(graph, svg)
+        // Guard: element may have been reset again while render was in flight
+        if (el.isConnected && !el.classList.contains('mermaid-rendered')) {
+          el.innerHTML = svg
+          el.classList.add('mermaid-rendered')
+        }
+      }).catch((err: unknown) => {
+        el.classList.add('mermaid-error')
+        el.textContent = `Mermaid error: ${String(err)}`
+      })
+    })
+  }) // intentionally no deps — must run after every render
 
   async function handleCopy() {
     await navigator.clipboard.writeText(displayContent)
@@ -78,7 +143,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
           <div
             ref={contentRef}
             className="prose text-sm leading-[1.65] break-words w-full"
-            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(displayContent) as string) }}
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(displayContent, projectId) }}
           />
         )}
         <div className={`flex items-start gap-2 px-3.5 py-2.5 rounded-lg text-sm leading-relaxed border w-full ${style}`}>
@@ -119,8 +184,18 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
             <div
               ref={contentRef}
               className={`prose text-sm leading-[1.65] break-words w-full${streaming ? ' streaming-cursor' : ''}`}
-              dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(displayContent) as string) }}
-            />
+            >
+              {splitContent(displayContent).map((seg, i) =>
+                seg.type === 'html-preview' ? (
+                  <HtmlPreview key={i} html={seg.content} />
+                ) : (
+                  <div
+                    key={i}
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(seg.content, projectId) }}
+                  />
+                )
+              )}
+            </div>
             {!streaming && displayContent && (
               <button
                 className={`absolute top-1 right-1 bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]

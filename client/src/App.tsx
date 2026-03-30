@@ -476,6 +476,7 @@ export default function App() {
             timezone={sessions.find((s) => s.id === activeSessionId)?.timezone ?? null}
             model={sessions.find((s) => s.id === activeSessionId)?.model ?? null}
             claudeSessionId={sessions.find((s) => s.id === activeSessionId)?.claude_session_id ?? null}
+            projectId={activeProjectId}
             onTitle={(title) => handleTitleUpdate(activeSessionId, title)}
             onActivity={() => handleSessionActivity(activeSessionId)}
             onSystemPromptChange={(prompt) =>
