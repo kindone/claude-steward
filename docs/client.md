@@ -101,9 +101,15 @@ Key refs (not state, so they don't trigger re-renders):
 `ChatWindow` manages its own local state (messages, streaming flag, active tool name, accumulated tool calls) and is fully reset on session switch via React's `key` prop.
 
 **Scroll behaviour** — a `scrollBehaviorRef` controls when and how the view scrolls to the bottom:
-- `'instant'` on initial message load (avoids iOS smooth-scroll interruption when tab becomes active)
-- `'smooth'` for streaming deltas and new messages
+- `'instant'` on initial message load (snaps to bottom unconditionally)
+- `'smooth'` for streaming deltas and new messages — but only when `wasAtBottomRef` is true and `userIsScrollingRef` is false
 - `'none'` when `loadOlder` prepends messages — instead, `scrollTop` is adjusted by the new content height so the viewport stays anchored to the previously-top message
+
+**iOS scroll architecture** — two separate mechanisms, each handling a different concern:
+- **`wasAtBottomRef` + `userIsScrollingRef`** — updated by a passive `scroll` listener (no React state = no re-renders during scroll). `userIsScrollingRef` uses a 150ms debounce that covers iOS momentum deceleration. Auto-scroll fires only when both refs say it's safe.
+- **`IntersectionObserver` on `bottomRef`** — drives `isAtBottom` React state (show/hide the ↓ button). Fires asynchronously outside the scroll path, avoiding the re-render-during-scroll that caused iOS momentum to stutter and snap back. `rootMargin: '0px 0px 80px 0px'` compensates for `bottomRef` being zero-height.
+- **`body { overscroll-behavior: none }`** — prevents iOS from elastically bouncing the page behind the scroll container.
+- **`flex-1 min-h-0`** on the scroll container (not `h-full`) — more robust across iOS Safari versions; `h-full` on a flex child with implicit height can miscalculate `clientHeight`.
 
 `App.tsx` persists `{ projectId, sessionId }` to `localStorage` under `steward:lastState` on every selection change and restores it on mount (validating IDs still exist). Since prod and dev run on separate origins, each environment independently tracks its own context.
 

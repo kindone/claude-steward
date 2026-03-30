@@ -102,6 +102,11 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   /** Tracks whether the scroll container was at the bottom before the last messages update.
    *  Updated by a scroll listener so it reflects pre-render state, not post-render distance. */
   const wasAtBottomRef = useRef(true)
+  /** True while the user is actively scrolling (including iOS momentum deceleration).
+   *  Detected via a 150ms debounce on scroll events — more reliable than touchend, which
+   *  fires before momentum ends. Auto-scroll is suppressed while this is true. */
+  const userIsScrollingRef = useRef(false)
+  const scrollSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cancelRef = useRef<(() => void) | null>(null)
   /** True while we have an active sendMessage() — poll must not overwrite the optimistic assistant bubble. */
   const streamingFromSendRef = useRef(false)
@@ -159,19 +164,49 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
     }
   }
 
-  // Track whether the user was at the bottom before each render so the scroll
-  // effect can use the pre-render position (post-render scrollHeight is larger
-  // after a new message lands, making the naive distanceFromBottom check fail).
+  // Track wasAtBottomRef for auto-scroll logic via scroll events (ref only, no state = no re-renders).
+  // isAtBottom state (for the button) is driven by IntersectionObserver on bottomRef so it never
+  // fires during the scroll path — React re-renders from setIsAtBottom were interrupting iOS momentum.
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
     const onScroll = () => {
+      // Mark scrolling active; clear 150ms after the last event fires.
+      // This covers iOS momentum: scroll events fire throughout deceleration,
+      // so the debounce stays active until the physics animation fully settles.
+      userIsScrollingRef.current = true
+      if (scrollSettleTimerRef.current) clearTimeout(scrollSettleTimerRef.current)
+      scrollSettleTimerRef.current = setTimeout(() => {
+        userIsScrollingRef.current = false
+      }, 150)
+
       const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50
       wasAtBottomRef.current = atBottom
-      setIsAtBottom(atBottom)
+      // NOTE: no setIsAtBottom here — that's handled by IntersectionObserver below
     }
     container.addEventListener('scroll', onScroll, { passive: true })
-    return () => container.removeEventListener('scroll', onScroll)
+    return () => {
+      container.removeEventListener('scroll', onScroll)
+      if (scrollSettleTimerRef.current) clearTimeout(scrollSettleTimerRef.current)
+    }
+  }, [])
+
+  // Show/hide the scroll-to-bottom button by observing whether bottomRef is visible.
+  // IntersectionObserver fires asynchronously outside the scroll path, so it never
+  // causes React re-renders during active scrolling.
+  useEffect(() => {
+    const bottom = bottomRef.current
+    const container = scrollContainerRef.current
+    if (!bottom || !container) return
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsAtBottom(entry.isIntersecting),
+      // rootMargin extends the root's bounding box — 80px at bottom so the
+      // zero-height bottomRef div registers as intersecting before it's fully
+      // scrolled into view (matches the ~50px "at bottom" feel).
+      { root: container, threshold: 0, rootMargin: '0px 0px 80px 0px' },
+    )
+    observer.observe(bottom)
+    return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
@@ -187,10 +222,8 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
       bottomRef.current?.scrollIntoView({ behavior: 'instant' })
       scrollBehaviorRef.current = 'smooth'
     } else {
-      // New content (streaming delta or subscription re-fetch): scroll to bottom only if
-      // the user was already at the bottom before this render (wasAtBottomRef is updated
-      // by the scroll listener and reflects pre-render position, not post-render distance).
-      if (wasAtBottomRef.current) {
+      // New content: scroll to bottom only if user was already there and not actively scrolling
+      if (wasAtBottomRef.current && !userIsScrollingRef.current) {
         const container = scrollContainerRef.current
         if (container) container.scrollTop = container.scrollHeight
       }
@@ -560,13 +593,20 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         )}
       </div>
 
-      {/* Messages */}
-      <div className="relative flex-1 min-h-0">
+      {/* Messages — flex column so scroll container can be flex-1 (avoids h-full fragility on iOS Safari) */}
+      <div className="relative flex-1 min-h-0 flex flex-col">
       {!isAtBottom && (
         <button
           onClick={() => {
             const container = scrollContainerRef.current
-            if (container) container.scrollTop = container.scrollHeight
+            if (!container) return
+            // Pin flags so streaming auto-scroll keeps us at bottom after the snap.
+            wasAtBottomRef.current = true
+            userIsScrollingRef.current = false
+            // rAF ensures layout is settled before we read scrollHeight.
+            requestAnimationFrame(() => {
+              container.scrollTop = container.scrollHeight
+            })
           }}
           className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-[#1a1a1a] border border-[#333] hover:border-[#555] rounded-full text-[#888] hover:text-[#ccc] text-xs px-3 py-1.5 cursor-pointer transition-colors shadow-lg"
           title="Scroll to bottom"
@@ -574,7 +614,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
           ↓ Scroll to bottom
         </button>
       )}
-      <div ref={scrollContainerRef} className="h-full overflow-y-auto px-4 py-6 md:px-6 md:py-8 flex flex-col gap-5">
+      <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-y-none px-4 pt-6 md:px-6 md:pt-8 flex flex-col gap-5" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         {hasMore && (
           <div className="flex justify-center flex-shrink-0">
             <button
