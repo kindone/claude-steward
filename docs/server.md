@@ -85,6 +85,34 @@ The `createApp()` / `listen` split exists so tests can import `createApp()` with
 | `DELETE` | `/api/push/subscribe` | ✓ | Remove subscription by `{ endpoint }` |
 | `GET` | `/api/admin/version` | ✓ | Package version |
 | `POST` | `/api/admin/reload` | ✓ | Broadcast reload event then `process.exit(0)` |
+| `POST` | `/api/eval` | API key or cookie | Submit JS code for browser execution; long-polls up to 10 s for result |
+| `POST` | `/api/eval/:id/result` | open (UUID is secret) | Browser posts back `{ result?, error? }` to resolve the pending eval |
+
+### Browser Eval Relay (`/api/eval`)
+
+Lets Claude execute JS in the live browser context without the user relaying anything from DevTools.
+
+```
+Claude → POST /api/eval { code }          (Authorization: Bearer <API_KEY>)
+  Server: creates UUID, stores pending Promise, broadcasts SSE event: eval { id, code }
+  Browser: receives eval event via /api/events SSE, executes eval(code),
+           awaits Promises (8 s timeout), POSTs { result?, error? } to /api/eval/:id/result
+  Server: resolves promise, returns result to Claude
+```
+
+- Auth on `POST /api/eval`: API key (`Authorization: Bearer`) **or** session cookie — Claude can call directly without a login step
+- `POST /api/eval/:id/result` is open; the UUID is the shared secret
+- 10 s server-side timeout returns `{ error: "timeout: no browser responded…" }` if no tab is connected
+- Result is `JSON.stringify`ed by the browser with a `String()` fallback for unserializable values
+
+**Claude usage pattern** (shell escaping is tricky — pipe JSON via stdin or use Python):
+```bash
+python3 -c "import json; print(json.dumps({'code': 'document.title'}))" \
+  | curl -s -X POST http://localhost:3001/api/eval \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer $(grep API_KEY .env | cut -d= -f2)" \
+    -d @-
+```
 
 File routes use `safeResolvePath()` to prevent path traversal; dotfiles are filtered from directory listings. For file browser and editor details see [File Browser](file-browser.md). For the exec endpoint see [Terminal](terminal.md).
 
