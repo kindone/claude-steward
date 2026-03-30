@@ -55,7 +55,7 @@ router.post('/register/start', async (req, res) => {
     attestationType: 'none',
     excludeCredentials,
     authenticatorSelection: {
-      residentKey: 'preferred',
+      residentKey: 'discouraged',
       userVerification: 'preferred',
     },
   })
@@ -187,6 +187,19 @@ router.post('/login/finish', async (req, res) => {
     console.error('[auth] login/finish error:', err)
     res.status(400).json({ error: String(err) })
   }
+})
+
+// ── API key direct login (fallback for devices without WebAuthn) ──────────────
+
+router.post('/login/apikey', (req, res) => {
+  const { apiKey } = req.body as { apiKey?: string }
+  const serverKey = process.env.API_KEY
+  if (!serverKey || !apiKey || apiKey !== serverKey) {
+    res.status(401).json({ error: 'Invalid API key' })
+    return
+  }
+  createSessionCookie(res)
+  res.json({ ok: true })
 })
 
 // ── Logout ────────────────────────────────────────────────────────────────────

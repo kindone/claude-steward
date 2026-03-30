@@ -9,6 +9,7 @@ import {
   finishRegistration,
   startLogin as apiStartLogin,
   finishLogin,
+  loginWithApiKey,
 } from '../lib/api'
 
 type Props = {
@@ -152,16 +153,28 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
                     ) : (
                       <PasskeyIcon />
                     )}
-                    Register this device
+                    Register passkey
                   </button>
                   <button
-                    onClick={() => { setShowBootstrap(false); setBootstrapKey(''); setError(null) }}
-                    disabled={busy}
-                    className="rounded-lg border border-[#333] px-4 py-2.5 text-sm text-[#666] transition hover:text-white disabled:opacity-50"
+                    onClick={async () => {
+                      setBusy(true); setError(null)
+                      try { await loginWithApiKey(bootstrapKey); onAuthenticated() }
+                      catch (err) { setError(err instanceof Error ? err.message : String(err)) }
+                      finally { setBusy(false) }
+                    }}
+                    disabled={busy || !bootstrapKey}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-[#333] bg-[#1a1a1a] px-4 py-2.5 text-sm font-medium text-[#aaa] transition hover:text-white hover:border-[#555] disabled:opacity-50"
                   >
-                    Cancel
+                    Sign in directly
                   </button>
                 </div>
+                <button
+                  onClick={() => { setShowBootstrap(false); setBootstrapKey(''); setError(null) }}
+                  disabled={busy}
+                  className="mt-1 w-full text-center text-xs text-[#444] hover:text-[#888] transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
               </div>
             )}
           </div>

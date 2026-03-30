@@ -70,6 +70,19 @@ export async function finishLogin(response: unknown): Promise<void> {
   }
 }
 
+export async function loginWithApiKey(apiKey: string): Promise<void> {
+  const res = await fetch('/api/auth/login/apikey', {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ apiKey }),
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(body.error ?? 'Invalid API key')
+  }
+}
+
 export async function logout(): Promise<void> {
   await fetch('/api/auth/logout', { method: 'POST', ...credentialsOpt })
 }
