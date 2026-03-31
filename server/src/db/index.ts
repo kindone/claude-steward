@@ -146,6 +146,15 @@ try {
   db.exec(`ALTER TABLE schedules ADD COLUMN once INTEGER NOT NULL DEFAULT 0`)
 } catch { /* already exists */ }
 try {
+  db.exec(`ALTER TABLE schedules ADD COLUMN label TEXT NOT NULL DEFAULT ''`)
+} catch { /* already exists */ }
+// Unique index so re-emitting the same label+session upserts instead of duplicating.
+// Non-empty labels only — empty label schedules are always inserted fresh.
+try {
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_schedules_session_label
+           ON schedules(session_id, label) WHERE label != ''`)
+} catch { /* already exists */ }
+try {
   db.exec(`ALTER TABLE sessions ADD COLUMN model TEXT`)
 } catch { /* already exists */ }
 
@@ -511,8 +520,14 @@ export const pushSubscriptionQueries = {
 // ── Schedule queries ──────────────────────────────────────────────────────────
 
 const insertScheduleStmt = db.prepare(
-  `INSERT INTO schedules (id, session_id, cron, prompt, enabled, once, next_run_at)
-   VALUES (?, ?, ?, ?, 1, ?, ?) RETURNING *`
+  `INSERT INTO schedules (id, session_id, cron, prompt, label, enabled, once, next_run_at)
+   VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+   ON CONFLICT(session_id, label) WHERE label != '' DO UPDATE SET
+     cron        = excluded.cron,
+     prompt      = excluded.prompt,
+     next_run_at = excluded.next_run_at,
+     updated_at  = unixepoch()
+   RETURNING *`
 )
 const listSchedulesStmt = db.prepare(`SELECT * FROM schedules ORDER BY created_at ASC`)
 const listSchedulesBySessionStmt = db.prepare(
@@ -534,8 +549,8 @@ const deleteScheduleStmt = db.prepare(`DELETE FROM schedules WHERE id = ?`)
 const deleteSchedulesBySessionStmt = db.prepare(`DELETE FROM schedules WHERE session_id = ?`)
 
 export const scheduleQueries = {
-  create: (id: string, sessionId: string, cron: string, prompt: string, nextRunAt: number | null, once = false) =>
-    insertScheduleStmt.get(id, sessionId, cron, prompt, once ? 1 : 0, nextRunAt) as Schedule,
+  create: (id: string, sessionId: string, cron: string, prompt: string, nextRunAt: number | null, once = false, label = '') =>
+    insertScheduleStmt.get(id, sessionId, cron, prompt, label, once ? 1 : 0, nextRunAt) as Schedule,
   list: () => listSchedulesStmt.all() as Schedule[],
   listBySession: (sessionId: string) => listSchedulesBySessionStmt.all(sessionId) as Schedule[],
   findById: (id: string) => findScheduleByIdStmt.get(id) as Schedule | undefined,
