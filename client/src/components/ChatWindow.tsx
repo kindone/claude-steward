@@ -107,6 +107,9 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
    *  fires before momentum ends. Auto-scroll is suppressed while this is true. */
   const userIsScrollingRef = useRef(false)
   const scrollSettleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /** Set to true before a programmatic scrollTop change so the resulting scroll event
+   *  doesn't incorrectly mark the user as scrolling and block streaming auto-scroll. */
+  const skipNextScrollRef = useRef(false)
   const cancelRef = useRef<(() => void) | null>(null)
   /** True while we have an active sendMessage() — poll must not overwrite the optimistic assistant bubble. */
   const streamingFromSendRef = useRef(false)
@@ -164,49 +167,42 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
     }
   }
 
-  // Track wasAtBottomRef for auto-scroll logic via scroll events (ref only, no state = no re-renders).
-  // isAtBottom state (for the button) is driven by IntersectionObserver on bottomRef so it never
-  // fires during the scroll path — React re-renders from setIsAtBottom were interrupting iOS momentum.
+  // Track wasAtBottomRef synchronously on every scroll event (ref-only, no re-renders).
+  // isAtBottom state (for the button) is updated only after scrolling fully settles (150ms
+  // of no events) — piggybacking on the same debounce timer as userIsScrollingRef.
+  // This replaces the previous IntersectionObserver approach: the IO was oscillating when
+  // bottomRef sat exactly at its rootMargin threshold, causing rapid setIsAtBottom flips
+  // that triggered re-renders → micro layout shifts → more IO firings → loop.
   useEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
     const onScroll = () => {
-      // Mark scrolling active; clear 150ms after the last event fires.
-      // This covers iOS momentum: scroll events fire throughout deceleration,
-      // so the debounce stays active until the physics animation fully settles.
+      // Ignore the scroll event fired by our own programmatic scrollTop assignment
+      // (e.g. the scroll-to-bottom button click). Without this, the event would set
+      // userIsScrollingRef=true for 150ms, blocking streaming auto-scroll and causing
+      // the view to drift up from the bottom as new content arrived.
+      if (skipNextScrollRef.current) {
+        skipNextScrollRef.current = false
+        return
+      }
       userIsScrollingRef.current = true
       if (scrollSettleTimerRef.current) clearTimeout(scrollSettleTimerRef.current)
       scrollSettleTimerRef.current = setTimeout(() => {
         userIsScrollingRef.current = false
+        // Update button visibility only after scroll physics have fully settled.
+        // No re-render fires during active scrolling, so iOS momentum is never interrupted.
+        const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50
+        setIsAtBottom(atBottom)
       }, 150)
 
       const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50
       wasAtBottomRef.current = atBottom
-      // NOTE: no setIsAtBottom here — that's handled by IntersectionObserver below
     }
     container.addEventListener('scroll', onScroll, { passive: true })
     return () => {
       container.removeEventListener('scroll', onScroll)
       if (scrollSettleTimerRef.current) clearTimeout(scrollSettleTimerRef.current)
     }
-  }, [])
-
-  // Show/hide the scroll-to-bottom button by observing whether bottomRef is visible.
-  // IntersectionObserver fires asynchronously outside the scroll path, so it never
-  // causes React re-renders during active scrolling.
-  useEffect(() => {
-    const bottom = bottomRef.current
-    const container = scrollContainerRef.current
-    if (!bottom || !container) return
-    const observer = new IntersectionObserver(
-      ([entry]) => setIsAtBottom(entry.isIntersecting),
-      // rootMargin extends the root's bounding box — 80px at bottom so the
-      // zero-height bottomRef div registers as intersecting before it's fully
-      // scrolled into view (matches the ~50px "at bottom" feel).
-      { root: container, threshold: 0, rootMargin: '0px 0px 80px 0px' },
-    )
-    observer.observe(bottom)
-    return () => observer.disconnect()
   }, [])
 
   useEffect(() => {
@@ -218,14 +214,19 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
       return
     }
     if (behavior === 'instant') {
-      // Initial load: snap to bottom unconditionally
-      bottomRef.current?.scrollIntoView({ behavior: 'instant' })
+      // Initial load: snap to absolute bottom.
+      // Setting scrollTop = 1e9 (clamped by the browser to scrollHeight - clientHeight)
+      // is more reliable than reading scrollHeight ourselves — layout may not have fully
+      // resolved yet (fonts, mermaid, flex recalc), so a stale scrollHeight would land
+      // us short of the true bottom and cause the scroll button to appear spuriously.
+      const container = scrollContainerRef.current
+      if (container) container.scrollTop = 1e9
       scrollBehaviorRef.current = 'smooth'
     } else {
       // New content: scroll to bottom only if user was already there and not actively scrolling
       if (wasAtBottomRef.current && !userIsScrollingRef.current) {
         const container = scrollContainerRef.current
-        if (container) container.scrollTop = container.scrollHeight
+        if (container) container.scrollTop = 1e9
       }
     }
   }, [messages])
@@ -593,27 +594,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         )}
       </div>
 
-      {/* Messages — flex column so scroll container can be flex-1 (avoids h-full fragility on iOS Safari) */}
-      <div className="relative flex-1 min-h-0 flex flex-col">
-      {!isAtBottom && (
-        <button
-          onClick={() => {
-            const container = scrollContainerRef.current
-            if (!container) return
-            // Pin flags so streaming auto-scroll keeps us at bottom after the snap.
-            wasAtBottomRef.current = true
-            userIsScrollingRef.current = false
-            // rAF ensures layout is settled before we read scrollHeight.
-            requestAnimationFrame(() => {
-              container.scrollTop = container.scrollHeight
-            })
-          }}
-          className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-[#1a1a1a] border border-[#333] hover:border-[#555] rounded-full text-[#888] hover:text-[#ccc] text-xs px-3 py-1.5 cursor-pointer transition-colors shadow-lg"
-          title="Scroll to bottom"
-        >
-          ↓ Scroll to bottom
-        </button>
-      )}
+      {/* Scroll container — direct flex child; no extra wrapper needed */}
       <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto overscroll-y-none px-4 pt-6 md:px-6 md:pt-8 flex flex-col gap-5" style={{ paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom))' }}>
         {hasMore && (
           <div className="flex justify-center flex-shrink-0">
@@ -666,6 +647,34 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         )}
         <div ref={bottomRef} />
       </div>
+
+      {/* Scroll-to-bottom button — lives in a zero-height div OUTSIDE the scroll container
+          so it has no DOM relationship with the scrollable area. This prevents iOS Safari
+          from firing micro scroll-correction events when the button appears/disappears,
+          which was causing the IntersectionObserver threshold to oscillate.
+          Negative top pulls it up to float above the MessageInput. */}
+      <div className="relative h-0 overflow-visible">
+        <button
+          onClick={() => {
+            const container = scrollContainerRef.current
+            if (!container) return
+            wasAtBottomRef.current = true
+            userIsScrollingRef.current = false
+            // Flag the scroll event this assignment will fire as programmatic,
+            // so the handler ignores it and streaming auto-scroll keeps working.
+            skipNextScrollRef.current = true
+            requestAnimationFrame(() => {
+              container.scrollTop = 1e9
+            })
+            // Hide the button immediately — don't wait for the 150ms settle debounce.
+            setIsAtBottom(true)
+          }}
+          className={`absolute -top-12 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-[#1a1a1a] border border-[#333] hover:border-[#555] rounded-full text-[#888] hover:text-[#ccc] text-xs px-3 py-1.5 cursor-pointer shadow-lg transition-[opacity,visibility] duration-200 ${isAtBottom ? 'opacity-0 invisible' : 'opacity-100 visible'}`}
+          title="Scroll to bottom"
+          aria-hidden={isAtBottom}
+        >
+          ↓ Scroll to bottom
+        </button>
       </div>
 
       <MessageInput

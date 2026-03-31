@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
@@ -51,14 +51,22 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
   /** Per-message SVG cache: graph source → rendered SVG string. */
   const mermaidCache = useRef<Map<string, string>>(new Map())
 
-  // Syntax-highlight code blocks after render
-  useEffect(() => {
+  // Syntax-highlight code blocks after every render.
+  //
+  // dangerouslySetInnerHTML resets innerHTML on any re-render (e.g. parent
+  // state changes like isAtBottom toggling), which wipes hljs-applied
+  // <span class="hljs-*"> elements and causes colors to disappear.
+  // Running this as a useLayoutEffect with no deps array mirrors the mermaid
+  // pattern: it fires synchronously after every render before paint, so hljs
+  // re-applies before the user sees unstyled code. The :not(.hljs) selector
+  // skips already-highlighted blocks, making each pass cheap.
+  useLayoutEffect(() => {
     if (contentRef.current && role === 'assistant' && !errorCode) {
       contentRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
         hljs.highlightElement(block as HTMLElement)
       })
     }
-  }, [displayContent, role, errorCode])
+  }) // intentionally no deps — must run after every render
 
   // Re-apply Mermaid SVGs after every render.
   //
