@@ -22,7 +22,9 @@ client/src/
     ├── ChatWindow.tsx     ← message history, streaming, stop, 🔔 push toggle, 🕐 schedule panel, ↓ scroll button
     ├── HtmlPreview.tsx    ← sandboxed <iframe srcdoc> with Source/Preview tab toggle; auto-sizes to content
     ├── MessageBubble.tsx  ← rich rendering: markdown + hljs + mermaid + KaTeX + HTML preview + image rewriting
-    └── MessageInput.tsx   ← textarea, Send / Stop button
+    ├── MessageInput.tsx   ← textarea, Send / Stop button
+    ├── AppsPanel.tsx      ← list/create/start/stop mini-apps; "View" button opens AppViewPanel inline
+    └── AppViewPanel.tsx   ← side panel that embeds a running app in an iframe (½ or ⅔ split; full-screen on mobile)
 
 hooks/
 └── usePushNotifications.ts ← SW registration, subscribe/unsubscribe, PushState machine
@@ -57,6 +59,9 @@ App
 │   └── [Term tab]  ← always mounted (CSS hidden), xterm.js instance persists
 │       └── TerminalPanel    (xterm.js viewport + input bar + history)
 │
+├── AppViewPanel  (conditional; rendered alongside chat when an app is being viewed)
+│   └── <iframe sandbox="…"> embedding the running app URL
+│
 └── ChatWindow  (keyed on sessionId — remounts on session switch)
     ├── session header bar   (always visible: ⚙ Prompt toggle left, ⊡ Compact + 🔔 Push + 🕐 Schedules + Plan/Edit/Full right)
     │   ├── token usage row  (shown after first response: "N ctx · M out · $X.XXXX"; ctx = input + cache_read + cache_creation; hover for breakdown)
@@ -89,6 +94,8 @@ All global state lives in `App.tsx`. No external store.
 | `sessions[].permission_mode` | `PermissionMode` | Per-session; controls `--permission-mode` passed to Claude CLI |
 | `loading` | `boolean` | Session list loading indicator |
 | `restarting` | `boolean` | Overlay shown during app-level reload |
+| `appPanel` | `{ url: string; name: string } \| null` | Currently-viewed app; set by `AppsPanel`'s "View" button, cleared by `AppViewPanel`'s close button |
+| `appPanelPreset` | `'half' \| 'wide'` | Split ratio for the app panel (persisted as React state; not persisted to localStorage) |
 
 Key refs (not state, so they don't trigger re-renders):
 

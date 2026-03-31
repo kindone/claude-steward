@@ -27,6 +27,7 @@ type Props = {
   onLogout?: () => void
   connState?: ConnState
   lastSeenAt?: number | null
+  onOpenApp?: (url: string, name: string) => void
 }
 
 export function SessionSidebar({
@@ -49,6 +50,7 @@ export function SessionSidebar({
   onLogout,
   connState,
   lastSeenAt,
+  onOpenApp,
 }: Props) {
   const { state: pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
@@ -288,7 +290,7 @@ export function SessionSidebar({
       {activeTab === 'apps' && (() => {
         const project = projects.find((p) => p.id === activeProjectId)
         return project
-          ? <AppsPanel projectId={project.id} projectPath={project.path} />
+          ? <AppsPanel projectId={project.id} projectPath={project.path} onOpenApp={onOpenApp} />
           : <p className="px-3 py-4 text-[12px] text-[#444] italic">No project selected</p>
       })()}
 

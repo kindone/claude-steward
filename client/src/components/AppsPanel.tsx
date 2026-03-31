@@ -4,6 +4,7 @@ import { listApps, createApp, deleteApp, startApp, stopApp, type AppConfig } fro
 type Props = {
   projectId: string
   projectPath: string
+  onOpenApp?: (url: string, name: string) => void
 }
 
 const MKDOCS_TEMPLATE = '/home/ubuntu/venv/bin/mkdocs serve --dev-addr 0.0.0.0:{port}'
@@ -15,7 +16,7 @@ const STATUS_DOT: Record<AppConfig['status'], string> = {
   error:   'bg-red-500',
 }
 
-export function AppsPanel({ projectId, projectPath }: Props) {
+export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
   const [apps, setApps] = useState<AppConfig[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -218,13 +219,23 @@ export function AppsPanel({ projectId, projectPath }: Props) {
               {/* Actions */}
               <div className="flex items-center gap-1.5">
                 {(isRunning || isStarting) ? (
-                  <button
-                    onClick={() => void handleStop(app)}
-                    disabled={isBusy || isStarting}
-                    className="bg-transparent border border-[#2a2a2a] hover:border-red-500/50 hover:text-red-400 text-[#666] rounded px-2 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40"
-                  >
-                    {isBusy ? 'Stopping…' : isStarting ? 'Starting…' : 'Stop'}
-                  </button>
+                  <>
+                    <button
+                      onClick={() => void handleStop(app)}
+                      disabled={isBusy || isStarting}
+                      className="bg-transparent border border-[#2a2a2a] hover:border-red-500/50 hover:text-red-400 text-[#666] rounded px-2 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40"
+                    >
+                      {isBusy ? 'Stopping…' : isStarting ? 'Starting…' : 'Stop'}
+                    </button>
+                    {isRunning && appUrl && onOpenApp && (
+                      <button
+                        onClick={() => onOpenApp(appUrl, app.name)}
+                        className="bg-transparent border border-[#2a2a2a] hover:border-blue-500/50 hover:text-blue-400 text-[#666] rounded px-2 py-0.5 text-[11px] cursor-pointer transition-colors"
+                      >
+                        View
+                      </button>
+                    )}
+                  </>
                 ) : (
                   <button
                     onClick={() => void handleStart(app)}

@@ -8,6 +8,7 @@ import {
 } from './lib/api'
 import { SessionSidebar } from './components/SessionSidebar'
 import { ChatWindow } from './components/ChatWindow'
+import { AppViewPanel } from './components/AppViewPanel'
 import AuthPage from './components/AuthPage'
 import { useAppConnection, type ConnState } from './hooks/useAppConnection'
 
@@ -98,6 +99,8 @@ export default function App() {
   const [restarting, setRestarting] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [clientError, setClientError] = useState<string | null>(null)
+  const [appPanel, setAppPanel] = useState<{ url: string; name: string } | null>(null)
+  const [appPanelPreset, setAppPanelPreset] = useState<'half' | 'wide'>('half')
 
   // Capture unhandled JS errors and promise rejections for visibility
   useEffect(() => {
@@ -428,86 +431,101 @@ export default function App() {
           onLogout={handleLogout}
           connState={connState}
           lastSeenAt={lastSeenAt}
+          onOpenApp={(url, name) => setAppPanel({ url, name })}
         />
       </div>
 
       {/* Main content */}
-      <main className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Mobile header bar */}
-        <div className="flex items-center gap-2 h-11 px-2 border-b border-[#1f1f1f] md:hidden flex-shrink-0 bg-[#0d0d0d]">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="w-11 h-11 flex items-center justify-center text-[#666] hover:text-[#aaa] text-xl flex-shrink-0"
-            aria-label="Open sidebar"
-          >
-            ☰
-          </button>
-          <ConnectionDot state={connState} lastSeenAt={lastSeenAt} />
-          <span className="flex-1 text-sm text-[#888] truncate text-center">
-            {mobileTitle}
-          </span>
-          <button
-            onClick={() => window.location.reload()}
-            className="w-11 h-11 flex items-center justify-center text-[#555] hover:text-[#aaa] flex-shrink-0"
-            title="Refresh"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-            </svg>
-          </button>
-          <button
-            onClick={handleLogout}
-            className="w-11 h-11 flex items-center justify-center text-[#555] hover:text-[#aaa] flex-shrink-0"
-            title="Sign out"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
-            </svg>
-          </button>
+      <main className="flex-1 flex overflow-hidden min-w-0">
+        {/* Chat column */}
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          {/* Mobile header bar */}
+          <div className="flex items-center gap-2 h-11 px-2 border-b border-[#1f1f1f] md:hidden flex-shrink-0 bg-[#0d0d0d]">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="w-11 h-11 flex items-center justify-center text-[#666] hover:text-[#aaa] text-xl flex-shrink-0"
+              aria-label="Open sidebar"
+            >
+              ☰
+            </button>
+            <ConnectionDot state={connState} lastSeenAt={lastSeenAt} />
+            <span className="flex-1 text-sm text-[#888] truncate text-center">
+              {mobileTitle}
+            </span>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-11 h-11 flex items-center justify-center text-[#555] hover:text-[#aaa] flex-shrink-0"
+              title="Refresh"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+              </svg>
+            </button>
+            <button
+              onClick={handleLogout}
+              className="w-11 h-11 flex items-center justify-center text-[#555] hover:text-[#aaa] flex-shrink-0"
+              title="Sign out"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/>
+              </svg>
+            </button>
+          </div>
+
+          {activeSessionId ? (
+            <ChatWindow
+              key={activeSessionId}
+              sessionId={activeSessionId}
+              systemPrompt={sessions.find((s) => s.id === activeSessionId)?.system_prompt ?? null}
+              permissionMode={sessions.find((s) => s.id === activeSessionId)?.permission_mode ?? 'acceptEdits'}
+              timezone={sessions.find((s) => s.id === activeSessionId)?.timezone ?? null}
+              model={sessions.find((s) => s.id === activeSessionId)?.model ?? null}
+              claudeSessionId={sessions.find((s) => s.id === activeSessionId)?.claude_session_id ?? null}
+              projectId={activeProjectId}
+              onTitle={(title) => handleTitleUpdate(activeSessionId, title)}
+              onActivity={() => handleSessionActivity(activeSessionId)}
+              onSystemPromptChange={(prompt) =>
+                setSessions((prev) =>
+                  prev.map((s) => s.id === activeSessionId ? { ...s, system_prompt: prompt } : s)
+                )
+              }
+              onPermissionModeChange={(mode) => handlePermissionModeChange(activeSessionId, mode)}
+              onModelChange={(newModel) =>
+                setSessions((prev) =>
+                  prev.map((s) => s.id === activeSessionId ? { ...s, model: newModel } : s)
+                )
+              }
+              onCompact={handleCompact}
+            />
+          ) : (
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-[#666]">
+              {activeProjectId ? (
+                <>
+                  <p>No sessions in this project yet.</p>
+                  <button
+                    className="bg-blue-600 hover:bg-blue-700 text-white border-none px-6 py-2.5 rounded-lg cursor-pointer text-[15px] transition-colors"
+                    onClick={handleNewSession}
+                  >
+                    New Chat
+                  </button>
+                </>
+              ) : (
+                <p>Create a project to start chatting.</p>
+              )}
+            </div>
+          )}
         </div>
 
-        {activeSessionId ? (
-          <ChatWindow
-            key={activeSessionId}
-            sessionId={activeSessionId}
-            systemPrompt={sessions.find((s) => s.id === activeSessionId)?.system_prompt ?? null}
-            permissionMode={sessions.find((s) => s.id === activeSessionId)?.permission_mode ?? 'acceptEdits'}
-            timezone={sessions.find((s) => s.id === activeSessionId)?.timezone ?? null}
-            model={sessions.find((s) => s.id === activeSessionId)?.model ?? null}
-            claudeSessionId={sessions.find((s) => s.id === activeSessionId)?.claude_session_id ?? null}
-            projectId={activeProjectId}
-            onTitle={(title) => handleTitleUpdate(activeSessionId, title)}
-            onActivity={() => handleSessionActivity(activeSessionId)}
-            onSystemPromptChange={(prompt) =>
-              setSessions((prev) =>
-                prev.map((s) => s.id === activeSessionId ? { ...s, system_prompt: prompt } : s)
-              )
-            }
-            onPermissionModeChange={(mode) => handlePermissionModeChange(activeSessionId, mode)}
-            onModelChange={(newModel) =>
-              setSessions((prev) =>
-                prev.map((s) => s.id === activeSessionId ? { ...s, model: newModel } : s)
-              )
-            }
-            onCompact={handleCompact}
+        {/* App view panel — mobile: full-screen overlay; desktop: side column */}
+        {appPanel && (
+          <AppViewPanel
+            url={appPanel.url}
+            name={appPanel.name}
+            preset={appPanelPreset}
+            onPresetChange={setAppPanelPreset}
+            onClose={() => setAppPanel(null)}
           />
-        ) : (
-          <div className="flex flex-col items-center justify-center h-full gap-4 text-[#666]">
-            {activeProjectId ? (
-              <>
-                <p>No sessions in this project yet.</p>
-                <button
-                  className="bg-blue-600 hover:bg-blue-700 text-white border-none px-6 py-2.5 rounded-lg cursor-pointer text-[15px] transition-colors"
-                  onClick={handleNewSession}
-                >
-                  New Chat
-                </button>
-              </>
-            ) : (
-              <p>Create a project to start chatting.</p>
-            )}
-          </div>
         )}
       </main>
     </div>

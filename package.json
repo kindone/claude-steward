@@ -29,7 +29,8 @@
     "test:all": "npm test && npm run test:e2e",
     "status": "node scripts/status.js",
     "stock-chart": "npx tsx scripts/stock-chart.ts",
-    "compare-chart": "npx tsx scripts/compare-chart.ts"
+    "compare-chart": "npx tsx scripts/compare-chart.ts",
+    "overview-chart": "npx tsx scripts/overview-chart.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

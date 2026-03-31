@@ -49,8 +49,13 @@ function handleCommand(socket: net.Socket, cmd: AppsCommand): void {
       child = spawn('sh', ['-c', cmd.command], {
         cwd: cmd.workDir,
         stdio: 'ignore',
-        detached: false,
+        // detached=true creates a new process group so we can kill the entire
+        // group (sh + all children) with process.kill(-pgid). Without this,
+        // killing the sh wrapper orphans child processes (e.g. mkdocs).
+        detached: true,
       })
+      // Don't keep the sidecar alive just because the child is running
+      child.unref()
     } catch (err) {
       reply(socket, { type: 'error', configId: cmd.configId, error: String(err) })
       return
@@ -92,11 +97,14 @@ function handleCommand(socket: net.Socket, cmd: AppsCommand): void {
     }
 
     child.once('exit', onExit)
-    child.kill('SIGTERM')
+    // Kill the entire process group (negative pgid) so sh + all children die
+    try { process.kill(-child.pid!, 'SIGTERM') } catch { child.kill('SIGTERM') }
 
     // Force-kill after 5s if SIGTERM didn't work
     setTimeout(() => {
-      if (!child.killed) child.kill('SIGKILL')
+      if (!child.killed) {
+        try { process.kill(-child.pid!, 'SIGKILL') } catch { child.kill('SIGKILL') }
+      }
     }, 5_000)
   } else if (cmd.type === 'status') {
     const list = Array.from(apps.entries()).map(([configId, app]) => ({
@@ -149,7 +157,7 @@ function shutdown(): void {
   console.log('[apps] shutting down...')
   for (const [configId, app] of apps) {
     console.log(`[apps] killing configId=${configId}`)
-    app.process.kill('SIGTERM')
+    try { process.kill(-app.process.pid!, 'SIGTERM') } catch { app.process.kill('SIGTERM') }
   }
   server.close(() => process.exit(0))
   setTimeout(() => process.exit(0), 3_000)

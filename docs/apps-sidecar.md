@@ -9,6 +9,7 @@ The `steward-apps` process manages mini-app child processes (MkDocs, Vite, etc.)
 - **Sidecar = dumb process manager** — no DB access, no business logic. Receives commands, spawns/kills OS processes, replies with status.
 - **Server = brain** — owns all DB writes (CRUD for `app_configs`, slot assignment, status tracking). Tells the sidecar what to run.
 - **Independence** — apps are children of the sidecar, not the HTTP server. Server restart = apps unaffected.
+- **Always use the HTTP API** — never send commands directly to the sidecar socket. Only the server knows the UUID `configId` from the DB; bypassing the API creates state divergence (sidecar has a friendly string key, DB has a UUID, resulting in a phantom `crashed` event).
 
 This mirrors the worker architecture: the sidecar holds the process lifecycle, the server handles persistence and API.
 
@@ -132,6 +133,9 @@ child process exits unexpectedly
 
 ### Sidecar restart
 All child processes die. On reconnect, the server should call `appSlotQueries.resetStale()` to clear any `starting`/`running` slots back to `stopped` — analogous to `markStaleStreamingMessages()` in the worker. (Registered as `appsClient.onReconnected` hook — not yet implemented; left as a TODO.)
+
+### Process group killing
+The sidecar spawns with `detached: true`, which puts the child in its own process group. On stop/crash, the sidecar calls `process.kill(-pgid, 'SIGTERM')` (note the negative PID = PGID) to kill the entire group — `sh` wrapper plus all its descendants (e.g. mkdocs + its Python subprocess). Without this, killing the `sh` wrapper would orphan child processes that keep the port bound. Falls back to `child.kill()` if the PGID kill throws. Force-SIGKILL fires after 5s if SIGTERM doesn't work.
 
 ---
 
