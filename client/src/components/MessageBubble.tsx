@@ -8,6 +8,7 @@ import 'katex/dist/katex.min.css'
 import type { ClaudeErrorCode, ToolCall } from '../lib/api'
 import { splitContent, buildMarkedOptions, preprocessKaTeX } from '../lib/markdownRenderer'
 import { HtmlPreview } from './HtmlPreview'
+import { ImageLightbox, type LightboxContent } from './ImageLightbox'
 
 // Mermaid is initialized once at module level with a dark theme.
 mermaid.initialize({ startOnLoad: false, theme: 'dark' })
@@ -48,6 +49,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
   const contentRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
+  const [lightbox, setLightbox] = useState<LightboxContent | null>(null)
   /** Per-message SVG cache: graph source → rendered SVG string. */
   const mermaidCache = useRef<Map<string, string>>(new Map())
 
@@ -113,6 +115,21 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       })
     })
   }) // intentionally no deps — must run after every render
+
+  function handleContentClick(e: React.MouseEvent<HTMLDivElement>) {
+    const target = e.target as Element
+    // img click — open lightbox with the image src
+    const img = target.closest('img')
+    if (img) {
+      setLightbox({ type: 'img', src: (img as HTMLImageElement).src, alt: img.getAttribute('alt') ?? '' })
+      return
+    }
+    // svg click — target may be an inner <path>/<g>/etc., walk up to <svg> root
+    const svg = target.closest('svg')
+    if (svg) {
+      setLightbox({ type: 'svg', markup: svg.outerHTML })
+    }
+  }
 
   async function handleCopy() {
     await navigator.clipboard.writeText(displayContent)
@@ -192,6 +209,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
             <div
               ref={contentRef}
               className={`prose text-sm leading-[1.65] break-words w-full${streaming ? ' streaming-cursor' : ''}`}
+              onClick={handleContentClick}
             >
               {splitContent(displayContent).map((seg, i) =>
                 seg.type === 'html-preview' ? (
@@ -254,6 +272,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
           )}
         </>
       )}
+      {lightbox && <ImageLightbox content={lightbox} onClose={() => setLightbox(null)} />}
     </div>
   )
 }

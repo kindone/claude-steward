@@ -77,3 +77,10 @@ body {
   color: #999;
   margin: 10px 0;
 }
+
+/* Lightbox: images and SVGs are clickable to enlarge */
+.prose img,
+.prose svg,
+.mermaid-placeholder svg {
+  cursor: zoom-in;
+}

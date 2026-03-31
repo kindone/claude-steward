@@ -21,7 +21,8 @@ client/src/
     ├── TerminalPanel.tsx  ← xterm.js terminal; runs commands via POST /exec SSE
     ├── ChatWindow.tsx     ← message history, streaming, stop, 🔔 push toggle, 🕐 schedule panel, ↓ scroll button
     ├── HtmlPreview.tsx    ← sandboxed <iframe srcdoc> with Source/Preview tab toggle; auto-sizes to content
-    ├── MessageBubble.tsx  ← rich rendering: markdown + hljs + mermaid + KaTeX + HTML preview + image rewriting
+    ├── ImageLightbox.tsx  ← fullscreen image/SVG viewer; scroll-to-zoom (cursor-anchored), drag-to-pan, Escape/backdrop to close
+    ├── MessageBubble.tsx  ← rich rendering: markdown + hljs + mermaid + KaTeX + HTML preview + image rewriting + lightbox
     ├── MessageInput.tsx   ← textarea, Send / Stop button
     ├── AppsPanel.tsx      ← list/create/start/stop mini-apps; "View" button opens AppViewPanel inline
     └── AppViewPanel.tsx   ← side panel that embeds a running app in an iframe (½ or ⅔ split; full-screen on mobile)
@@ -241,6 +242,20 @@ raw content string
 - The `image` renderer in `buildMarkedOptions(projectId)` intercepts relative paths (anything that doesn't start with `https?:`, `data:`, or `/`) and rewrites them to `/api/projects/:id/files/raw?path=<encoded>`.
 - Absolute URLs and data URIs pass through unchanged.
 - When `projectId` is null (no active project) no rewriting happens.
+
+---
+
+### Image Lightbox (`ImageLightbox.tsx`)
+
+Clicking any `<img>` or `<svg>` inside an assistant bubble opens a fullscreen lightbox.
+
+- **Trigger**: delegated `onClick` on the `.prose` container catches clicks on `img` and `svg` elements (uses `closest()` since SVG click targets can be inner `<path>`/`<g>` children).
+- **Zoom**: scroll wheel, cursor-anchored (point under cursor stays fixed). Range: 0.1×–20×. Non-passive wheel listener attached via `useEffect` so `preventDefault()` actually works.
+- **Pan**: drag to move. `onMouseLeave` on the overlay ends the drag so it doesn't get stuck if the mouse exits.
+- **Controls**: 1:1 reset button (top-right), close button (✕), Escape key, backdrop click.
+- **Portal**: renders into `document.body` via `createPortal` at `z-[300]`, above the FileTree modal (`z-[200]`).
+- **SVG content**: captured as `svg.outerHTML` (already DOMPurify-sanitized from the render pipeline) and re-injected via `dangerouslySetInnerHTML` — no second sanitization pass needed.
+- **Cursor hint**: `.prose img`, `.prose svg`, and `.mermaid-placeholder svg` get `cursor: zoom-in` via plain CSS in `index.css` (Tailwind can't reach inside `dangerouslySetInnerHTML`).
 
 ---
 
