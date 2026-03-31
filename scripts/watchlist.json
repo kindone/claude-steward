@@ -1,0 +1,128 @@
+{
+  "groups": {
+    "us-bigtech": {
+      "description": "US mega-cap tech",
+      "benchmarks": ["^GSPC", "^NDX"],
+      "tickers": [
+        { "symbol": "GOOG",  "name": "Alphabet" },
+        { "symbol": "AAPL",  "name": "Apple" },
+        { "symbol": "MSFT",  "name": "Microsoft" },
+        { "symbol": "META",  "name": "Meta" },
+        { "symbol": "AMZN",  "name": "Amazon" }
+      ]
+    },
+    "us-semiconductor": {
+      "description": "US semiconductors",
+      "benchmarks": ["^GSPC", "^SOX"],
+      "tickers": [
+        { "symbol": "NVDA",  "name": "NVIDIA" },
+        { "symbol": "AMD",   "name": "AMD" },
+        { "symbol": "INTC",  "name": "Intel" },
+        { "symbol": "AVGO",  "name": "Broadcom" },
+        { "symbol": "MRVL",  "name": "Marvell" }
+      ]
+    },
+    "us-software": {
+      "description": "Enterprise & data software (US/EU)",
+      "benchmarks": ["^GSPC"],
+      "tickers": [
+        { "symbol": "IBM",    "name": "IBM" },
+        { "symbol": "PLTR",   "name": "Palantir" },
+        { "symbol": "SAP.DE", "name": "SAP" }
+      ]
+    },
+    "us-entertainment": {
+      "description": "US entertainment & streaming",
+      "benchmarks": ["^GSPC"],
+      "tickers": [
+        { "symbol": "DIS",   "name": "Disney" },
+        { "symbol": "NFLX",  "name": "Netflix" }
+      ]
+    },
+    "us-pharma": {
+      "description": "Pharma & biotech",
+      "benchmarks": ["^GSPC"],
+      "tickers": [
+        { "symbol": "JNJ",   "name": "Johnson & Johnson" },
+        { "symbol": "AMGN",  "name": "Amgen" },
+        { "symbol": "MRK",   "name": "Merck" },
+        { "symbol": "NVO",   "name": "Novo Nordisk" }
+      ]
+    },
+    "us-emerging": {
+      "description": "Disruptive / niche US",
+      "benchmarks": ["^GSPC"],
+      "tickers": [
+        { "symbol": "RKLB",  "name": "Rocket Lab" },
+        { "symbol": "COIN",  "name": "Coinbase" },
+        { "symbol": "CRCL",  "name": "Circle" },
+        { "symbol": "GRMN",  "name": "Garmin" },
+        { "symbol": "LEU",   "name": "Centrus Energy" }
+      ]
+    },
+    "korean-bluechip": {
+      "description": "Korean blue-chip (KOSPI)",
+      "benchmarks": ["^KS11", "^GSPC"],
+      "tickers": [
+        { "symbol": "005930.KS", "name": "Samsung Electronics" },
+        { "symbol": "000660.KS", "name": "SK Hynix" },
+        { "symbol": "005380.KS", "name": "Hyundai Motor" },
+        { "symbol": "000270.KS", "name": "Kia Motors" },
+        { "symbol": "055550.KS", "name": "Shinhan Financial" },
+        { "symbol": "066570.KS", "name": "LG Electronics" }
+      ]
+    },
+    "korean-tech": {
+      "description": "Korean internet & tech (KOSPI)",
+      "benchmarks": ["^KS11", "^GSPC"],
+      "tickers": [
+        { "symbol": "035420.KS", "name": "NAVER" },
+        { "symbol": "035720.KS", "name": "Kakao" },
+        { "symbol": "012450.KS", "name": "Samsung Electro-Mechanics" }
+      ]
+    },
+    "korean-defense": {
+      "description": "Korean defense, heavy industry & energy",
+      "benchmarks": ["^KS11", "^GSPC"],
+      "tickers": [
+        { "symbol": "034020.KS", "name": "Doosan Enerbility" },
+        { "symbol": "042660.KS", "name": "Hanwha Ocean" },
+        { "symbol": "009830.KS", "name": "Hanwha Solutions" },
+        { "symbol": "241560.KS", "name": "Doosan Bobcat" },
+        { "symbol": "00088K.KS", "name": "Hanwha Corp (pref)" }
+      ]
+    },
+    "korean-space": {
+      "description": "Korean space & deep tech (KOSDAQ)",
+      "benchmarks": ["^KQ11", "^KS11"],
+      "tickers": [
+        { "symbol": "099320.KQ", "name": "Satrec Initiative" }
+      ]
+    },
+    "asia-pacific": {
+      "description": "Asia-Pacific equities",
+      "benchmarks": ["^GSPC"],
+      "tickers": [
+        { "symbol": "1810.HK",  "name": "Xiaomi" },
+        { "symbol": "2330.TW",  "name": "TSMC" },
+        { "symbol": "6758.T",   "name": "Sony" }
+      ]
+    },
+    "currencies": {
+      "description": "FX pairs",
+      "benchmarks": ["^KS11"],
+      "tickers": [
+        { "symbol": "KRW=X",    "name": "USD/KRW" },
+        { "symbol": "EURKRW=X", "name": "EUR/KRW" }
+      ]
+    }
+  },
+  "indices": [
+    { "symbol": "^GSPC",  "name": "S&P 500" },
+    { "symbol": "^NDX",   "name": "NASDAQ 100" },
+    { "symbol": "^SOX",   "name": "Philadelphia Semiconductor" },
+    { "symbol": "^KS11",  "name": "KOSPI" },
+    { "symbol": "^KQ11",  "name": "KOSDAQ Composite" },
+    { "symbol": "^KQ100", "name": "KOSDAQ 100" }
+  ]
+}
