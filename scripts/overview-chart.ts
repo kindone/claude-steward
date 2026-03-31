@@ -4,11 +4,13 @@
  * all sharing the same Y-axis scale for honest cross-group comparison.
  *
  * Usage:
- *   npm run overview-chart
- *   npm run overview-chart -- 1mo
+ *   npm run overview-chart              # default: 5d
+ *   npm run overview-chart -- 1mo       # single range
+ *   npm run overview-chart -- all       # all ranges in parallel
  */
 
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fetchWithCache, type SeriesData } from './lib/fetch.js';
@@ -36,7 +38,24 @@ const RANGE_MAP: Record<string, RangeConfig> = {
   '2y':  { yahooRange: '2y',  interval: '1wk', intervalType: 'week', label: '2 Years'  },
 };
 
-const rangeArg    = process.argv[2]?.toLowerCase() ?? '';
+const rangeArg = process.argv[2]?.toLowerCase() ?? '';
+
+// ─── "all" mode: re-spawn once per range in parallel ─────────────────────────
+
+if (rangeArg === 'all') {
+  const ALL_RANGES = ['1d', '5d', '1mo', '3mo', '6mo', '1y'];
+  const script     = fileURLToPath(import.meta.url);
+  const procs = ALL_RANGES.map(r =>
+    spawn(process.execPath, ['--import', 'tsx/esm', script, r], {
+      stdio: 'inherit',
+      env:   { ...process.env },
+    })
+  );
+  const codes = await Promise.all(procs.map(p => new Promise<number>(res => p.on('close', res))));
+  const failed = codes.filter(c => c !== 0).length;
+  process.exit(failed ? 1 : 0);
+}
+
 const rangeKey    = RANGE_MAP[rangeArg] ? rangeArg : '5d';
 const rangeConfig = RANGE_MAP[rangeKey];
 

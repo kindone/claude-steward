@@ -37,10 +37,13 @@ Key design decisions:
 
 ```bash
 npm run overview-chart                # default range: 5d
-npm run overview-chart -- 1mo
+npm run overview-chart -- 1mo         # single range
+npm run overview-chart -- all         # all ranges in parallel (1d 5d 1mo 3mo 6mo 1y)
 ```
 
 Reads `scripts/watchlist.json`, fetches every ticker, and renders a 4×3 SVG grid — one cell per group. All cells share the same Y-axis (5th–95th percentile bounds, so extreme outliers are clipped rather than flattening everything else). Benchmarks appear as thin dashed lines within each cell.
+
+The `all` option re-spawns the script once per range in parallel, so all 6 SVGs are produced in one go with full cache reuse across processes.
 
 Output: `overview_<range>_chart.svg`
 
@@ -109,7 +112,7 @@ Current groups: `us-bigtech` · `us-semiconductor` · `us-software` · `us-enter
 | `/stocks remove IBM` | Remove from watchlist |
 | `/stocks list` | Show current watchlist |
 
-For the full-watchlist overview use `npm run overview-chart` directly.
+For the full-watchlist overview use `npm run overview-chart -- all` directly.
 
 ---
 
