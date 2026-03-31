@@ -35,17 +35,26 @@ Key design decisions:
 
 ### `scripts/overview-chart.ts` — small-multiples watchlist grid
 
+Two complementary modes:
+
+**Duration-wise** — one SVG per range, showing all 12 groups side by side:
 ```bash
 npm run overview-chart                # default range: 5d
 npm run overview-chart -- 1mo         # single range
-npm run overview-chart -- all         # all ranges in parallel (1d 5d 1mo 3mo 6mo 1y)
+npm run overview-chart -- all         # all 6 ranges in parallel (1d 5d 1mo 3mo 6mo 1y)
 ```
+Renders a 4×3 SVG grid (one cell per group). All cells share the same Y-axis (5th–95th percentile bounds, outliers clipped). Output: `overview_<range>_chart.svg`
 
-Reads `scripts/watchlist.json`, fetches every ticker, and renders a 4×3 SVG grid — one cell per group. All cells share the same Y-axis (5th–95th percentile bounds, so extreme outliers are clipped rather than flattening everything else). Benchmarks appear as thin dashed lines within each cell.
+**Group-wise** — one SVG per group, showing all 6 durations side by side:
+```bash
+npm run overview-chart -- group-all            # all 12 groups, each across all durations
+npm run overview-chart -- group:korean-tech    # single group
+```
+Renders a 3×2 SVG grid (one cell per duration: 1d · 5d · 1mo · 3mo · 6mo · 1y). Each panel has its own auto-scaled Y-axis so intraday and yearly views are both readable. A shared legend at the bottom labels all tickers. Output: `group_<name>_chart.svg`
 
-The `all` option re-spawns the script once per range in parallel, so all 6 SVGs are produced in one go with full cache reuse across processes.
+Both modes re-spawn child processes in parallel for maximum throughput with full cache reuse.
 
-Output: `overview_<range>_chart.svg`
+**Legend labels** — number-based tickers (Korean `.KS`, HK `.HK`, FX `=X`, etc.) display abbreviated names from the watchlist (e.g. `Samsung El…`, `SK Hynix`, `USD/KRW`). Clean alphabetic symbols (GOOG, NVDA…) keep their symbol.
 
 ---
 
@@ -112,7 +121,7 @@ Current groups: `us-bigtech` · `us-semiconductor` · `us-software` · `us-enter
 | `/stocks remove IBM` | Remove from watchlist |
 | `/stocks list` | Show current watchlist |
 
-For the full-watchlist overview use `npm run overview-chart -- all` directly.
+For the duration-wise overview use `npm run overview-chart -- all`; for group-wise use `npm run overview-chart -- group-all`.
 
 ---
 

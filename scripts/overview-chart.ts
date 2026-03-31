@@ -40,20 +40,40 @@ const RANGE_MAP: Record<string, RangeConfig> = {
 
 const rangeArg = process.argv[2]?.toLowerCase() ?? '';
 
+const ALL_RANGES = ['1d', '5d', '1mo', '3mo', '6mo', '1y'] as const;
+
 // ─── "all" mode: re-spawn once per range in parallel ─────────────────────────
 
 if (rangeArg === 'all') {
-  const ALL_RANGES = ['1d', '5d', '1mo', '3mo', '6mo', '1y'];
-  const script     = fileURLToPath(import.meta.url);
-  const procs = ALL_RANGES.map(r =>
+  const script = fileURLToPath(import.meta.url);
+  const procs  = ALL_RANGES.map(r =>
     spawn(process.execPath, ['--import', 'tsx/esm', script, r], {
       stdio: 'inherit',
       env:   { ...process.env },
     })
   );
+  const codes  = await Promise.all(procs.map(p => new Promise<number>(res => p.on('close', res))));
+  process.exit(codes.filter(c => c !== 0).length ? 1 : 0);
+}
+
+// ─── "group-all" / "group:<name>" mode ───────────────────────────────────────
+
+if (rangeArg === 'group-all' || rangeArg.startsWith('group:')) {
+  const script      = fileURLToPath(import.meta.url);
+  const watchlistRaw = JSON.parse(readFileSync(WATCHLIST, 'utf8')) as { groups: Record<string, unknown> };
+  const groupNames  = Object.keys(watchlistRaw.groups);
+  const targets     = rangeArg === 'group-all'
+    ? groupNames
+    : [rangeArg.slice(6)];
+
+  const procs = targets.map(g =>
+    spawn(process.execPath, ['--import', 'tsx/esm', script, `_group:${g}`], {
+      stdio: 'inherit',
+      env:   { ...process.env },
+    })
+  );
   const codes = await Promise.all(procs.map(p => new Promise<number>(res => p.on('close', res))));
-  const failed = codes.filter(c => c !== 0).length;
-  process.exit(failed ? 1 : 0);
+  process.exit(codes.filter(c => c !== 0).length ? 1 : 0);
 }
 
 const rangeKey    = RANGE_MAP[rangeArg] ? rangeArg : '5d';
@@ -67,6 +87,24 @@ interface Watchlist       { groups: Record<string, WatchlistGroup> }
 
 const watchlist = JSON.parse(readFileSync(WATCHLIST, 'utf8')) as Watchlist;
 const groups    = Object.entries(watchlist.groups);
+
+// Map symbol → short display name for legend labels.
+// Number-based / exchange-suffixed tickers (Korean, HK, TW, T, FX) use the
+// watchlist name truncated to 10 chars; clean alpha symbols keep themselves.
+const nameMap = new Map<string, string>();
+for (const [, g] of groups) {
+  for (const t of g.tickers) nameMap.set(t.symbol, t.name);
+}
+
+function legendLabel(sym: string): string {
+  const stripped = sym.replace(/\.\w+$/, ''); // strip .KS / .HK / .T etc.
+  const needsName = /\d/.test(stripped) || sym.endsWith('=X');
+  if (needsName) {
+    const name = nameMap.get(sym) ?? stripped;
+    return name.length <= 10 ? name : name.slice(0, 9) + '…';
+  }
+  return stripped;
+}
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
 
@@ -131,6 +169,149 @@ const LEG_ROW_H    = 13;
 const LEG_COLS     = 3;
 const CELL_H       = TITLE_H + 6 + CHART_H + 6 + LEG_ROW_H * 2 + 6;  // ~186
 const SVG_H        = PAD_TOP + ROWS * CELL_H + (ROWS - 1) * GAP_Y + PAD_BOT;
+
+// ─── Group-wise chart (all durations for one group) ───────────────────────────
+
+async function mainGroupWise(groupName: string) {
+  const entry = groups.find(([n]) => n === groupName);
+  if (!entry) { console.error(`❌ Unknown group: ${groupName}`); process.exit(1); }
+  const [, group] = entry;
+
+  const mainSyms  = group.tickers.map(t => t.symbol);
+  const benchSyms = group.benchmarks ?? ['^GSPC'];
+  const allSyms   = [...new Set([...benchSyms, ...mainSyms])];
+
+  // Fetch all 6 ranges in parallel
+  const rangeDataMaps = new Map<string, Map<string, SeriesData>>();
+  await Promise.all(ALL_RANGES.map(async rk => {
+    const rc = RANGE_MAP[rk];
+    console.log(`⏳ [${groupName}] Fetching ${allSyms.length} symbols [${rc.label}]...`);
+    const settled = await Promise.allSettled(
+      allSyms.map(s => fetchWithCache(s, rc.yahooRange, rc.interval, rc.intervalType))
+    );
+    const dm = new Map<string, SeriesData>();
+    for (let i = 0; i < allSyms.length; i++) {
+      const r = settled[i];
+      if (r.status === 'fulfilled') dm.set(allSyms[i], r.value);
+    }
+    rangeDataMaps.set(rk, dm);
+  }));
+
+  // Assign stable colors
+  let mainIdx = 0, benchIdx = 0;
+  const colorMap = new Map<string, string>();
+  [...benchSyms, ...mainSyms].forEach(s => {
+    colorMap.set(s, isBenchmark(s)
+      ? BENCH_PALETTE[benchIdx++ % BENCH_PALETTE.length]
+      : PALETTE[mainIdx++ % PALETTE.length]);
+  });
+
+  // ── Layout: 3 cols × 2 rows (6 duration panels) ──
+  const GCOLS   = 3, GROWS = 2;
+  const GAXIS_W = 38, GCHART_H = 150, GTITLE_H = 17;
+  const GCELL_W = Math.floor((SVG_W - 2 * PAD_X - (GCOLS - 1) * GAP_X) / GCOLS);
+  const GCELL_H = GTITLE_H + 6 + GCHART_H + 6;
+
+  // Shared legend sizing
+  const GLEG_COLS  = Math.min(6, mainSyms.length);
+  const GLEG_ROWS  = Math.ceil(mainSyms.length / GLEG_COLS);
+  const GLEG_H     = GLEG_ROWS * 18 + 16;
+  const G_SVG_H    = PAD_TOP + GROWS * GCELL_H + (GROWS - 1) * GAP_Y + GLEG_H + PAD_BOT;
+
+  const defs: string[]  = [];
+  const cells: string[] = [];
+
+  for (let ri = 0; ri < ALL_RANGES.length; ri++) {
+    const rk = ALL_RANGES[ri];
+    const rc = RANGE_MAP[rk];
+    const dm = rangeDataMaps.get(rk)!;
+
+    const col  = ri % GCOLS;
+    const row  = Math.floor(ri / GCOLS);
+    const cx   = PAD_X + col * (GCELL_W + GAP_X);
+    const cy   = PAD_TOP + row * (GCELL_H + GAP_Y);
+    const chx  = cx + GAXIS_W;
+    const chy  = cy + GTITLE_H + 6;
+    const cchw = GCELL_W - GAXIS_W - 2;
+    const clipId = `gc${ri}`;
+
+    defs.push(`<clipPath id="${clipId}"><rect x="${chx}" y="${chy}" width="${cchw}" height="${GCHART_H}"/></clipPath>`);
+
+    // Per-cell Y-axis auto-scaled to this duration
+    const cellPcts: number[] = [];
+    for (const s of allSyms) {
+      const d = dm.get(s);
+      if (d) toPercent(d.closes).forEach(p => { if (p !== null) cellPcts.push(p); });
+    }
+    cellPcts.sort((a, b) => a - b);
+    const cp05 = cellPcts[Math.floor(cellPcts.length * 0.05)] ?? -5;
+    const cp95 = cellPcts[Math.floor(cellPcts.length * 0.95)] ?? 5;
+    const yPad = (cp95 - cp05) * 0.06;
+    const { axisMin, axisMax, step } = niceAxis(cp05 - yPad, cp95 + yPad);
+    const yRange = axisMax - axisMin || 1;
+    const pyC = (pct: number) => chy + (1 - (pct - axisMin) / yRange) * GCHART_H;
+
+    const gridLines: string[] = [];
+    for (let p = axisMin; p <= axisMax + 1e-9; p += step) {
+      const y = pyC(p), isZero = Math.abs(p) < 1e-9;
+      gridLines.push(
+        `<line x1="${chx}" y1="${y.toFixed(1)}" x2="${(chx+cchw).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${isZero ? '#388bfd' : '#21262d'}" stroke-width="${isZero ? '0.8' : '0.5'}" ${isZero ? 'opacity="0.7"' : ''}/>`,
+        `<text x="${(cx+GAXIS_W-3).toFixed(1)}" y="${(y+3).toFixed(1)}" text-anchor="end" fill="${isZero ? '#58a6ff' : '#484f58'}" font-family="monospace" font-size="7">${fmtPct(p)}</text>`,
+      );
+    }
+
+    const polylineFor = (sym: string, bench: boolean) => {
+      const d = dm.get(sym); if (!d) return '';
+      const n   = d.closes.length;
+      const pxS = (i: number) => chx + (i / Math.max(n - 1, 1)) * cchw;
+      const pts = toPercent(d.closes)
+        .map((p, i) => p === null ? null : `${pxS(i).toFixed(1)},${pyC(p).toFixed(1)}`)
+        .filter(Boolean).join(' ');
+      const color = colorMap.get(sym) ?? '#666';
+      return bench
+        ? `<polyline clip-path="url(#${clipId})" points="${pts}" fill="none" stroke="${color}" stroke-width="0.8" stroke-dasharray="3,2" opacity="0.55" stroke-linejoin="round"/>`
+        : `<polyline clip-path="url(#${clipId})" points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
+    };
+
+    const barLabel = rc.intervalType === 'hour' ? rc.interval : rc.intervalType === 'day' ? '1d' : '1wk';
+    cells.push(`
+<rect x="${cx}" y="${cy}" width="${GCELL_W}" height="${GCELL_H}" fill="#161b22" rx="3"/>
+<text x="${(cx+5).toFixed(1)}" y="${(cy+12).toFixed(1)}" fill="#8b949e" font-family="monospace" font-size="9" font-weight="bold">${rc.label}</text>
+<text x="${(cx+GCELL_W-4).toFixed(1)}" y="${(cy+12).toFixed(1)}" text-anchor="end" fill="#484f58" font-family="monospace" font-size="7">${barLabel} bars · ${fmtPct(axisMin)}→${fmtPct(axisMax)}</text>
+<rect x="${chx}" y="${chy}" width="${cchw}" height="${GCHART_H}" fill="#0d1117" rx="2"/>
+${gridLines.join('\n')}
+${[...benchSyms.map(s => polylineFor(s, true)), ...mainSyms.map(s => polylineFor(s, false))].filter(Boolean).join('\n')}
+<rect x="${chx}" y="${chy}" width="${cchw}" height="${GCHART_H}" fill="none" stroke="#30363d" stroke-width="0.5" rx="2"/>`);
+  }
+
+  // Shared legend
+  const legendY    = PAD_TOP + GROWS * GCELL_H + (GROWS - 1) * GAP_Y + 10;
+  const legItemW   = (SVG_W - 2 * PAD_X) / GLEG_COLS;
+  const legendItems = mainSyms.map((sym, li) => {
+    const lx    = PAD_X + (li % GLEG_COLS) * legItemW;
+    const ly    = legendY + Math.floor(li / GLEG_COLS) * 18 + 12;
+    const color = colorMap.get(sym)!;
+    const label = legendLabel(sym);
+    return `<line x1="${lx.toFixed(1)}" y1="${(ly-3).toFixed(1)}" x2="${(lx+16).toFixed(1)}" y2="${(ly-3).toFixed(1)}" stroke="${color}" stroke-width="2"/>` +
+           `<text x="${(lx+20).toFixed(1)}" y="${ly.toFixed(1)}" fill="${color}" font-family="monospace" font-size="10" font-weight="bold">${label}</text>`;
+  }).join('\n');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SVG_W} ${G_SVG_H}" width="${SVG_W}" height="${G_SVG_H}">
+  <defs>${defs.join('')}</defs>
+  <rect width="${SVG_W}" height="${G_SVG_H}" fill="#0d1117" rx="8"/>
+  <text x="${SVG_W/2}" y="24" text-anchor="middle" fill="#e6edf3" font-family="monospace" font-size="14" font-weight="bold">${groupName} — All Durations % Change</text>
+  <text x="${SVG_W/2}" y="40" text-anchor="middle" fill="#6e7681" font-family="monospace" font-size="10">per-panel Y-axis · normalized to midpoint · benchmarks dashed</text>
+  ${cells.join('\n')}
+  ${legendItems}
+</svg>`;
+
+  mkdirSync(CHARTS_DIR, { recursive: true });
+  const fname   = `group_${groupName}_chart.svg`;
+  const outFile = resolve(CHARTS_DIR, fname);
+  writeFileSync(outFile, svg, 'utf8');
+  console.log(`\n✓  SVG saved → ${outFile}`);
+  console.log(`\n![${groupName} — All Durations](${BASE_URL}/charts/${fname}?t=${Date.now()})\n`);
+}
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -252,7 +433,7 @@ async function main() {
       const finalPct = pcts[pcts.length - 1] ?? 0;
       const color    = colorMap.get(sym)!;
       const pctClr   = finalPct >= 0 ? '#3fb950' : '#f85149';
-      const label    = sym.replace(/\.\w+$/, ''); // strip exchange suffix for brevity
+      const label    = legendLabel(sym);
       return [
         `<line x1="${lx.toFixed(1)}" y1="${(ly - 3).toFixed(1)}" x2="${(lx + 10).toFixed(1)}" y2="${(ly - 3).toFixed(1)}" stroke="${color}" stroke-width="1.5"/>`,
         `<text x="${(lx + 13).toFixed(1)}" y="${ly.toFixed(1)}" fill="${color}" font-family="monospace" font-size="7.5" font-weight="bold">${label}</text>`,
@@ -294,4 +475,8 @@ ${legendSvg}`);
   console.log(`\n![Watchlist Overview ${rangeConfig.label}](${BASE_URL}/charts/${fname}?t=${Date.now()})\n`);
 }
 
-main().catch(err => { console.error('❌', err.message); process.exit(1); });
+if (rangeArg.startsWith('_group:')) {
+  mainGroupWise(rangeArg.slice(7)).catch(err => { console.error('❌', err.message); process.exit(1); });
+} else {
+  main().catch(err => { console.error('❌', err.message); process.exit(1); });
+}
