@@ -44,7 +44,7 @@ interface RangeConfig {
 }
 
 const RANGE_MAP: Record<string, RangeConfig> = {
-  '1d':  { yahooRange: '1d',  interval: '1h',  intervalType: 'hour', label: '1 Day'     },
+  '1d':  { yahooRange: '2d',  interval: '1m',  intervalType: 'hour', label: '1 Day'     },
   '5d':  { yahooRange: '5d',  interval: '1h',  intervalType: 'hour', label: '1 Week'    },
   '1w':  { yahooRange: '5d',  interval: '1h',  intervalType: 'hour', label: '1 Week'    },
   '1mo': { yahooRange: '1mo', interval: '1d',  intervalType: 'day',  label: '1 Month'   },
@@ -94,6 +94,10 @@ const allTickers = hasExplicitBenchmark
   : [...new Set([...userTickers, '^GSPC'])];
 
 // ─── Fetch ────────────────────────────────────────────────────────────────────
+
+function xmlEsc(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 function fetchData(sym: string): Promise<SeriesData> {
   const { yahooRange, interval, intervalType } = rangeConfig;
@@ -271,11 +275,11 @@ function buildSVG(allSeries: SeriesData[]): string {
 
   const mainTickers  = userTickers.filter(t => !isBenchmark(t));
   const benchTickers = userTickers.filter(t => isBenchmark(t));
-  const titleMain    = mainTickers.join(' · ');
-  const titleBench   = benchTickers.length ? ` vs ${benchTickers.join(' · ')}` : hasExplicitBenchmark ? '' : ' vs S&P 500';
+  const titleMain    = xmlEsc(mainTickers.join(' · '));
+  const titleBench   = benchTickers.length ? ` vs ${xmlEsc(benchTickers.join(' · '))}` : hasExplicitBenchmark ? '' : ' vs S&amp;P 500';
   const startDate    = fmtDate(refTs[0]);
   const endDate      = fmtDate(refTs[refTs.length - 1]);
-  const subtitle     = `${startDate} – ${endDate} · ${rangeConfig.intervalType === 'hour' ? '1h' : rangeConfig.intervalType === 'day' ? '1d' : '1wk'} bars · normalized to midpoint`;
+  const subtitle     = xmlEsc(`${startDate} – ${endDate} · ${rangeConfig.intervalType === 'hour' ? '1h' : rangeConfig.intervalType === 'day' ? '1d' : '1wk'} bars · normalized to midpoint`);
 
   const benchLines = lineData.filter(l => l.isBenchmark);
   const stockLines = lineData.filter(l => !l.isBenchmark);
@@ -375,7 +379,7 @@ async function main() {
   writeFileSync(outFile, svg, 'utf8');
   console.log(`\n✓  SVG saved → ${outFile}`);
 
-  const url = `${BASE_URL}/charts/${fname}`;
+  const url = `${BASE_URL}/charts/${fname}?t=${Date.now()}`;
   console.log(`\n![${userTickers.join(' vs ')} ${rangeConfig.label}](${url})\n`);
 }
 

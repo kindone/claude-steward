@@ -25,7 +25,7 @@ const BASE_URL   = 'https://steward.jradoo.com';
 interface RangeConfig { yahooRange: string; interval: string; intervalType: 'hour' | 'day' | 'week'; label: string }
 
 const RANGE_MAP: Record<string, RangeConfig> = {
-  '1d':  { yahooRange: '1d',  interval: '1h',  intervalType: 'hour', label: '1 Day'    },
+  '1d':  { yahooRange: '2d',  interval: '1m',  intervalType: 'hour', label: '1 Day'    },
   '5d':  { yahooRange: '5d',  interval: '1h',  intervalType: 'hour', label: '1 Week'   },
   '1w':  { yahooRange: '5d',  interval: '1h',  intervalType: 'hour', label: '1 Week'   },
   '1mo': { yahooRange: '1mo', interval: '1d',  intervalType: 'day',  label: '1 Month'  },
@@ -291,7 +291,7 @@ ${legendSvg}`);
   const outFile = resolve(CHARTS_DIR, fname);
   writeFileSync(outFile, svg, 'utf8');
   console.log(`\n✓  SVG saved → ${outFile}`);
-  console.log(`\n![Watchlist Overview ${rangeConfig.label}](${BASE_URL}/charts/${fname})\n`);
+  console.log(`\n![Watchlist Overview ${rangeConfig.label}](${BASE_URL}/charts/${fname}?t=${Date.now()})\n`);
 }
 
 main().catch(err => { console.error('❌', err.message); process.exit(1); });

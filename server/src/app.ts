@@ -63,7 +63,11 @@ export function createApp() {
     // Serve generated charts from a build-safe directory (server/data/charts/).
     // Must be registered before the SPA catch-all so /charts/*.svg resolves correctly.
     const chartsDir = path.join(__dirname, '../data/charts')
-    app.use('/charts', express.static(chartsDir))
+    app.use('/charts', express.static(chartsDir, {
+      setHeaders: (res) => {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate')
+      },
+    }))
     app.use(express.static(publicDir))
     app.get('/{*path}', (_req, res) => {
       res.sendFile(path.join(publicDir, 'index.html'))
