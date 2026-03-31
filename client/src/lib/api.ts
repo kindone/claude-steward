@@ -3,6 +3,23 @@ const JSON_HEADERS: HeadersInit = { 'Content-Type': 'application/json' }
 // Include credentials (session cookie) in every request.
 const credentialsOpt = { credentials: 'include' } as const
 
+/**
+ * Returns true when an error is the result of an intentional stream abort.
+ *
+ * Browsers are inconsistent about what they throw when AbortController.abort()
+ * is called while reading a fetch() body stream:
+ *   - Chrome:  DOMException  { name: 'AbortError' }
+ *   - Safari:  TypeError     { name: 'TypeError', message: 'BodyStreamBuffer was aborted' }
+ *   - Firefox: DOMException  { name: 'AbortError' } (same as Chrome)
+ *
+ * Checking only err.name misses the Safari case, causing spurious error banners
+ * and unnecessary reconnect cycles.
+ */
+function isAbortError(err: unknown): boolean {
+  if (!(err instanceof Error)) return false
+  return err.name === 'AbortError' || err.message.includes('BodyStreamBuffer was aborted')
+}
+
 // ── Auth ─────────────────────────────────────────────────────────────────────
 
 export type AuthStatus = {
@@ -383,7 +400,7 @@ export function execCommand(projectId: string, command: string, handlers: ExecHa
       }
     }
   }).catch((err: unknown) => {
-    if ((err as Error).name !== 'AbortError') handlers.onError?.((err as Error).message ?? 'Connection failed')
+    if (!isAbortError(err)) handlers.onError?.((err as Error).message ?? 'Connection failed')
   })
 
   return () => controller.abort()
@@ -623,7 +640,7 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
         }
       }
     } catch (err) {
-      if ((err as Error).name === 'AbortError') return
+      if (isAbortError(err)) return
     }
     // Reconnect after 3s on unexpected drop
     if (!cancelled) {
@@ -843,7 +860,7 @@ export function sendMessage(
       }
     })
     .catch((err: Error) => {
-      if (err.name !== 'AbortError') {
+      if (!isAbortError(err)) {
         // fetch() itself rejected — network failure before any response (e.g. DNS error,
         // offline, connection refused).  Pass http_error so the assistant bubble shows the
         // "Connection error" banner instead of silently staying empty with no spinner.
