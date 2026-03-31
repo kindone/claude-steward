@@ -60,6 +60,17 @@ module.exports = {
       },
     },
     {
+      name: 'steward-apps',
+      script: 'npx',
+      args: 'tsx watch server/src/apps/sidecar.ts',
+      autorestart: true,
+      watch: false,
+      env: {
+        NODE_ENV: 'development',
+        APPS_SOCKET: '/tmp/claude-apps.sock',
+      },
+    },
+    {
       name: 'steward-client',
       script: 'npm',
       args: 'run dev --workspace=client',

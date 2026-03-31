@@ -7,6 +7,8 @@ import { projectQueries, migrateOrphanedSessions } from './db/index.js'
 import { workerClient } from './worker/client.js'
 import { recoverStreamingSessions } from './worker/recovery.js'
 import { startScheduler } from './lib/scheduler.js'
+import { appsClient } from './apps/client.js'
+import { appSlotQueries } from './db/index.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // .env lives in the monorepo root (two levels up from server/src/ or server/dist/)
@@ -48,6 +50,15 @@ migrateOrphanedSessions(APP_ROOT)
 // remaining streaming rows as interrupted.
 workerClient.onReconnected = recoverStreamingSessions
 workerClient.connect()
+
+// Connect to the apps sidecar. On reconnect, reset any slots left in
+// 'starting'/'running' state — the sidecar restart killed those processes.
+appsClient.onCrashed = (configId, _exitCode) => {
+  const slot = appSlotQueries.findByConfigId(configId)
+  if (slot) appSlotQueries.markError(slot.slot, 'process exited unexpectedly')
+}
+appsClient.connect()
+
 startScheduler()
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10)

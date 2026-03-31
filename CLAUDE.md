@@ -98,7 +98,9 @@ These have caused significant bugs — do not skip:
 | 3002 | steward-server (dev) | dev |
 | 5173 | steward-client (Vite) | dev |
 | 3003 | steward-safe | always |
+| 4001–4010 | steward-apps (mini-apps) | both; slot N → port 400N → `app{N}.steward.jradoo.com` |
 | `/tmp/claude-worker.sock` | steward-worker | both |
+| `/tmp/claude-apps.sock` | steward-apps sidecar | both |
 
 ---
 

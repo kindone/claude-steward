@@ -149,6 +149,37 @@ try {
   db.exec(`ALTER TABLE sessions ADD COLUMN model TEXT`)
 } catch { /* already exists */ }
 
+// ── Mini-app tables ───────────────────────────────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS app_configs (
+    id               TEXT PRIMARY KEY,
+    project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name             TEXT NOT NULL,
+    type             TEXT NOT NULL DEFAULT 'mkdocs',
+    command_template TEXT NOT NULL,
+    work_dir         TEXT NOT NULL,
+    created_at       INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at       INTEGER NOT NULL DEFAULT (unixepoch())
+  )
+`)
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS app_slots (
+    slot       INTEGER PRIMARY KEY,
+    config_id  TEXT REFERENCES app_configs(id) ON DELETE SET NULL,
+    status     TEXT NOT NULL DEFAULT 'stopped',
+    pid        INTEGER,
+    started_at INTEGER,
+    error      TEXT
+  )
+`)
+
+// Pre-seed the 10 fixed slots (idempotent)
+db.exec(`
+  INSERT OR IGNORE INTO app_slots (slot) VALUES (1),(2),(3),(4),(5),(6),(7),(8),(9),(10)
+`)
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export type Schedule = {
@@ -520,6 +551,109 @@ export const scheduleQueries = {
     markScheduleRanStmt.run(ranAt, nextRunAt, id),
   delete: (id: string) => deleteScheduleStmt.run(id),
   deleteBySession: (sessionId: string) => deleteSchedulesBySessionStmt.run(sessionId),
+}
+
+// ── App config types + queries ────────────────────────────────────────────────
+
+export type AppConfig = {
+  id: string
+  project_id: string
+  name: string
+  type: string
+  command_template: string
+  work_dir: string
+  created_at: number
+  updated_at: number
+}
+
+export type AppSlotStatus = 'stopped' | 'starting' | 'running' | 'error'
+
+export type AppSlot = {
+  slot: number
+  config_id: string | null
+  status: AppSlotStatus
+  pid: number | null
+  started_at: number | null
+  error: string | null
+}
+
+const insertAppConfigStmt = db.prepare(
+  `INSERT INTO app_configs (id, project_id, name, type, command_template, work_dir)
+   VALUES (?, ?, ?, ?, ?, ?) RETURNING *`
+)
+const listAppConfigsByProjectStmt = db.prepare(
+  `SELECT * FROM app_configs WHERE project_id = ? ORDER BY created_at ASC`
+)
+const findAppConfigByIdStmt = db.prepare(`SELECT * FROM app_configs WHERE id = ?`)
+const updateAppConfigStmt = db.prepare(
+  `UPDATE app_configs
+   SET name = COALESCE(?, name),
+       command_template = COALESCE(?, command_template),
+       work_dir = COALESCE(?, work_dir),
+       updated_at = unixepoch()
+   WHERE id = ? RETURNING *`
+)
+const deleteAppConfigStmt = db.prepare(`DELETE FROM app_configs WHERE id = ?`)
+const countAllAppConfigsStmt = db.prepare(`SELECT COUNT(*) as n FROM app_configs`)
+
+const listAllAppSlotsStmt = db.prepare(`SELECT * FROM app_slots ORDER BY slot ASC`)
+const findAppSlotByConfigStmt = db.prepare(
+  `SELECT * FROM app_slots WHERE config_id = ?`
+)
+const findFreeAppSlotStmt = db.prepare(
+  `SELECT * FROM app_slots WHERE config_id IS NULL ORDER BY slot ASC LIMIT 1`
+)
+const assignAppSlotStmt = db.prepare(
+  `UPDATE app_slots SET config_id = ?, status = 'starting', pid = NULL, started_at = NULL, error = NULL
+   WHERE slot = ?`
+)
+const markAppSlotRunningStmt = db.prepare(
+  `UPDATE app_slots SET status = 'running', pid = ?, started_at = unixepoch() WHERE slot = ?`
+)
+const markAppSlotStoppedStmt = db.prepare(
+  `UPDATE app_slots SET config_id = NULL, status = 'stopped', pid = NULL, started_at = NULL, error = NULL
+   WHERE slot = ?`
+)
+const markAppSlotErrorStmt = db.prepare(
+  `UPDATE app_slots SET status = 'error', pid = NULL, error = ? WHERE slot = ?`
+)
+const resetStaleAppSlotsStmt = db.prepare(
+  `UPDATE app_slots SET config_id = NULL, status = 'stopped', pid = NULL, started_at = NULL, error = 'sidecar restarted'
+   WHERE status IN ('starting', 'running')`
+)
+
+export const appConfigQueries = {
+  create: (id: string, projectId: string, name: string, type: string, commandTemplate: string, workDir: string) =>
+    insertAppConfigStmt.get(id, projectId, name, type, commandTemplate, workDir) as AppConfig,
+  listByProject: (projectId: string) =>
+    listAppConfigsByProjectStmt.all(projectId) as AppConfig[],
+  findById: (id: string) =>
+    findAppConfigByIdStmt.get(id) as AppConfig | undefined,
+  update: (id: string, patch: { name?: string; command_template?: string; work_dir?: string }) =>
+    updateAppConfigStmt.get(patch.name ?? null, patch.command_template ?? null, patch.work_dir ?? null, id) as AppConfig,
+  delete: (id: string) =>
+    deleteAppConfigStmt.run(id),
+  countAll: () =>
+    (countAllAppConfigsStmt.get() as { n: number }).n,
+}
+
+export const appSlotQueries = {
+  listAll: () =>
+    listAllAppSlotsStmt.all() as AppSlot[],
+  findByConfigId: (configId: string) =>
+    findAppSlotByConfigStmt.get(configId) as AppSlot | undefined,
+  findFreeSlot: () =>
+    findFreeAppSlotStmt.get() as AppSlot | undefined,
+  assign: (slot: number, configId: string) =>
+    assignAppSlotStmt.run(configId, slot),
+  markRunning: (slot: number, pid: number) =>
+    markAppSlotRunningStmt.run(pid, slot),
+  markStopped: (slot: number) =>
+    markAppSlotStoppedStmt.run(slot),
+  markError: (slot: number, error: string) =>
+    markAppSlotErrorStmt.run(error, slot),
+  resetStale: () =>
+    resetStaleAppSlotsStmt.run(),
 }
 
 /**

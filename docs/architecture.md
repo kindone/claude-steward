@@ -12,6 +12,7 @@ This document covers the overall system structure, how the three programs relate
 | [Safe-Mode Core](safe.md) | Emergency terminal internals and freeze policy |
 | [Self-Management](self-management.md) | In-app upgrade flow, PM2 process management, nginx dev/prod switching |
 | [Worker protocol](worker-protocol.md) | Claude worker process, Unix socket IPC, `worker.db`, recovery flow |
+| [Apps Sidecar](apps-sidecar.md) | Mini-app process manager, slot model, Unix socket protocol |
 | [Roadmap](roadmap.md) | Shipped milestones and planned features |
 
 ---
@@ -49,7 +50,9 @@ claude-steward/               ← npm workspace root
 | `3002` | Main server (dev) | `tsx watch`; separate DB (`steward-dev.db`) |
 | `3003` | Safe-mode core | Always-on, independent PM2 process |
 | `5173` | Client dev server | Vite HMR; proxies `/api` → `:3002`. Not present in production |
+| `4001–4010` | Mini-apps | Reserved for `steward-apps` sidecar; slot N binds port `400N` |
 | `/tmp/claude-worker.sock` | Claude worker | Unix socket; always-on; survives HTTP restarts |
+| `/tmp/claude-apps.sock` | Apps sidecar | Unix socket; manages mini-app child processes |
 
 ### Domain routing (nginx)
 
@@ -58,8 +61,11 @@ claude-steward/               ← npm workspace root
 | `steward.jradoo.com` | `127.0.0.1:3001` | Production |
 | `dev.steward.jradoo.com` | `127.0.0.1:5173` | Dev (Vite HMR) |
 | `safe.steward.jradoo.com` | `127.0.0.1:3003` | Always |
+| `app1–app10.steward.jradoo.com` | `127.0.0.1:4001–4010` | Mini-apps (wildcard TLS cert) |
 
 Switching between dev and production requires one `proxy_pass` line change in `/etc/nginx/sites-available/steward`. See [Self-Management](self-management.md) for the exact steps.
+
+TLS: `steward.jradoo.com` and `dev/safe` subdomains use individual certs. `app1–app10` use a wildcard cert (`*.steward.jradoo.com`) provisioned via Let's Encrypt DNS-01 challenge with the Route 53 plugin. Config: `/etc/nginx/sites-available/steward-apps`.
 
 ---
 
@@ -70,8 +76,9 @@ Browser
   │  HTTPS (TLS terminated by nginx)
   ▼
 nginx
-  ├─ steward.jradoo.com      → :5173 (dev) or :3001 (prod)
-  └─ safe.steward.jradoo.com → :3003
+  ├─ steward.jradoo.com          → :5173 (dev) or :3001 (prod)
+  ├─ safe.steward.jradoo.com    → :3003
+  └─ app{1-10}.steward.jradoo.com → :4001–:4010 (mini-apps)
 
   ┌─────────────────────────────────────────────────────────┐
   │  steward.jradoo.com                                     │
@@ -104,6 +111,11 @@ nginx
   │  POST /api/projects/:id/exec              SSE exec stream   │
   │  GET  /api/push/vapid-public-key                            │
   │  POST/DELETE /api/push/subscribe                            │
+  │  GET/POST /api/projects/:id/apps          app config CRUD   │
+  │  PATCH/DELETE /api/apps/:configId         update/delete     │
+  │  POST /api/apps/:configId/start           claim slot+spawn  │
+  │  POST /api/apps/:configId/stop            kill+release slot │
+  │  GET  /api/apps/slots                     all 10 slot states│
   │  GET  /api/admin/version                                    │
   │  POST /api/admin/reload                   → PM2 restart    │
   │       │                                                 │
@@ -234,6 +246,26 @@ CREATE TABLE push_subscriptions (
   auth       TEXT NOT NULL,
   session_id TEXT REFERENCES sessions(id),  -- null = global; non-null = session-scoped opt-in
   created_at INTEGER NOT NULL DEFAULT (unixepoch())
+)
+
+CREATE TABLE app_configs (
+  id               TEXT PRIMARY KEY,
+  project_id       TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+  name             TEXT NOT NULL,
+  type             TEXT NOT NULL DEFAULT 'mkdocs',
+  command_template TEXT NOT NULL,   -- e.g. "mkdocs serve -a 0.0.0.0:{port}"; {port} substituted at start
+  work_dir         TEXT NOT NULL,
+  created_at       INTEGER NOT NULL DEFAULT (unixepoch()),
+  updated_at       INTEGER NOT NULL DEFAULT (unixepoch())
+)
+
+CREATE TABLE app_slots (
+  slot       INTEGER PRIMARY KEY,   -- 1–10; pre-seeded; slot N → port 400N
+  config_id  TEXT REFERENCES app_configs(id) ON DELETE SET NULL,
+  status     TEXT NOT NULL DEFAULT 'stopped',  -- stopped | starting | running | error
+  pid        INTEGER,
+  started_at INTEGER,
+  error      TEXT
 )
 
 CREATE TABLE schedules (

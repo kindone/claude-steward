@@ -13,6 +13,7 @@ import adminRouter from './routes/admin.js'
 import pushRouter, { vapidPublicKeyHandler } from './routes/push.js'
 import schedulesRouter from './routes/schedules.js'
 import evalRouter from './routes/eval.js'
+import appsRouter from './routes/apps.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Monorepo root — two levels up from server/src/
@@ -55,6 +56,7 @@ export function createApp() {
   app.use('/api/admin', adminRouter)
   app.use('/api/push', pushRouter)
   app.use('/api/schedules', schedulesRouter)
+  app.use('/api', appsRouter)
 
   if (NODE_ENV === 'production') {
     const publicDir = path.join(__dirname, '../public')

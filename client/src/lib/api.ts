@@ -883,3 +883,64 @@ export async function compactSession(sessionId: string): Promise<{ sessionId: st
   }
   return res.json() as Promise<{ sessionId: string }>
 }
+
+// ── Mini-apps ─────────────────────────────────────────────────────────────────
+
+export type AppConfig = {
+  id: string
+  project_id: string
+  name: string
+  type: string
+  command_template: string
+  work_dir: string
+  created_at: number
+  updated_at: number
+  // joined fields from slot
+  slot: number | null
+  status: 'stopped' | 'starting' | 'running' | 'error'
+  pid: number | null
+}
+
+export async function listApps(projectId: string): Promise<AppConfig[]> {
+  const res = await fetch(`/api/projects/${projectId}/apps`, credentialsOpt)
+  if (!res.ok) throw new Error('Failed to list apps')
+  const data = await res.json() as { apps: AppConfig[] }
+  return data.apps
+}
+
+export async function createApp(projectId: string, body: {
+  name: string; command_template: string; work_dir: string; type?: string
+}): Promise<AppConfig> {
+  const res = await fetch(`/api/projects/${projectId}/apps`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+    ...credentialsOpt,
+  })
+  const data = await res.json() as { app: AppConfig; error?: string }
+  if (!res.ok) throw new Error(data.error ?? 'Failed to create app')
+  return data.app
+}
+
+export async function deleteApp(configId: string): Promise<void> {
+  const res = await fetch(`/api/apps/${configId}`, { method: 'DELETE', ...credentialsOpt })
+  if (!res.ok) {
+    const data = await res.json() as { error?: string }
+    throw new Error(data.error ?? 'Failed to delete app')
+  }
+}
+
+export async function startApp(configId: string): Promise<{ slot: number; port: number; pid: number; url: string }> {
+  const res = await fetch(`/api/apps/${configId}/start`, { method: 'POST', ...credentialsOpt })
+  const data = await res.json() as { slot?: number; port?: number; pid?: number; url?: string; error?: string }
+  if (!res.ok) throw new Error(data.error ?? 'Failed to start app')
+  return data as { slot: number; port: number; pid: number; url: string }
+}
+
+export async function stopApp(configId: string): Promise<void> {
+  const res = await fetch(`/api/apps/${configId}/stop`, { method: 'POST', ...credentialsOpt })
+  if (!res.ok) {
+    const data = await res.json() as { error?: string }
+    throw new Error(data.error ?? 'Failed to stop app')
+  }
+}

@@ -52,6 +52,16 @@ module.exports = {
       },
     },
     {
+      name: 'steward-apps',
+      script: './server/dist/apps/sidecar.js',
+      autorestart: true,
+      watch: false,
+      env: {
+        NODE_ENV: 'production',
+        APPS_SOCKET: '/tmp/claude-apps.sock',
+      },
+    },
+    {
       // FROZEN — do not modify this process config or the safe/ directory.
       // This process runs independently and is never part of the upgrade cycle.
       name: 'steward-safe',

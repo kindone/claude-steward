@@ -3,6 +3,7 @@ import type { Session, Project } from '../lib/api'
 import { ProjectPicker } from './ProjectPicker'
 import { FileTree } from './FileTree'
 import { TerminalPanel } from './TerminalPanel'
+import { AppsPanel } from './AppsPanel'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import type { ConnState } from '../hooks/useAppConnection'
 
@@ -54,12 +55,12 @@ export function SessionSidebar({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const editInputRef = useRef<HTMLInputElement>(null)
-  const [activeTab, setActiveTab] = useState<'sessions' | 'files' | 'terminal'>(() => {
-    try { return (localStorage.getItem('steward:sidebarTab') as 'sessions' | 'files' | 'terminal') ?? 'sessions' }
+  const [activeTab, setActiveTab] = useState<'sessions' | 'files' | 'terminal' | 'apps'>(() => {
+    try { return (localStorage.getItem('steward:sidebarTab') as 'sessions' | 'files' | 'terminal' | 'apps') ?? 'sessions' }
     catch { return 'sessions' }
   })
 
-  const switchTab = useCallback((tab: 'sessions' | 'files' | 'terminal') => {
+  const switchTab = useCallback((tab: 'sessions' | 'files' | 'terminal' | 'apps') => {
     setActiveTab(tab)
     try { localStorage.setItem('steward:sidebarTab', tab) } catch { /* ignore */ }
   }, [])
@@ -143,7 +144,7 @@ export function SessionSidebar({
 
       {/* Tab bar */}
       <div className="flex items-stretch border-b border-[#1f1f1f] flex-shrink-0">
-        {(['sessions', 'files', 'terminal'] as const).map((tab) => (
+        {(['sessions', 'files', 'apps', 'terminal'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => switchTab(tab)}
@@ -161,7 +162,7 @@ export function SessionSidebar({
                   </span>
                 )}
               </span>
-            ) : tab === 'terminal' ? 'Term' : 'Files'}
+            ) : tab === 'terminal' ? 'Term' : tab === 'apps' ? 'Apps' : 'Files'}
           </button>
         ))}
         {/* Push notification bell — tab bar keeps it always visible on all screen sizes */}
@@ -282,6 +283,14 @@ export function SessionSidebar({
           {loading && <p className="px-3 py-3 text-[12px] text-[#555] text-center">Loading…</p>}
         </>
       )}
+
+      {/* Apps tab */}
+      {activeTab === 'apps' && (() => {
+        const project = projects.find((p) => p.id === activeProjectId)
+        return project
+          ? <AppsPanel projectId={project.id} projectPath={project.path} />
+          : <p className="px-3 py-4 text-[12px] text-[#444] italic">No project selected</p>
+      })()}
 
       {/* Files tab */}
       {activeTab === 'files' && (
