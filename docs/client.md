@@ -123,6 +123,16 @@ Key refs (not state, so they don't trigger re-renders):
 
 `App.tsx` persists `{ projectId, sessionId }` to `localStorage` under `steward:lastState` on every selection change and restores it on mount (validating IDs still exist). Since prod and dev run on separate origins, each environment independently tracks its own context.
 
+**Push notification intelligence** — notifications are routed based on whether the user is actively looking at the app:
+
+- **Foreground (app visible)** → in-app toast via SSE `pushTarget` event. The toast shows session title + message preview, is tappable to switch sessions, and auto-dismisses after 8 seconds.
+- **Backgrounded (home screen)** → real push notification via web-push. Also stores the target via `setLastPushTarget()` for the iOS `visibilitychange` poll fallback.
+- **App killed (swiped away)** → same as backgrounded; SSE drops, no active clients.
+
+Visibility tracking: when the `/api/events` SSE connects, the server assigns a `connectionId` (sent via `connected` event). The client sets up a `visibilitychange` listener that reports state changes to `POST /api/events/visibility`. Hidden uses `navigator.sendBeacon()` (reliable even as iOS suspends the page); visible uses `fetch`. Server-side, `hasActiveClients()` checks `foregroundConnections` (not just `appConnections`), so a backgrounded tab with a live SSE connection is correctly treated as inactive.
+
+iOS-specific: iOS Safari doesn't fire SW `notificationclick`, so push tap navigation uses a server-side poll: `GET /api/push/last-target` returns and clears the stored target on `visibilitychange` → `visible`.
+
 ### Session list behaviour
 
 - **Reordering** — when the first SSE byte arrives from a `sendMessage` call, `onActivity()` fires and the session is moved to index 0 in the `sessions` array. The list always reflects recency.

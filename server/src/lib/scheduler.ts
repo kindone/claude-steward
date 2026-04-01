@@ -12,6 +12,7 @@ import { notifyWatchers, notifySubscribers } from './sessionWatchers.js'
 import { notifySession, notifyAll } from './pushNotifications.js'
 import { pushSubscriptionQueries } from '../db/index.js'
 import { setLastPushTarget } from './pushNotifications.js'
+import { broadcastEvent, hasActiveClients } from './connections.js'
 
 /**
  * Compute the next UTC unix timestamp (seconds) for a cron expression.
@@ -72,14 +73,20 @@ async function runSchedule(schedule: Schedule): Promise<void> {
       body: preview.slice(0, 80) + (preview.length > 80 ? '…' : ''),
       url: `/?session=${schedule.session_id}${session.project_id ? `&project=${session.project_id}` : ''}`,
     }
-    // Try session-targeted subs first; fall back to all global (untagged) subs
-    const sessionSubs = pushSubscriptionQueries.listBySession(schedule.session_id)
-    if (sessionSubs.length > 0) {
-      void notifySession(schedule.session_id, payload)
+    const pushTarget = { sessionId: schedule.session_id, projectId: session.project_id ?? null, title: session.title ?? 'New message', body: payload.body }
+    if (hasActiveClients()) {
+      // User is in the app — show in-app toast, skip push
+      broadcastEvent('pushTarget', pushTarget)
     } else {
-      void notifyAll(payload)
+      // User left the app — send push notification + store target for visibilitychange poll
+      const sessionSubs = pushSubscriptionQueries.listBySession(schedule.session_id)
+      if (sessionSubs.length > 0) {
+        void notifySession(schedule.session_id, payload)
+      } else {
+        void notifyAll(payload)
+      }
+      setLastPushTarget(pushTarget.sessionId, pushTarget.projectId)
     }
-    setLastPushTarget(schedule.session_id, session.project_id ?? null)
   }
 }
 

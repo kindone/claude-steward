@@ -538,6 +538,8 @@ export async function deleteSession(sessionId: string): Promise<void> {
 
 export type AppEventHandlers = {
   onReload?: () => void
+  /** Fired when the server sends a push notification — carries the target session/project for navigation. */
+  onPushTarget?: (target: { sessionId: string; projectId: string | null }) => void
   /** Fired when the SSE connection is established (initial + every reconnect). */
   onConnect?: () => void
   /** Fired when the SSE connection drops unexpectedly (before the reconnect delay). */
@@ -598,6 +600,36 @@ async function handleEval(raw: string): Promise<void> {
   }).catch(() => { /* ignore */ })
 }
 
+// Report page visibility changes to the server so it knows whether to
+// send a push notification (backgrounded) or an in-app toast (foreground).
+let visibilityCleanup: (() => void) | null = null
+function setupVisibilityReporting(connectionId: string) {
+  // Clean up previous listener (e.g. on reconnect)
+  visibilityCleanup?.()
+
+  const handler = () => {
+    const visible = document.visibilityState === 'visible'
+    // Use sendBeacon for hidden (fires reliably even as page suspends on iOS)
+    // Use fetch for visible (sendBeacon is fire-and-forget, fine for hidden)
+    if (!visible) {
+      navigator.sendBeacon(
+        '/api/events/visibility',
+        new Blob([JSON.stringify({ connectionId, visible: false })], { type: 'application/json' })
+      )
+    } else {
+      fetch('/api/events/visibility', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ connectionId, visible: true }),
+        ...credentialsOpt,
+      }).catch(() => { /* ignore */ })
+    }
+  }
+
+  document.addEventListener('visibilitychange', handler)
+  visibilityCleanup = () => document.removeEventListener('visibilitychange', handler)
+}
+
 // Connect to the app-level SSE stream. Reconnects automatically on drop.
 // Returns a cancel function to close the connection.
 export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
@@ -633,8 +665,17 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
           if (line.startsWith('data: ')) {
             const raw = line.slice(6)
             handlers.onActivity?.()
+            if (pendingEvent === 'connected') {
+              try {
+                const { connectionId } = JSON.parse(raw) as { connectionId: string }
+                setupVisibilityReporting(connectionId)
+              } catch { /* ignore */ }
+            }
             if (pendingEvent === 'reload') handlers.onReload?.()
             if (pendingEvent === 'eval') void handleEval(raw)
+            if (pendingEvent === 'pushTarget') {
+              try { handlers.onPushTarget?.(JSON.parse(raw)) } catch { /* ignore */ }
+            }
             pendingEvent = ''
           }
         }

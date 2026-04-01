@@ -129,12 +129,39 @@ export default function App() {
     }
   }, [])
 
-  // iOS push notification navigation.
-  // iOS Safari doesn't fire 'notificationclick' in the SW, and the SSE connection
-  // dies when iOS backgrounds the page. So neither postMessage nor SSE pushTarget
-  // events reach the client. Instead, the server stores the last push target in
-  // memory. On visibilitychange, the page polls GET /api/push/last-target and
-  // navigates if there's a recent target.
+  // Push notification navigation — handles two scenarios:
+  //
+  // 1. App backgrounded (iOS): SSE dies, notificationclick doesn't fire.
+  //    Server stores last push target in memory. On visibilitychange,
+  //    page polls GET /api/push/last-target and navigates.
+  //
+  // 2. App in foreground: SSE is alive so the server broadcasts a
+  //    'pushTarget' event. Page navigates immediately without polling.
+  const navigateToPushTarget = useCallback((sessionId: string, projectId: string | null) => {
+    if (sessionsRef.current.some((s) => s.id === sessionId)) {
+      setActiveSessionId(sessionId)
+    } else if (projectId) {
+      pendingSessionIdRef.current = sessionId
+      setActiveProjectId(projectId)
+    } else {
+      window.location.href = `/?session=${sessionId}`
+    }
+  }, [])
+
+  // Foreground: SSE pushTarget event — don't auto-navigate (that would switch
+  // sessions without user intent). Instead, show a dismissible in-app toast that
+  // the user can tap to switch. iOS doesn't fire notificationclick so this is the
+  // only way to offer navigation when the app is already visible.
+  const [pushToast, setPushToast] = useState<{ sessionId: string; projectId: string | null; title: string; body?: string } | null>(null)
+  const pushToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const handlePushTarget = useCallback((target: { sessionId: string; projectId: string | null; title?: string; body?: string }) => {
+    setPushToast({ sessionId: target.sessionId, projectId: target.projectId, title: target.title ?? 'New message', body: target.body })
+    // Auto-dismiss after 8 seconds
+    if (pushToastTimerRef.current) clearTimeout(pushToastTimerRef.current)
+    pushToastTimerRef.current = setTimeout(() => setPushToast(null), 8000)
+  }, [])
+
+  // Backgrounded: poll server on visibilitychange
   useEffect(() => {
     const onVisible = async () => {
       if (document.visibilityState !== 'visible') return
@@ -145,20 +172,12 @@ export default function App() {
         if (!target) return
         // Only act on pushes from the last 60 seconds
         if (Date.now() - target.ts > 60_000) return
-        const { sessionId, projectId } = target
-        if (sessionsRef.current.some((s) => s.id === sessionId)) {
-          setActiveSessionId(sessionId)
-        } else if (projectId) {
-          pendingSessionIdRef.current = sessionId
-          setActiveProjectId(projectId)
-        } else {
-          window.location.href = `/?session=${sessionId}`
-        }
+        navigateToPushTarget(target.sessionId, target.projectId)
       } catch { /* ignore network errors */ }
     }
     document.addEventListener('visibilitychange', onVisible)
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [])
+  }, [navigateToPushTarget])
 
   // Handle push notification taps: SW sends { type: 'switchSession', sessionId, projectId, url }
   // postMessage works on all platforms (iOS/Android) unlike client.navigate().
@@ -217,6 +236,7 @@ export default function App() {
   }, [])
   const { state: connState, lastSeenAt } = useAppConnection({
     onReload: authState === 'authenticated' ? handleReload : undefined,
+    onPushTarget: handlePushTarget,
   })
 
   // Load projects and meta once authenticated; restore last-used project if it still exists.
@@ -424,6 +444,30 @@ export default function App() {
         <div className="fixed top-0 inset-x-0 z-[9998] bg-red-900/90 border-b border-red-700 px-4 py-2 flex items-start gap-3 text-sm text-red-100">
           <span className="flex-1 font-mono text-xs leading-relaxed break-all">{clientError}</span>
           <button onClick={() => setClientError(null)} className="flex-shrink-0 text-red-300 hover:text-white leading-none text-lg">✕</button>
+        </div>
+      )}
+
+      {/* Push notification toast — shown when a push arrives while the app is in the foreground */}
+      {pushToast && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9998] max-w-sm w-[calc(100%-2rem)] animate-in">
+          <button
+            onClick={() => {
+              setPushToast(null)
+              if (pushToastTimerRef.current) clearTimeout(pushToastTimerRef.current)
+              navigateToPushTarget(pushToast.sessionId, pushToast.projectId)
+            }}
+            className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl px-4 py-3 shadow-2xl cursor-pointer hover:border-[#555] transition-colors text-left"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-[#e8e8e8] truncate flex-1">{pushToast.title}</span>
+              <span
+                onClick={(e) => { e.stopPropagation(); setPushToast(null); if (pushToastTimerRef.current) clearTimeout(pushToastTimerRef.current) }}
+                className="text-[#555] hover:text-[#888] text-xs flex-shrink-0 px-1"
+              >✕</span>
+            </div>
+            {pushToast.body && <div className="text-xs text-[#aaa] mt-1 line-clamp-2">{pushToast.body}</div>}
+            <div className="text-[11px] text-[#666] mt-1">Tap to switch session</div>
+          </button>
         </div>
       )}
 

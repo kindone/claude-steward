@@ -111,6 +111,8 @@ nginx
   │  POST /api/projects/:id/exec              SSE exec stream   │
   │  GET  /api/push/vapid-public-key                            │
   │  POST/DELETE /api/push/subscribe                            │
+  │  GET  /api/push/last-target          iOS poll fallback      │
+  │  POST /api/events/visibility         fg/bg tracking         │
   │  GET/POST /api/projects/:id/apps          app config CRUD   │
   │  PATCH/DELETE /api/apps/:configId         update/delete     │
   │  POST /api/apps/:configId/start           claim slot+spawn  │

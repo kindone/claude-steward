@@ -6,6 +6,7 @@ import { spawnClaude } from '../claude/process.js'
 import { notifyWatchers, notifySubscribers } from '../lib/sessionWatchers.js'
 import { registerChat, unregisterChat, abortChat } from '../lib/activeChats.js'
 import { notifyAll, setLastPushTarget } from '../lib/pushNotifications.js'
+import { broadcastEvent, hasActiveClients } from '../lib/connections.js'
 import { extractToolDetail } from '../claude/toolDetail.js'
 import { workerClient } from '../worker/client.js'
 import { buildEffectiveSystemPrompt } from '../lib/schedulePrompt.js'
@@ -129,14 +130,23 @@ router.post('/', (req, res) => {
     }
     const notified = notifyWatchers(sessionId)
     notifySubscribers(sessionId)
-    if (notified === 0 && clientDisconnectedEarly && cleanText) {
+    if (notified === 0 && (clientDisconnectedEarly || !hasActiveClients()) && cleanText) {
       const preview = cleanText.replace(/\s+/g, ' ').trim().slice(0, 80)
-      void notifyAll({
-        title: session.title === 'New Chat' ? 'Claude replied' : session.title,
-        body: preview + (cleanText.length > 80 ? '…' : ''),
-        url: `/?session=${sessionId}${session.project_id ? `&project=${session.project_id}` : ''}`,
-      })
-      setLastPushTarget(sessionId, session.project_id ?? null)
+      const body = preview + (cleanText.length > 80 ? '…' : '')
+      const title = session.title === 'New Chat' ? 'Claude replied' : session.title
+      const pushTarget = { sessionId, projectId: session.project_id ?? null, title, body }
+      if (hasActiveClients()) {
+        // User is in the app (on a different session) — show in-app toast, skip push
+        broadcastEvent('pushTarget', pushTarget)
+      } else {
+        // User left the app — send push notification + store target for visibilitychange poll
+        void notifyAll({
+          title,
+          body,
+          url: `/?session=${sessionId}${session.project_id ? `&project=${session.project_id}` : ''}`,
+        })
+        setLastPushTarget(pushTarget.sessionId, pushTarget.projectId)
+      }
     }
   }
 

@@ -29,6 +29,12 @@ body {
 .tool-pulse-2 { animation-delay: 0.2s; }
 .tool-pulse-3 { animation-delay: 0.4s; }
 
+@keyframes slide-down {
+  from { opacity: 0; transform: translate(-50%, -100%); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+.animate-in { animation: slide-down 0.25s ease-out; }
+
 /* Streaming cursor — appended to markdown-rendered assistant message */
 .streaming-cursor::after {
   content: '▋';

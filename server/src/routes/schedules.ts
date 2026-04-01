@@ -7,6 +7,7 @@ import { sendToSession } from '../lib/sendToSession.js'
 import { notifyWatchers, notifySubscribers } from '../lib/sessionWatchers.js'
 import { notifySession, notifyAll } from '../lib/pushNotifications.js'
 import { setLastPushTarget } from '../lib/pushNotifications.js'
+import { broadcastEvent, hasActiveClients } from '../lib/connections.js'
 
 const router = Router()
 
@@ -126,13 +127,20 @@ router.post('/:id/run', async (req, res) => {
         body: preview.slice(0, 80) + (preview.length > 80 ? '…' : ''),
         url: `/?session=${schedule.session_id}${session.project_id ? `&project=${session.project_id}` : ''}`,
       }
-      const sessionSubs = pushSubscriptionQueries.listBySession(schedule.session_id)
-      if (sessionSubs.length > 0) {
-        void notifySession(schedule.session_id, payload)
+      const pushTarget = { sessionId: schedule.session_id, projectId: session.project_id ?? null, title: session.title ?? 'New message', body: payload.body }
+      if (hasActiveClients()) {
+        // User is in the app — show in-app toast, skip push
+        broadcastEvent('pushTarget', pushTarget)
       } else {
-        void notifyAll(payload)
+        // User left the app — send push notification + store target for visibilitychange poll
+        const sessionSubs = pushSubscriptionQueries.listBySession(schedule.session_id)
+        if (sessionSubs.length > 0) {
+          void notifySession(schedule.session_id, payload)
+        } else {
+          void notifyAll(payload)
+        }
+        setLastPushTarget(pushTarget.sessionId, pushTarget.projectId)
       }
-      setLastPushTarget(schedule.session_id, session.project_id ?? null)
     }
   } catch (err) {
     console.error(`[schedules] manual run failed for schedule ${schedule.id}:`, err)

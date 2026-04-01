@@ -11,21 +11,25 @@ export type AppConnection = {
 
 type AppConnectionOpts = {
   onReload?: () => void
+  onPushTarget?: (target: { sessionId: string; projectId: string | null }) => void
 }
 
 /**
  * Tracks the app-level SSE connection state and last-activity time.
- * Re-exports onReload so callers don't need to call subscribeToAppEvents separately.
+ * Re-exports onReload/onPushTarget so callers don't need to call subscribeToAppEvents separately.
  */
 export function useAppConnection(opts?: AppConnectionOpts): AppConnection {
   const [state, setState] = useState<ConnState>('connecting')
   const [lastSeenAt, setLastSeenAt] = useState<number | null>(null)
   const onReloadRef = useRef(opts?.onReload)
   onReloadRef.current = opts?.onReload
+  const onPushTargetRef = useRef(opts?.onPushTarget)
+  onPushTargetRef.current = opts?.onPushTarget
 
   useEffect(() => {
     const cancel = subscribeToAppEvents({
       onReload: () => onReloadRef.current?.(),
+      onPushTarget: (t) => onPushTargetRef.current?.(t),
       onConnect: () => {
         setState('connected')
         setLastSeenAt(Date.now())

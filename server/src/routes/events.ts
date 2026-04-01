@@ -1,5 +1,5 @@
 import { Router } from 'express'
-import { registerConnection } from '../lib/connections.js'
+import { registerConnection, setConnectionVisibility } from '../lib/connections.js'
 
 const router = Router()
 
@@ -12,7 +12,10 @@ router.get('/', (_req, res) => {
   res.setHeader('X-Accel-Buffering', 'no')
   res.flushHeaders()
 
-  registerConnection(res)
+  const connectionId = registerConnection(res)
+
+  // Send connection ID so the client can POST visibility changes
+  res.write(`event: connected\ndata: ${JSON.stringify({ connectionId })}\n\n`)
 
   // Keep-alive ping every 30s to prevent proxy/browser timeouts
   const ping = setInterval(() => {
@@ -21,6 +24,18 @@ router.get('/', (_req, res) => {
   }, 30_000)
 
   res.on('close', () => clearInterval(ping))
+})
+
+// POST /api/events/visibility — client reports page visibility changes.
+// Body: { connectionId: string, visible: boolean }
+router.post('/visibility', (req, res) => {
+  const { connectionId, visible } = req.body as { connectionId?: string; visible?: boolean }
+  if (!connectionId || typeof visible !== 'boolean') {
+    res.status(400).json({ error: 'connectionId and visible are required' })
+    return
+  }
+  setConnectionVisibility(connectionId, visible)
+  res.json({ ok: true })
 })
 
 export default router
