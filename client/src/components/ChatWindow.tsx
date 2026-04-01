@@ -231,13 +231,30 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
     }
     if (behavior === 'instant') {
       // Initial load: snap to absolute bottom.
-      // Setting scrollTop = 1e9 (clamped by the browser to scrollHeight - clientHeight)
-      // is more reliable than reading scrollHeight ourselves — layout may not have fully
-      // resolved yet (fonts, mermaid, flex recalc), so a stale scrollHeight would land
-      // us short of the true bottom and cause the scroll button to appear spuriously.
+      // Flag the scroll event as programmatic so it doesn't set userIsScrollingRef.
       const container = scrollContainerRef.current
-      if (container) container.scrollTop = 1e9
+      if (container) {
+        skipNextScrollRef.current = true
+        container.scrollTop = 1e9
+      }
       scrollBehaviorRef.current = 'smooth'
+      // Async content (mermaid SVGs, images, KaTeX) may increase scrollHeight after
+      // this initial snap. Poll scrollHeight via rAF for a short window — whenever it
+      // grows, re-snap to bottom. rAF runs after layout so scrollHeight is accurate.
+      if (container) {
+        let lastH = container.scrollHeight
+        const deadline = performance.now() + 5000
+        const check = () => {
+          if (userIsScrollingRef.current || performance.now() > deadline) return
+          if (container.scrollHeight !== lastH) {
+            lastH = container.scrollHeight
+            skipNextScrollRef.current = true
+            container.scrollTop = 1e9
+          }
+          requestAnimationFrame(check)
+        }
+        requestAnimationFrame(check)
+      }
     } else {
       // New content: scroll to bottom only if user was already there and not actively scrolling
       if (wasAtBottomRef.current && !userIsScrollingRef.current) {

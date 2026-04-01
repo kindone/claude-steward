@@ -113,9 +113,11 @@ Key refs (not state, so they don't trigger re-renders):
 - `'smooth'` for streaming deltas and new messages — but only when `wasAtBottomRef` is true and `userIsScrollingRef` is false
 - `'none'` when `loadOlder` prepends messages — instead, `scrollTop` is adjusted by the new content height so the viewport stays anchored to the previously-top message
 
-**iOS scroll architecture** — two separate mechanisms, each handling a different concern:
-- **`wasAtBottomRef` + `userIsScrollingRef`** — updated by a passive `scroll` listener (no React state = no re-renders during scroll). `userIsScrollingRef` uses a 150ms debounce that covers iOS momentum deceleration. Auto-scroll fires only when both refs say it's safe.
-- **`IntersectionObserver` on `bottomRef`** — drives `isAtBottom` React state (show/hide the ↓ button). Fires asynchronously outside the scroll path, avoiding the re-render-during-scroll that caused iOS momentum to stutter and snap back. `rootMargin: '0px 0px 80px 0px'` compensates for `bottomRef` being zero-height.
+**iOS/mobile scroll architecture** — designed to never trigger React re-renders during scroll:
+- **`wasAtBottomRef` + `userIsScrollingRef`** — updated by a passive `scroll` listener (ref-only, no state). `userIsScrollingRef` uses a 150ms debounce that covers iOS momentum deceleration. Auto-scroll fires only when both refs say it's safe.
+- **`isAtBottomRef` + direct DOM toggle** — the scroll-to-bottom button's visibility is controlled by direct `classList` manipulation on `scrollBtnRef`, not React state. The previous `useState`-based approach caused mobile scroll stutter: `setIsAtBottom()` triggered re-renders that interrupted the browser's compositor mid-momentum-deceleration.
+- **`skipNextScrollRef`** — set before every programmatic `scrollTop` assignment (initial load snap, rAF re-snaps, scroll-to-bottom button click). Without this, the resulting scroll event would set `userIsScrollingRef = true` and block auto-scroll or kill the initial-load rAF catchup loop.
+- **Initial load rAF catchup** — after the first `scrollTop = 1e9` snap, a `requestAnimationFrame` loop runs for up to 5 seconds, re-snapping whenever `scrollHeight` grows (mermaid SVGs, images, KaTeX rendering asynchronously after React commit). Each re-snap sets `skipNextScrollRef` so it isn't misinterpreted as user scrolling.
 - **`body { overscroll-behavior: none }`** — prevents iOS from elastically bouncing the page behind the scroll container.
 - **`flex-1 min-h-0`** on the scroll container (not `h-full`) — more robust across iOS Safari versions; `h-full` on a flex child with implicit height can miscalculate `clientHeight`.
 

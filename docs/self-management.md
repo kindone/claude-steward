@@ -195,6 +195,69 @@ sudo sed -i 's|proxy_pass http://127.0.0.1:3001|proxy_pass http://127.0.0.1:5173
 sudo systemctl reload nginx
 ```
 
+---
+
+## Remote Debugging via `/api/eval`
+
+The eval relay lets Claude run JavaScript in the user's browser and read the result — invaluable for diagnosing mobile-only issues where a desktop console isn't available.
+
+### How it works
+
+```
+Claude → POST /api/eval { code }
+  ↓
+Server broadcasts SSE event: eval { id, code }
+  ↓
+Browser executes eval(code), awaits Promises (≤8s)
+  ↓
+Browser POSTs result back to /api/eval/:id/result
+  ↓
+Server resolves the pending long-poll → returns result to Claude
+```
+
+Auth: session cookie or `Authorization: Bearer <API_KEY>`. The browser-side handler runs automatically (registered in `api.ts`'s `handleEval`).
+
+### Playbook: diagnosing issues on mobile
+
+When a bug only reproduces on the user's phone and you can't access the browser console:
+
+1. **Store debug data on `window`** — instrument the code to write diagnostics to a global (e.g. `window.__scrollDebug = [...]`). This survives across eval calls.
+
+2. **Deploy the instrumented build** — `npm run build` → `POST /api/admin/reload`.
+
+3. **Ask the user to reproduce** — navigate to the problematic view, trigger the bug.
+
+4. **Read the data via eval:**
+   ```bash
+   curl -s -X POST http://localhost:3001/api/eval \
+     --cookie "sid=<token>" \
+     -H "Content-Type: application/json" \
+     -d '{"code": "JSON.stringify(window.__scrollDebug)"}'
+   ```
+
+5. **Query live DOM state:**
+   ```bash
+   # Get scroll container dimensions
+   curl ... -d '{"code": "const c = document.querySelector(\".overflow-y-auto\"); JSON.stringify({ scrollHeight: c.scrollHeight, scrollTop: c.scrollTop, clientHeight: c.clientHeight })"}'
+
+   # Count rendered mermaid diagrams
+   curl ... -d '{"code": "document.querySelectorAll(\".mermaid-rendered\").length"}'
+
+   # Remove a debug overlay that's blocking the UI
+   curl ... -d '{"code": "document.querySelector(\"div[style*=\\\"z-index:99999\\\"]\")?.remove(); \"done\""}'
+   ```
+
+6. **Clean up** — remove the `window.__*` instrumentation and redeploy.
+
+### Tips
+
+- **Don't block the UI** — avoid `alert()` or overlays that cover navigation (the user can't dismiss them without eval access). Use `window.__*` globals instead.
+- **Eval timeout is 10s server-side, 8s browser-side** — keep expressions fast.
+- **Session cookie required** — the eval endpoint uses the same auth as all `/api` routes. Grab a valid `sid` token from the `auth_sessions` table if needed.
+- **Only one browser receives the eval** — if the user has multiple tabs, the first one to respond wins. The eval SSE is broadcast to all connected clients.
+
+---
+
 ### Verifying nginx config before reload
 
 ```bash
