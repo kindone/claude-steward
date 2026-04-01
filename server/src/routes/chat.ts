@@ -25,16 +25,34 @@ function sendSseEvent(res: Response, event: string, data: unknown): void {
  */
 function processScheduleBlocks(text: string, sessionId: string): string {
   const { schedules, strippedText } = extractScheduleBlocks(text)
+  const warnings: string[] = []
+
   for (const s of schedules) {
     try {
+      // update:true — only proceed if a record with this label already exists
+      if (s.update) {
+        if (!s.label) {
+          warnings.push(`⚠️ Schedule update skipped: \`update: true\` requires a label.`)
+          continue
+        }
+        const existing = scheduleQueries.findBySessionAndLabel(sessionId, s.label)
+        if (!existing) {
+          warnings.push(`⚠️ Schedule update skipped: no existing schedule found with label **"${s.label}"**. Use \`update: false\` (or omit it) to create a new one.`)
+          console.warn(`[scheduler] update rejected — label "${s.label}" not found in session ${sessionId}`)
+          continue
+        }
+      }
+
       const nextRun = nextFireAt(s.cron)
       scheduleQueries.create(uuidv4ForSchedule(), sessionId, s.cron, s.prompt, nextRun, s.once, s.label)
-      console.log(`[scheduler] upserted schedule for session ${sessionId}: ${s.label} (${s.cron})`)
+      console.log(`[scheduler] ${s.update ? 'updated' : 'upserted'} schedule for session ${sessionId}: ${s.label} (${s.cron})`)
     } catch (err) {
       console.error('[scheduler] failed to create schedule from response block:', err)
     }
   }
-  return strippedText
+
+  if (warnings.length === 0) return strippedText
+  return strippedText + '\n\n' + warnings.join('\n')
 }
 
 /** Truncate the first message to a readable title (max 40 chars, breaks on word boundary). */

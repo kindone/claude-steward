@@ -534,6 +534,9 @@ const listSchedulesBySessionStmt = db.prepare(
   `SELECT * FROM schedules WHERE session_id = ? ORDER BY created_at ASC`
 )
 const findScheduleByIdStmt = db.prepare(`SELECT * FROM schedules WHERE id = ?`)
+const findScheduleBySessionAndLabelStmt = db.prepare(
+  `SELECT * FROM schedules WHERE session_id = ? AND label = ? AND label != '' LIMIT 1`
+)
 const listDueSchedulesStmt = db.prepare(
   `SELECT * FROM schedules WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ?`
 )
@@ -554,6 +557,8 @@ export const scheduleQueries = {
   list: () => listSchedulesStmt.all() as Schedule[],
   listBySession: (sessionId: string) => listSchedulesBySessionStmt.all(sessionId) as Schedule[],
   findById: (id: string) => findScheduleByIdStmt.get(id) as Schedule | undefined,
+  findBySessionAndLabel: (sessionId: string, label: string) =>
+    findScheduleBySessionAndLabelStmt.get(sessionId, label) as Schedule | undefined,
   listDue: (now: number) => listDueSchedulesStmt.all(now) as Schedule[],
   update: (id: string, patch: { cron?: string; prompt?: string; enabled?: boolean; nextRunAt?: number | null }) =>
     updateScheduleStmt.get(

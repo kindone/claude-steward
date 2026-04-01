@@ -42,6 +42,7 @@ Rules:
 - prompt is the task context injected at fire time — write it as a clear instruction to yourself
 - label is a short human-readable name shown in the schedule list
 - once: true means the schedule fires exactly once then disables itself — use this for specific one-time reminders (e.g. "remind me on June 15th"). Omit or set false for recurring schedules.
+- update: true means only update an existing schedule with this label — if no matching label exists the operation is rejected and the user is warned. Use this when the user explicitly asks to update/change an existing schedule. Omit (or set false) when creating a new schedule.
 - Relative time baseline: treat "later", "from now", "in X minutes/hours" as relative to the current time unless the user explicitly states a different reference point (e.g. "30 minutes after that" or "an hour since the last reminder"). When in doubt, assume now.
 - ${currentTimeLine}
 - ${tzLine}
