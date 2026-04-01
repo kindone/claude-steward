@@ -2,7 +2,7 @@ import type { Request, Response } from 'express'
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import { pushSubscriptionQueries } from '../db/index.js'
-import { isPushEnabled } from '../lib/pushNotifications.js'
+import { isPushEnabled, getLastPushTarget, clearLastPushTarget } from '../lib/pushNotifications.js'
 
 const router = Router()
 
@@ -58,6 +58,18 @@ router.delete('/subscribe', (req, res) => {
   }
   pushSubscriptionQueries.deleteByEndpoint(endpoint)
   res.json({ ok: true })
+})
+
+/**
+ * GET /api/push/last-target
+ * Returns the most recent push notification target (session + project).
+ * Used by iOS clients on visibilitychange since iOS doesn't fire notificationclick.
+ * Clears the target after reading so it's consumed only once.
+ */
+router.get('/last-target', (_req, res) => {
+  const target = getLastPushTarget()
+  if (target) clearLastPushTarget()
+  res.json({ target })
 })
 
 export default router

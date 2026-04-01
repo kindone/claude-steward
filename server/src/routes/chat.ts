@@ -5,7 +5,7 @@ import { sessionQueries, messageQueries, projectQueries } from '../db/index.js'
 import { spawnClaude } from '../claude/process.js'
 import { notifyWatchers, notifySubscribers } from '../lib/sessionWatchers.js'
 import { registerChat, unregisterChat, abortChat } from '../lib/activeChats.js'
-import { notifyAll } from '../lib/pushNotifications.js'
+import { notifyAll, setLastPushTarget } from '../lib/pushNotifications.js'
 import { extractToolDetail } from '../claude/toolDetail.js'
 import { workerClient } from '../worker/client.js'
 import { buildEffectiveSystemPrompt } from '../lib/schedulePrompt.js'
@@ -134,8 +134,9 @@ router.post('/', (req, res) => {
       void notifyAll({
         title: session.title === 'New Chat' ? 'Claude replied' : session.title,
         body: preview + (cleanText.length > 80 ? '…' : ''),
-        url: `/?session=${sessionId}`,
+        url: `/?session=${sessionId}${session.project_id ? `&project=${session.project_id}` : ''}`,
       })
+      setLastPushTarget(sessionId, session.project_id ?? null)
     }
   }
 

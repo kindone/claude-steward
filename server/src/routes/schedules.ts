@@ -6,6 +6,7 @@ import { nextFireAt } from '../lib/scheduler.js'
 import { sendToSession } from '../lib/sendToSession.js'
 import { notifyWatchers, notifySubscribers } from '../lib/sessionWatchers.js'
 import { notifySession, notifyAll } from '../lib/pushNotifications.js'
+import { setLastPushTarget } from '../lib/pushNotifications.js'
 
 const router = Router()
 
@@ -123,7 +124,7 @@ router.post('/:id/run', async (req, res) => {
       const payload = {
         title: session.title === 'New Chat' ? 'Claude replied' : session.title,
         body: preview.slice(0, 80) + (preview.length > 80 ? '…' : ''),
-        url: `/?session=${schedule.session_id}`,
+        url: `/?session=${schedule.session_id}${session.project_id ? `&project=${session.project_id}` : ''}`,
       }
       const sessionSubs = pushSubscriptionQueries.listBySession(schedule.session_id)
       if (sessionSubs.length > 0) {
@@ -131,6 +132,7 @@ router.post('/:id/run', async (req, res) => {
       } else {
         void notifyAll(payload)
       }
+      setLastPushTarget(schedule.session_id, session.project_id ?? null)
     }
   } catch (err) {
     console.error(`[schedules] manual run failed for schedule ${schedule.id}:`, err)

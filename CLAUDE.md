@@ -75,6 +75,8 @@ When deploying changes: **build must succeed before reload**. Always verify `npm
 - **PM2 env caching**: `pm2 restart` keeps the old env snapshot. To apply new env vars: `pm2 restart ecosystem.dev.config.cjs --only steward-server --update-env`.
 - **Run `tsc` after client changes.** The language server misses some errors that only surface at compile time. Always run `npm run build --workspace=client` (or `cd client && npx tsc --noEmit`) after TypeScript changes in `client/`.
 - **Dev vs prod routing**: nginx routes `dev.steward.jradoo.com → :5173` (Vite, HMR over WSS). nginx routes `steward.jradoo.com → :3001` (prod, built static files). Do not set `build.watch` non-null in `vite.config.ts` unconditionally — that activates watch mode for all builds including production.
+- **Scheduling: use `<schedule>` blocks, not CronCreate.** This project has a custom scheduler (see `docs/scheduler.md`). When the user asks to schedule something, emit a `<schedule>` JSON block in your response — the server will intercept it, store it in the DB, and manage it. `CronCreate` is ephemeral and session-only; it's only for quick testing, never for user-facing features. The `<schedule>` block system persists across server restarts, supports `update: true` semantics, and is visible in the UI.
+- **Get current time via Bash, not system prompt.** The system prompt contains current time at session start, but it becomes stale as the conversation progresses. When scheduling, run `date "+%H:%M:%S %Z" && date -u "+%H:%M:%S UTC"` via Bash to get the accurate current time, then calculate the cron expression relative to that.
 
 ---
 

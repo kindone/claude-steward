@@ -7,6 +7,23 @@ export type PushPayload = {
   url?: string
 }
 
+// Last push target — stored in memory so the client can poll it on visibilitychange.
+// iOS Safari kills the SSE connection when backgrounded, so broadcastEvent doesn't
+// reach the page. Instead, when the page wakes up it calls GET /api/push/last-target.
+let lastPushTarget: { sessionId: string; projectId: string | null; ts: number } | null = null
+
+export function setLastPushTarget(sessionId: string, projectId: string | null): void {
+  lastPushTarget = { sessionId, projectId, ts: Date.now() }
+}
+
+export function getLastPushTarget(): { sessionId: string; projectId: string | null; ts: number } | null {
+  return lastPushTarget
+}
+
+export function clearLastPushTarget(): void {
+  lastPushTarget = null
+}
+
 /** Whether push is configured — reads env vars lazily so dotenv has already run. */
 export function isPushEnabled(): boolean {
   return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY)

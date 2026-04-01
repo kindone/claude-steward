@@ -17,30 +17,34 @@ self.addEventListener('push', (event) => {
     // DevTools test button sends plain text — show it as the body
     data = { title: 'Steward', body: event.data?.text() ?? '' }
   }
+  const url = data.url ?? '/'
   event.waitUntil(
     self.registration.showNotification(data.title ?? 'Steward', {
       body: data.body ?? '',
       icon: '/favicon.svg',
       badge: '/favicon.svg',
-      data: { url: data.url ?? '/' },
+      data: { url },
     })
   )
+  // Note: iOS Safari doesn't fire 'notificationclick' when a push notification is
+  // tapped, so SW-to-page IPC for navigation doesn't work on iOS. Instead, the
+  // server broadcasts a 'pushTarget' event on the /api/events SSE stream, which
+  // the page picks up and navigates on visibilitychange. See App.tsx.
 })
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
   const url = event.notification.data?.url ?? '/'
-  // Extract session ID from e.g. /?session=<id>
-  const sessionId = new URL(url, self.location.origin).searchParams.get('session')
+  // Extract session and project IDs from e.g. /?session=<id>&project=<id>
+  const params = new URL(url, self.location.origin).searchParams
+  const sessionId = params.get('session')
+  const projectId = params.get('project')
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
       if (clientList.length > 0) {
         const client = clientList[0]
-        // postMessage is universally supported (iOS/Android PWA, all browsers).
-        // client.navigate() only works on controlled clients and is unreliable on
-        // iOS Safari — postMessage lets the app switch sessions without a reload.
-        client.postMessage({ type: 'switchSession', sessionId, url })
+        client.postMessage({ type: 'switchSession', sessionId, projectId, url })
         return client.focus()
       }
       // No existing tab — open a new window with the session URL

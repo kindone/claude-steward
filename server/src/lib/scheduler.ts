@@ -11,6 +11,7 @@ import { sendToSession } from './sendToSession.js'
 import { notifyWatchers, notifySubscribers } from './sessionWatchers.js'
 import { notifySession, notifyAll } from './pushNotifications.js'
 import { pushSubscriptionQueries } from '../db/index.js'
+import { setLastPushTarget } from './pushNotifications.js'
 
 /**
  * Compute the next UTC unix timestamp (seconds) for a cron expression.
@@ -78,6 +79,7 @@ async function runSchedule(schedule: Schedule): Promise<void> {
     } else {
       void notifyAll(payload)
     }
+    setLastPushTarget(schedule.session_id, session.project_id ?? null)
   }
 }
 

@@ -129,22 +129,58 @@ export default function App() {
     }
   }, [])
 
-  // Handle push notification taps: SW sends { type: 'switchSession', sessionId, url }
+  // iOS push notification navigation.
+  // iOS Safari doesn't fire 'notificationclick' in the SW, and the SSE connection
+  // dies when iOS backgrounds the page. So neither postMessage nor SSE pushTarget
+  // events reach the client. Instead, the server stores the last push target in
+  // memory. On visibilitychange, the page polls GET /api/push/last-target and
+  // navigates if there's a recent target.
+  useEffect(() => {
+    const onVisible = async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        const res = await fetch('/api/push/last-target', { credentials: 'include' })
+        if (!res.ok) return
+        const { target } = await res.json() as { target: { sessionId: string; projectId: string | null; ts: number } | null }
+        if (!target) return
+        // Only act on pushes from the last 60 seconds
+        if (Date.now() - target.ts > 60_000) return
+        const { sessionId, projectId } = target
+        if (sessionsRef.current.some((s) => s.id === sessionId)) {
+          setActiveSessionId(sessionId)
+        } else if (projectId) {
+          pendingSessionIdRef.current = sessionId
+          setActiveProjectId(projectId)
+        } else {
+          window.location.href = `/?session=${sessionId}`
+        }
+      } catch { /* ignore network errors */ }
+    }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => document.removeEventListener('visibilitychange', onVisible)
+  }, [])
+
+  // Handle push notification taps: SW sends { type: 'switchSession', sessionId, projectId, url }
   // postMessage works on all platforms (iOS/Android) unlike client.navigate().
   useEffect(() => {
     if (!('serviceWorker' in navigator)) return
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type !== 'switchSession') return
-      const targetId = event.data.sessionId as string | undefined
+      const targetSessionId = event.data.sessionId as string | undefined
+      const targetProjectId = event.data.projectId as string | undefined
       const targetUrl = event.data.url as string | undefined
-      if (!targetId) return
+      if (!targetSessionId) return
       // If session is in the current project's list, switch directly (no reload)
-      if (sessionsRef.current.some((s) => s.id === targetId)) {
-        setActiveSessionId(targetId)
+      if (sessionsRef.current.some((s) => s.id === targetSessionId)) {
+        setActiveSessionId(targetSessionId)
+      } else if (targetProjectId) {
+        // Session is in a different project — switch project first, then session.
+        // The sessions-load effect will pick up pendingSessionIdRef and select it.
+        pendingSessionIdRef.current = targetSessionId
+        setActiveProjectId(targetProjectId)
       } else {
-        // Session is in a different project — fall back to full navigation
-        // which triggers the ?session= URL param handling on mount
-        window.location.href = targetUrl ?? `/?session=${targetId}`
+        // No project ID available — fall back to full navigation
+        window.location.href = targetUrl ?? `/?session=${targetSessionId}`
       }
     }
     navigator.serviceWorker.addEventListener('message', handleMessage)
@@ -179,9 +215,9 @@ export default function App() {
     setRestarting(true)
     setTimeout(() => window.location.reload(), 1500)
   }, [])
-  const { state: connState, lastSeenAt } = useAppConnection(
-    authState === 'authenticated' ? handleReload : undefined
-  )
+  const { state: connState, lastSeenAt } = useAppConnection({
+    onReload: authState === 'authenticated' ? handleReload : undefined,
+  })
 
   // Load projects and meta once authenticated; restore last-used project if it still exists.
   // If a push notification tap supplied ?project=<id>, prefer that over localStorage so the
