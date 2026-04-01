@@ -196,6 +196,7 @@ export type Schedule = {
   session_id: string
   cron: string
   prompt: string
+  label: string
   enabled: number
   once: number   // 1 = disable after first fire, 0 = recurring
   last_run_at: number | null

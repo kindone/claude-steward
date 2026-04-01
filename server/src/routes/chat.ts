@@ -37,7 +37,14 @@ function processScheduleBlocks(text: string, sessionId: string): string {
         }
         const existing = scheduleQueries.findBySessionAndLabel(sessionId, s.label)
         if (!existing) {
-          warnings.push(`⚠️ Schedule update skipped: no existing schedule found with label **"${s.label}"**. Use \`update: false\` (or omit it) to create a new one.`)
+          const sessionSchedules = scheduleQueries.listBySession(sessionId)
+          const labelList = sessionSchedules
+            .filter(sc => sc.label)
+            .map(sc => `- \`${sc.label}\``)
+          const hint = labelList.length
+            ? `\n\nExisting labels in this session:\n${labelList.join('\n')}`
+            : '\n\n(No labelled schedules exist in this session yet.)'
+          warnings.push(`⚠️ Schedule update skipped: no existing schedule found with label **"${s.label}"**.${hint}`)
           console.warn(`[scheduler] update rejected — label "${s.label}" not found in session ${sessionId}`)
           continue
         }
