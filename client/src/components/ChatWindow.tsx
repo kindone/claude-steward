@@ -94,7 +94,23 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [scheduleTick, setScheduleTick] = useState(0)
   const [debugOpen, setDebugOpen] = useState(false)
-  const [isAtBottom, setIsAtBottom] = useState(true)
+  // Ref-only bottom tracking — avoids React re-renders on scroll settle (which caused
+  // mobile stutter by interrupting momentum deceleration). Button visibility is toggled
+  // via direct DOM class manipulation instead.
+  const isAtBottomRef = useRef(true)
+  const scrollBtnRef = useRef<HTMLButtonElement>(null)
+  const setIsAtBottom = (v: boolean) => {
+    isAtBottomRef.current = v
+    const btn = scrollBtnRef.current
+    if (!btn) return
+    if (v) {
+      btn.classList.add('opacity-0', 'invisible')
+      btn.classList.remove('opacity-100', 'visible')
+    } else {
+      btn.classList.remove('opacity-0', 'invisible')
+      btn.classList.add('opacity-100', 'visible')
+    }
+  }
   const bottomRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   /** 'instant' on first load, 'smooth' during streaming, 'none' when prepending older messages. */
@@ -649,29 +665,25 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
       </div>
 
       {/* Scroll-to-bottom button — lives in a zero-height div OUTSIDE the scroll container
-          so it has no DOM relationship with the scrollable area. This prevents iOS Safari
-          from firing micro scroll-correction events when the button appears/disappears,
-          which was causing the IntersectionObserver threshold to oscillate.
-          Negative top pulls it up to float above the MessageInput. */}
+          so it has no DOM relationship with the scrollable area. Visibility is toggled via
+          direct DOM class manipulation (setIsAtBottom) to avoid React re-renders that were
+          causing mobile scroll stutter by interrupting momentum deceleration. */}
       <div className="relative h-0 overflow-visible">
         <button
+          ref={scrollBtnRef}
           onClick={() => {
             const container = scrollContainerRef.current
             if (!container) return
             wasAtBottomRef.current = true
             userIsScrollingRef.current = false
-            // Flag the scroll event this assignment will fire as programmatic,
-            // so the handler ignores it and streaming auto-scroll keeps working.
             skipNextScrollRef.current = true
             requestAnimationFrame(() => {
               container.scrollTop = 1e9
             })
-            // Hide the button immediately — don't wait for the 150ms settle debounce.
             setIsAtBottom(true)
           }}
-          className={`absolute -top-12 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-[#1a1a1a] border border-[#333] hover:border-[#555] rounded-full text-[#888] hover:text-[#ccc] text-xs px-3 py-1.5 cursor-pointer shadow-lg transition-[opacity,visibility] duration-200 ${isAtBottom ? 'opacity-0 invisible' : 'opacity-100 visible'}`}
+          className="absolute -top-12 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-[#1a1a1a] border border-[#333] hover:border-[#555] rounded-full text-[#888] hover:text-[#ccc] text-xs px-3 py-1.5 cursor-pointer shadow-lg transition-[opacity,visibility] duration-200 opacity-0 invisible"
           title="Scroll to bottom"
-          aria-hidden={isAtBottom}
         >
           ↓ Scroll to bottom
         </button>
