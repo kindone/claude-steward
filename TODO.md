@@ -13,19 +13,13 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 ## Planned
 
 ### Mini-App Platform
-- [ ] **`steward-app.json` manifest spec** — `name`, `type`, `devCommand`, `port`, `buildCommand`; the pluggable contract that makes any project embeddable
-- [ ] **Sidecar process manager** — spawn/stop/restart mini-app processes per project; `GET /api/projects/:id/app/status`, `POST /api/projects/:id/app/start|stop`
-- [ ] **Split-panel UI** — resizable divider; iframe embed of running mini-app; collapse/expand to full-screen
 - [ ] **Project templates** — starters for `docs` (MkDocs-style), `notebook` (live code cells + output), `webapp` (Vite + React + Leaflet for travel-type apps)
-- [ ] **Claude as app maker** — scaffold new mini-apps via chat, modify files, trigger live-reload via sidecar manager
 
 ### Scheduler
 - [ ] **Complex schedule support** — 5-field cron cannot express biweekly, "last day of month", "Nth weekday", or exclusions natively. Two approaches to explore: (a) **schedule groups** — a named group of N cron entries that fire together, letting biweekly be expressed as two alternating weekly schedules with a shared label and toggle; (b) **condition field** — a lightweight filter evaluated at fire time (e.g. `{"type": "biweekly", "ref": "<ISO date>"}`) that skips the run if the condition isn't met, keeping the cron wakeup cheap and the logic in the scheduler. Trade-off: groups are simpler and composable; conditions are more expressive but require a small DSL and per-type evaluators. Claude's prompt fragment already gracefully explains the limitation and enumerates workarounds — any implementation should align with that UX.
 
 ### Core UX
 - [ ] **`after=<id>` message fetch endpoint** — `GET /api/sessions/:id/messages?after=<messageId>` returns only messages newer than the given ID; client uses it on visibility-change to append new messages without replacing the full view. Currently the visibility-change re-fetch loads the latest 50 and replaces state, which loses scroll position if the user had paged into older messages. Low priority — >50 new messages while backgrounded is practically impossible in a chat app.
-- [x] **Client-side JS console for AI** — `POST /api/eval { code }` long-poll relay: server broadcasts SSE `eval` event to connected browsers, browser executes and POSTs result back; Claude calls with API key Bearer token; Promises awaited up to 8 s; JSON-serialised result returned synchronously to caller; 10 s server timeout if no browser responds
-- [x] **Rich chat content rendering** — ` ```mermaid ` → SVG via mermaid.js (dark theme; SVG cache survives React re-renders/scroll); ` ```html ` → sandboxed `<iframe srcdoc>` with source/preview toggle; relative image paths rewritten to `/api/projects/:id/files/raw`; `$...$` / `$$...$$` → KaTeX; implemented in `client/src/lib/markdownRenderer.ts` + `HtmlPreview.tsx`
 
 ### Push Notifications (hardening)
 - [ ] **Push notification improvements** — (send bugs tracked in `BUGS.md`); remaining feature gaps:
@@ -44,10 +38,6 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 - [ ] **Tool calls on direct-spawn path** — worker + `result_reply` recovery now persist `tool_calls` to steward.db (`worker.db.jobs.tool_calls`, shared `extractToolDetail` in `server/src/claude/toolDetail.ts`). **Direct-spawn** fallback (`process.ts`) still does not write `tool_calls`; add if parity needed when worker is down.
 
 ### Claude Code Project Structure
-- [x] **`CLAUDE.md` at repo root** — the most impactful gap: Claude Code auto-loads this on every session; consolidate key content from `MEMORY.md` + docs gotchas (env var stripping, safe/ freeze, CI=true, etc.) + build/test/lint commands + current focus areas so every session is immediately oriented without relying on the auto-memory system
-- [x] **`.claude/commands/`** — custom slash commands: `/deploy` (build → reload) and `/test` (test strategy + commands)
-- [x] **`.claude/settings.json`** — project-level tool permissions; allow build/test/status, deny commit/push/rm-rf
-- [x] **`server/CLAUDE.md` + `client/CLAUDE.md`** — per-subdirectory context for server-specific (Express/worker/SQLite patterns) and client-specific (React/Tailwind/Vite patterns) rules
 - [ ] **`.mcp.json`** — MCP server config; a custom MCP server querying steward.db or wrapping pm2/nginx commands would be natural for self-management
 - [ ] **ADRs in `docs/adr/`** — structured Architecture Decision Records capturing *why* key decisions were made (node:sqlite over better-sqlite3, worker IPC over in-process, safe/ freeze policy); helps Claude judge whether constraints are load-bearing
 
