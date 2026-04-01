@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
-import { listFiles, getFileContent, patchFile, FileConflictError, type FileEntry } from '../lib/api'
+import { listFiles, getFileContent, patchFile, uploadFiles, FileConflictError, type FileEntry } from '../lib/api'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
@@ -293,6 +293,13 @@ function FileViewer({
                     {copied ? '✓ Copied' : 'Copy'}
                   </button>
                 )}
+                <a
+                  href={`${rawSrc}&download=1`}
+                  download
+                  className="text-xs text-[#666] hover:text-[#ccc] hover:bg-[#222] px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent no-underline"
+                >
+                  Download
+                </a>
                 <button
                   className="bg-transparent border-none text-[#666] hover:text-[#ccc] hover:bg-[#222] text-xl cursor-pointer leading-none px-2 py-1 rounded transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                   onClick={onClose}
@@ -362,8 +369,18 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
   const [loading, setLoading] = useState(false)
   const [viewer, setViewer] = useState<ViewerState>(null)
 
-  const loadDir = useCallback(async (dirPath: string) => {
-    if (tree.has(dirPath)) return
+  // Upload state
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState<{ loaded: number; total: number } | null>(null)
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null)
+  const [dragOver, setDragOver] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Track the "current directory" for uploads — last opened dir or root
+  const currentDirRef = useRef('')
+
+  /** Force-reload a directory listing. */
+  const refreshDir = useCallback(async (dirPath: string) => {
     setLoading(true)
     try {
       const entries = await listFiles(projectId, dirPath)
@@ -373,7 +390,40 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [projectId, tree])
+  }, [projectId])
+
+  const loadDir = useCallback(async (dirPath: string) => {
+    if (tree.has(dirPath)) return
+    await refreshDir(dirPath)
+  }, [tree, refreshDir])
+
+  const handleUpload = useCallback(async (files: FileList | File[]) => {
+    const fileArray = Array.from(files)
+    if (fileArray.length === 0) return
+    setUploading(true)
+    setUploadProgress(null)
+    setUploadStatus(null)
+    try {
+      const result = await uploadFiles(
+        projectId,
+        fileArray,
+        currentDirRef.current,
+        (loaded, total) => setUploadProgress({ loaded, total }),
+      )
+      setUploadStatus(`Uploaded ${result.uploaded.length} file${result.uploaded.length > 1 ? 's' : ''}`)
+      // Refresh the target directory
+      void refreshDir(currentDirRef.current)
+      // Timeout to clear status message
+      setTimeout(() => setUploadStatus(null), 3000)
+    } catch (err) {
+      setUploadStatus(`Error: ${(err as Error).message}`)
+      setTimeout(() => setUploadStatus(null), 5000)
+    } finally {
+      setUploading(false)
+      setUploadProgress(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }, [projectId, refreshDir])
 
   useEffect(() => {
     if (expanded && !tree.has('')) {
@@ -385,6 +435,7 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
     if (openDirs.has(path)) {
       setOpenDirs((prev) => { const s = new Set(prev); s.delete(path); return s })
     } else {
+      currentDirRef.current = path
       setOpenDirs((prev) => new Set(prev).add(path))
       await loadDir(path)
     }
@@ -434,28 +485,122 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
 
   const closeViewer = useCallback(() => setViewer(null), [])
 
+  // Drag-and-drop handlers for the tree container
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(true)
+  }, [])
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+  }, [])
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setDragOver(false)
+    if (e.dataTransfer.files.length > 0) void handleUpload(e.dataTransfer.files)
+  }, [handleUpload])
+
+  const uploadBar = (
+    <>
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={(e) => { if (e.target.files?.length) void handleUpload(e.target.files) }}
+      />
+      {/* Upload status / progress */}
+      {(uploading || uploadStatus) && (
+        <div className="px-3 py-1.5 text-[11px]">
+          {uploading && uploadProgress ? (
+            <div className="flex items-center gap-2">
+              <div className="flex-1 h-1 bg-[#1a1a1a] rounded overflow-hidden">
+                <div
+                  className="h-full bg-blue-500 transition-all duration-200"
+                  style={{ width: `${Math.round((uploadProgress.loaded / uploadProgress.total) * 100)}%` }}
+                />
+              </div>
+              <span className="text-[#555] flex-shrink-0">{Math.round((uploadProgress.loaded / uploadProgress.total) * 100)}%</span>
+            </div>
+          ) : uploading ? (
+            <span className="text-[#555]">Uploading…</span>
+          ) : uploadStatus ? (
+            <span className={uploadStatus.startsWith('Error') ? 'text-red-400' : 'text-green-400'}>{uploadStatus}</span>
+          ) : null}
+        </div>
+      )}
+    </>
+  )
+
   return (
     <>
       {alwaysExpanded ? (
-        <div className="flex-1 overflow-y-auto px-1.5 py-1.5 min-h-0">
-          {loading && !tree.has('') && (
-            <p className="text-xs text-[#444] px-2.5 py-1.5">Loading…</p>
+        <div
+          className={`flex-1 flex flex-col overflow-y-auto min-h-0 ${dragOver ? 'ring-1 ring-inset ring-blue-500/40 bg-blue-500/5' : ''}`}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <div className="flex items-center justify-between px-3 py-1.5 flex-shrink-0">
+            <span className="text-[11px] text-[#444] font-semibold tracking-widest uppercase">
+              {currentDirRef.current || 'Root'}
+            </span>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="text-[11px] text-[#555] hover:text-[#888] bg-transparent border-none cursor-pointer px-1.5 py-0.5 rounded hover:bg-[#1a1a1a] transition-colors disabled:opacity-50"
+              title="Upload files"
+            >
+              ↑ Upload
+            </button>
+          </div>
+          {uploadBar}
+          <div className="flex-1 overflow-y-auto px-1.5 py-1.5 min-h-0">
+            {loading && !tree.has('') && (
+              <p className="text-xs text-[#444] px-2.5 py-1.5">Loading…</p>
+            )}
+            {tree.has('') && tree.get('')!.length === 0 && (
+              <p className="text-xs text-[#444] px-2.5 py-1.5 italic">Empty directory</p>
+            )}
+            {tree.has('') && renderEntries(tree.get('')!, 0)}
+          </div>
+          {dragOver && (
+            <div className="px-3 py-2 text-center text-[11px] text-blue-400 flex-shrink-0">
+              Drop files to upload
+            </div>
           )}
-          {tree.has('') && tree.get('')!.length === 0 && (
-            <p className="text-xs text-[#444] px-2.5 py-1.5 italic">Empty directory</p>
-          )}
-          {tree.has('') && renderEntries(tree.get('')!, 0)}
         </div>
       ) : (
-        <div className="border-t border-[#1f1f1f] flex-shrink-0">
-          <button
-            className="w-full flex items-center gap-1.5 px-3 py-2 bg-transparent border-none text-[#555] hover:text-[#888] text-[11px] font-semibold tracking-widest uppercase cursor-pointer text-left transition-colors"
-            onClick={() => setExpanded((e) => !e)}
-          >
-            <span>{expanded ? '▾' : '▸'}</span>
-            <span>Files</span>
-            {loading && <span className="text-[#444] text-[11px]">…</span>}
-          </button>
+        <div
+          className={`border-t border-[#1f1f1f] flex-shrink-0 ${dragOver && expanded ? 'ring-1 ring-inset ring-blue-500/40 bg-blue-500/5' : ''}`}
+          onDragOver={expanded ? handleDragOver : undefined}
+          onDragLeave={expanded ? handleDragLeave : undefined}
+          onDrop={expanded ? handleDrop : undefined}
+        >
+          <div className="flex items-center">
+            <button
+              className="flex-1 flex items-center gap-1.5 px-3 py-2 bg-transparent border-none text-[#555] hover:text-[#888] text-[11px] font-semibold tracking-widest uppercase cursor-pointer text-left transition-colors"
+              onClick={() => setExpanded((e) => !e)}
+            >
+              <span>{expanded ? '▾' : '▸'}</span>
+              <span>Files</span>
+              {loading && <span className="text-[#444] text-[11px]">…</span>}
+            </button>
+            {expanded && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="text-[11px] text-[#555] hover:text-[#888] bg-transparent border-none cursor-pointer px-2 py-1.5 mr-1 rounded hover:bg-[#1a1a1a] transition-colors disabled:opacity-50"
+                title="Upload files"
+              >
+                ↑
+              </button>
+            )}
+          </div>
+          {uploadBar}
           {expanded && (
             <div className="max-h-[200px] overflow-y-auto px-1.5 pb-1.5">
               {tree.has('') && tree.get('')!.length === 0 && (

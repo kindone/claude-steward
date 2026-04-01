@@ -248,6 +248,63 @@ export async function patchFile(
   return res.json() as Promise<{ lastModified: number }>
 }
 
+// ── File upload ──────────────────────────────────────────────────────────────
+
+export type UploadedFile = { name: string; path: string; size: number }
+
+/**
+ * Upload files to a project directory via multipart POST.
+ * @param projectId  Target project
+ * @param files      File objects from <input type="file"> or DataTransfer
+ * @param targetPath Relative directory within the project (default: root)
+ * @param onProgress Optional callback for upload progress
+ */
+export function uploadFiles(
+  projectId: string,
+  files: File[],
+  targetPath = '',
+  onProgress?: (loaded: number, total: number) => void,
+): Promise<{ uploaded: UploadedFile[] }> {
+  const formData = new FormData()
+  for (const f of files) formData.append('files', f)
+
+  const url = `/api/projects/${projectId}/files/upload${targetPath ? `?path=${encodeURIComponent(targetPath)}` : ''}`
+
+  if (onProgress) {
+    // Use XMLHttpRequest for upload progress (fetch doesn't support it)
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest()
+      xhr.open('POST', url)
+      xhr.withCredentials = true
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded, e.total)
+      }
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try { resolve(JSON.parse(xhr.responseText)) } catch { reject(new Error('Invalid response')) }
+        } else {
+          try {
+            const body = JSON.parse(xhr.responseText)
+            reject(new Error(body.error ?? `Upload failed (${xhr.status})`))
+          } catch { reject(new Error(`Upload failed (${xhr.status})`)) }
+        }
+      }
+      xhr.onerror = () => reject(new Error('Upload failed (network error)'))
+      xhr.send(formData)
+    })
+  }
+
+  // Simple fetch path when progress isn't needed
+  return fetch(url, { method: 'POST', body: formData, ...credentialsOpt })
+    .then(async (res) => {
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({ error: 'Unknown error' })) as { error: string }
+        throw new Error(body.error ?? `Upload failed (${res.status})`)
+      }
+      return res.json() as Promise<{ uploaded: UploadedFile[] }>
+    })
+}
+
 // ── Push notifications ────────────────────────────────────────────────────────
 
 /** Fetch the server's VAPID public key (avoids needing a build-time env var). */

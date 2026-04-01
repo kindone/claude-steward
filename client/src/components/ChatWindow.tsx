@@ -708,6 +708,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
 
       <MessageInput
         sessionId={sessionId}
+        projectId={projectId}
         onSend={handleSend}
         onStop={() => {
           streamingFromSendRef.current = false

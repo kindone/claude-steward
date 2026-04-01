@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawn } from 'node:child_process'
+import multer from 'multer'
 import { projectQueries, type PermissionMode, type Project } from '../db/index.js'
 import { safeResolvePath } from '../lib/pathUtils.js'
 
@@ -224,6 +225,71 @@ router.patch('/:id/files', (req, res) => {
   }
 })
 
+// POST /api/projects/:id/files/upload?path=relative/sub/dir
+// Multipart file upload. Saves files to the target directory (relative to project root).
+// Creates the directory if it doesn't exist. Returns { uploaded: [{ name, path, size }] }.
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      // Set dynamically in the route handler via req.__uploadDir
+      cb(null, (_req as unknown as { __uploadDir: string }).__uploadDir)
+    },
+    filename: (_req, file, cb) => {
+      // Strip path separators from original filename to prevent traversal
+      const safeName = file.originalname.replace(/[/\\]/g, '_')
+      cb(null, safeName)
+    },
+  }),
+  limits: { fileSize: 50 * 1024 * 1024, files: 20 },
+})
+
+router.post('/:id/files/upload', (req, res, next) => {
+  const project = projectQueries.findById(req.params.id)
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' })
+    return
+  }
+
+  const relPath = (req.query.path as string | undefined) ?? ''
+  const targetDir = relPath ? safeResolvePath(project.path, relPath) : project.path
+  if (!targetDir) {
+    res.status(400).json({ error: 'Invalid path' })
+    return
+  }
+
+  // Create directory if it doesn't exist
+  fs.mkdirSync(targetDir, { recursive: true })
+
+  // Attach resolved dir for multer's destination callback
+  ;(req as unknown as { __uploadDir: string }).__uploadDir = targetDir
+
+  upload.array('files')(req, res, (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          res.status(413).json({ error: 'File too large (max 50 MB)' })
+          return
+        }
+        if (err.code === 'LIMIT_FILE_COUNT') {
+          res.status(400).json({ error: 'Too many files (max 20)' })
+          return
+        }
+      }
+      next(err)
+      return
+    }
+
+    const files = (req.files as Express.Multer.File[]) ?? []
+    const uploaded = files.map((f) => ({
+      name: f.filename,
+      path: relPath ? `${relPath}/${f.filename}` : f.filename,
+      size: f.size,
+    }))
+
+    res.status(201).json({ uploaded })
+  })
+})
+
 // GET /api/projects/:id/files/raw?path=relative/image.png
 // Serves the raw file bytes with the detected MIME type — used for image preview.
 router.get('/:id/files/raw', (req, res) => {
@@ -266,7 +332,12 @@ router.get('/:id/files/raw', (req, res) => {
     }
     const buf = fs.readFileSync(safePath)
     res.setHeader('Content-Type', mime)
-    res.setHeader('Cache-Control', 'private, max-age=60')
+    if (req.query.download === '1') {
+      const basename = path.basename(relPath)
+      res.setHeader('Content-Disposition', `attachment; filename="${basename}"`)
+    } else {
+      res.setHeader('Cache-Control', 'private, max-age=60')
+    }
     res.send(buf)
   } catch {
     res.status(404).json({ error: 'File not found' })

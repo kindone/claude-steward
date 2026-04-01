@@ -16,6 +16,7 @@ All routes require authentication and live under `/api/projects/:id/files*`.
 | `GET` | `/api/projects/:id/files/content?path=` | UTF-8 file content + `lastModified` mtime (1 MB cap) |
 | `GET` | `/api/projects/:id/files/raw?path=` | Binary file served with detected MIME type; used for image preview |
 | `PATCH` | `/api/projects/:id/files` | Write new content atomically (see below) |
+| `POST` | `/api/projects/:id/files/upload` | Multipart file upload (multer); max 50 MB / 20 files |
 
 All paths are validated through `safeResolvePath()`, which calls `path.resolve(projectRoot, userPath)` and rejects anything whose resolved form doesn't start with the resolved project root. This prevents directory traversal.
 
@@ -32,6 +33,16 @@ Dotfiles are filtered out of the response. Directories must be expanded one leve
 ### Raw endpoint
 
 Used exclusively for image preview — the content endpoint reads with `utf8` which corrupts binary data. The raw endpoint reads the file as a `Buffer` and sets an appropriate `Content-Type` from a local extension map (png, jpg, gif, svg, webp, avif, ico, bmp, pdf). Non-image types get `application/octet-stream`.
+
+### File upload (`POST /upload`)
+
+Accepts `multipart/form-data` with a `files` field (up to 20 files, 50 MB each) and an optional `targetPath` field specifying the subdirectory within the project to upload into. The target directory is created recursively if it doesn't exist. Filenames are sanitized (path separators replaced with `_`). Returns `{ uploaded: [{ name, path, size }] }`.
+
+nginx must have `client_max_body_size 55m` (or higher) to avoid 413 errors before the request reaches Express.
+
+### Raw endpoint with download mode
+
+The raw endpoint accepts an optional `?download=1` query parameter which adds a `Content-Disposition: attachment` header, triggering a browser download dialog instead of inline display.
 
 ### Atomic write with optimistic locking (`PATCH`)
 
@@ -99,5 +110,26 @@ After a successful save, `displayContent` and `lastModified` are updated in loca
 | `listFiles(projectId, path?)` | `GET /files` — returns `FileEntry[]` |
 | `getFileContent(projectId, path)` | Returns `{ content: string, lastModified: number }` |
 | `patchFile(projectId, path, content, lastModified?, force?)` | Returns `{ lastModified: number }`; throws `FileConflictError` on 409 |
+| `uploadFiles(projectId, files, targetPath?, onProgress?)` | `POST /files/upload`; uses XHR for upload progress; returns `{ uploaded: UploadedFile[] }` |
 
 `FileConflictError` extends `Error` with `name = 'FileConflictError'` for `instanceof` checks.
+
+---
+
+## Upload & Download UI
+
+### FileTree upload
+
+Both rendering modes (alwaysExpanded and collapsed) show an **↑ Upload** button in the header. The Files tab also supports **drag-and-drop** — dropping files onto the tree uploads them to the currently viewed directory. A progress bar appears during upload, and the directory listing refreshes automatically on completion.
+
+### FileViewer download
+
+The file viewer modal header includes a **↓ Download** link that opens the raw endpoint with `?download=1`.
+
+### Chat file attachment (MessageInput)
+
+The message input has a **📎 paperclip** button and accepts **drag-and-drop** on the textarea container. Selected files appear as removable chips below the input. On send:
+
+1. Files are uploaded to the project's `uploads/` directory via `uploadFiles()`
+2. The user's text message (or auto-generated "Please read and analyze…") is prepended with file paths
+3. Claude receives the message and can read the uploaded files using its `Read` tool (which is multimodal — supports images, PDFs, etc.)

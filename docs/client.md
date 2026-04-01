@@ -17,13 +17,13 @@ client/src/
 └── components/
     ├── SessionSidebar.tsx ← project switcher + 3-tab bar (Sessions/Files/Term)
     ├── ProjectPicker.tsx  ← dropdown: select/create/delete projects
-    ├── FileTree.tsx       ← collapsible file browser; openFile() → FileViewer portal
+    ├── FileTree.tsx       ← collapsible file browser; openFile() → FileViewer portal; upload (button + drag-drop) + download
     ├── TerminalPanel.tsx  ← xterm.js terminal; runs commands via POST /exec SSE
     ├── ChatWindow.tsx     ← message history, streaming, stop, 🔔 push toggle, 🕐 schedule panel, ↓ scroll button
     ├── HtmlPreview.tsx    ← sandboxed <iframe srcdoc> with Source/Preview tab toggle; auto-sizes to content
     ├── ImageLightbox.tsx  ← fullscreen image/SVG viewer; scroll-to-zoom (cursor-anchored), drag-to-pan, Escape/backdrop to close
     ├── MessageBubble.tsx  ← rich rendering: markdown + hljs + mermaid + KaTeX + HTML preview + image rewriting + lightbox
-    ├── MessageInput.tsx   ← textarea, Send / Stop button
+    ├── MessageInput.tsx   ← textarea, Send / Stop button, 📎 file attachment (drag-drop + paperclip button)
     ├── AppsPanel.tsx      ← list/create/start/stop mini-apps; "View" button opens AppViewPanel inline
     └── AppViewPanel.tsx   ← side panel that embeds a running app in an iframe (½ or ⅔ split; full-screen on mobile)
 

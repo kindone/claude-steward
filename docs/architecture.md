@@ -108,6 +108,7 @@ nginx
   │  GET  /api/projects/:id/files/content     file content      │
   │  GET  /api/projects/:id/files/raw         binary file       │
   │  PATCH /api/projects/:id/files            atomic file write │
+  │  POST /api/projects/:id/files/upload     multipart upload  │
   │  POST /api/projects/:id/exec              SSE exec stream   │
   │  GET  /api/push/vapid-public-key                            │
   │  POST/DELETE /api/push/subscribe                            │
