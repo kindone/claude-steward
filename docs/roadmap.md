@@ -25,13 +25,15 @@ Keyboard shortcuts (`Cmd/Ctrl+N/[/]`), session reordering by recency, inline ren
 
 ## Planned
 
-### Mini-App Platform
+### Mini-App Platform (partial)
 
-Projects can be more than chat sessions — **living artifacts**: embedded web apps Claude builds and maintains alongside the conversation. A `steward-app.json` manifest declares how to start the app (`devCommand`, `port`, etc.). The server spawns it as a sidecar process; the UI embeds it in a split-panel view.
+Projects can be more than chat sessions — **living artifacts**: embedded web apps Claude builds and maintains alongside the conversation. The server spawns a sidecar process per mini-app; the UI embeds it in a split-panel iframe.
 
-Three standard app types envisioned:
-- **`docs`** — MkDocs-style rendered documentation
-- **`notebook`** — Observable-style live code cells and visualisations
+Shipped app types:
+- **`docs`** — MkDocs proxy with injected Claude chat panel (floating toggle, persistent messages, model selector, compact/new with inline confirmation dialogs) + presenter/slideshow mode. See [`docs/apps-docs.md`](apps-docs.md).
+- **`notebook`** — Multi-language live-code-cell notebook (Python, Node, Bash, C++); React+Vite client; SQLite cell store; SSE execution streaming; Claude chat panel beside the notebook. See `apps/notebook/`.
+
+Still planned:
 - **`webapp`** — Fully custom; e.g. a travel research app with maps and price comparisons
 
 ### Workspace / Files

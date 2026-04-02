@@ -1,0 +1,689 @@
+/**
+ * Claude Docs Chat Panel
+ * Injected into every MkDocs page. Self-contained vanilla JS.
+ * Chat history persists in localStorage across page navigations/reloads.
+ */
+(function () {
+  'use strict';
+
+  const STORAGE_KEY = 'claude-docs-chat';
+  const MAX_STORED = 40;
+  const MODEL_KEY  = 'claude-docs-model';
+  const MODELS = [
+    { id: 'claude-haiku-3-5',  label: 'Haiku'  },
+    { id: 'claude-sonnet-4-6', label: 'Sonnet' },
+    { id: 'claude-opus-4-5',   label: 'Opus'   },
+  ];
+  const DEFAULT_MODEL = 'claude-sonnet-4-6';
+
+  // ── State ──────────────────────────────────────────────────────────────────
+
+  let messages = [];
+  let isOpen = false;
+  let isSending = false;
+  let currentModel = DEFAULT_MODEL;
+  const OPEN_KEY = 'claude-docs-open';
+  let abortController = null;
+  let currentAssistantId = null;
+
+  function loadMessages() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) messages = JSON.parse(raw);
+      // Fix any stuck-streaming messages from a previous interrupted load
+      let fixed = false;
+      messages = messages.map(m => {
+        if (m.isStreaming) { fixed = true; return { ...m, isStreaming: false }; }
+        return m;
+      });
+      if (fixed) saveMessages();
+    } catch { messages = []; }
+  }
+
+  function saveMessages() {
+    try {
+      const toSave = messages.slice(-MAX_STORED);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
+    } catch { /* storage full — ignore */ }
+  }
+
+  function clearMessages() {
+    messages = [];
+    localStorage.removeItem(STORAGE_KEY);
+    fetch('/api/chat/session', { method: 'DELETE' }).catch(() => {});
+  }
+
+  function compactMessages() {
+    const KEEP = 6; // last 3 exchanges
+    if (messages.length > KEEP) {
+      messages = messages.slice(-KEEP);
+      saveMessages();
+    }
+    renderMessages();
+  }
+
+  // ── Markdown renderer ──────────────────────────────────────────────────────
+  // Safe, self-contained — no external deps.
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function renderInline(text) {
+    let s = escHtml(text);
+
+    // Extract inline code first so we don't format inside it
+    const spans = [];
+    s = s.replace(/`([^`]+)`/g, (_, code) => {
+      const i = spans.length;
+      spans.push(`<code class="cp-ic">${code}</code>`); // already escaped via escHtml
+      return `\x00S${i}\x00`;
+    });
+
+    // Bold **text** or __text__
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    // Italic *text* (not **)
+    s = s.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+    // Strikethrough ~~text~~
+    s = s.replace(/~~(.+?)~~/g, '<del>$1</del>');
+    // Links [text](url) — only http/https
+    s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g, (_, linkText, url) => {
+      const safeUrl = url.replace(/"/g, '%22');
+      return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${linkText}</a>`;
+    });
+
+    // Restore inline code spans
+    s = s.replace(/\x00S(\d+)\x00/g, (_, i) => spans[parseInt(i)]);
+    return s;
+  }
+
+  function renderMarkdown(text) {
+    if (!text) return '';
+    const lines = text.split('\n');
+    const parts = [];
+    let i = 0;
+
+    while (i < lines.length) {
+      const line = lines[i];
+
+      // ── Fenced code block ──────────────────────────────────────────────────
+      if (line.startsWith('```')) {
+        const lang = line.slice(3).trim();
+        const codeLines = [];
+        i++;
+        while (i < lines.length && !lines[i].startsWith('```')) {
+          codeLines.push(lines[i]);
+          i++;
+        }
+        const langAttr = lang ? ` data-lang="${escHtml(lang)}"` : '';
+        parts.push(`<pre class="cp-pre"${langAttr}><code class="cp-code">${escHtml(codeLines.join('\n'))}</code></pre>`);
+        i++; // skip closing ```
+        continue;
+      }
+
+      // ── Heading ────────────────────────────────────────────────────────────
+      const hMatch = line.match(/^(#{1,3})\s+(.+)$/);
+      if (hMatch) {
+        // Use h4/h5/h6 to avoid conflicting with MkDocs page headings
+        const level = hMatch[1].length + 3;
+        parts.push(`<h${level} class="cp-h">${renderInline(hMatch[2])}</h${level}>`);
+        i++;
+        continue;
+      }
+
+      // ── Horizontal rule ────────────────────────────────────────────────────
+      if (/^[-*_]{3,}$/.test(line.trim())) {
+        parts.push('<hr class="cp-hr">');
+        i++;
+        continue;
+      }
+
+      // ── List items — collect a run into one list ───────────────────────────
+      const isUl = /^[\-\*\+]\s/.test(line);
+      const isOl = /^\d+\.\s/.test(line);
+      if (isUl || isOl) {
+        const tag = isOl ? 'ol' : 'ul';
+        const items = [];
+        while (i < lines.length && (/^[\-\*\+]\s/.test(lines[i]) || /^\d+\.\s/.test(lines[i]))) {
+          const itemText = lines[i].replace(/^[\-\*\+]\s|^\d+\.\s/, '');
+          items.push(`<li>${renderInline(itemText)}</li>`);
+          i++;
+        }
+        parts.push(`<${tag} class="cp-list">${items.join('')}</${tag}>`);
+        continue;
+      }
+
+      // ── Blank line ─────────────────────────────────────────────────────────
+      if (line.trim() === '') {
+        parts.push('<div class="cp-gap"></div>');
+        i++;
+        continue;
+      }
+
+      // ── Paragraph ─────────────────────────────────────────────────────────
+      parts.push(`<p class="cp-p">${renderInline(line)}</p>`);
+      i++;
+    }
+
+    return parts.join('');
+  }
+
+  // ── DOM ────────────────────────────────────────────────────────────────────
+
+  let toggleBtn, panel, messagesEl, textarea, sendBtn;
+
+  function createUI() {
+    const wrapper = document.createElement('div');
+    wrapper.id = 'claude-docs-chat';
+    wrapper.innerHTML = `
+      <button id="claude-docs-present" class="cp-pb-hidden" title="Present this page">▶</button>
+      <button id="claude-docs-toggle" title="Ask Claude about this page">✦</button>
+      <div id="claude-docs-panel" class="cp-hidden">
+        <div class="cp-header">
+          <span class="cp-header-title">
+            <span class="cp-header-dot"></span>
+            Claude
+          </span>
+          <div class="cp-header-actions">
+            <div class="cp-model-wrap">
+              <select class="cp-model-select">
+                ${MODELS.map(m => `<option value="${m.id}">${m.label}</option>`).join('')}
+              </select>
+            </div>
+            <button class="cp-btn-compact" title="Compact conversation">Compact</button>
+            <button class="cp-btn-clear" title="New conversation">New</button>
+            <button class="cp-btn-close" title="Close">✕</button>
+          </div>
+        </div>
+        <div class="cp-messages"></div>
+        <div class="cp-footer">
+          <div class="cp-input-row">
+            <textarea class="cp-textarea" rows="1" placeholder="Ask about this page…"></textarea>
+            <button class="cp-send cp-send-idle">↑</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(wrapper);
+
+    toggleBtn  = document.getElementById('claude-docs-toggle');
+    panel      = document.getElementById('claude-docs-panel');
+    messagesEl = panel.querySelector('.cp-messages');
+    textarea   = panel.querySelector('.cp-textarea');
+    sendBtn    = panel.querySelector('.cp-send');
+
+    toggleBtn.addEventListener('click', togglePanel);
+    panel.querySelector('.cp-btn-close').addEventListener('click', () => setOpen(false));
+
+    const clearBtn   = panel.querySelector('.cp-btn-clear');
+    const compactBtn = panel.querySelector('.cp-btn-compact');
+
+    clearBtn.addEventListener('click', () =>
+      withConfirm(clearBtn, 'New', () => { clearMessages(); renderMessages(); })
+    );
+    compactBtn.addEventListener('click', () =>
+      withConfirm(compactBtn, 'Compact', () => { compactMessages(); })
+    );
+    sendBtn.addEventListener('click', handleSend);
+    textarea.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); }
+    });
+    textarea.addEventListener('input', () => {
+      textarea.style.height = 'auto';
+      textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    });
+  }
+
+  function togglePanel() { setOpen(!isOpen); }
+
+  function setOpen(val) {
+    isOpen = val;
+    try { localStorage.setItem(OPEN_KEY, isOpen ? '1' : '0'); } catch { /* ignore */ }
+    if (isOpen) {
+      panel.classList.remove('cp-hidden');
+      textarea.focus();
+      scrollToBottom();
+    } else {
+      panel.classList.add('cp-hidden');
+    }
+  }
+
+  function scrollToBottom() {
+    setTimeout(() => { messagesEl.scrollTop = messagesEl.scrollHeight; }, 50);
+  }
+
+  // ── Rendering ──────────────────────────────────────────────────────────────
+
+  function renderMessages() {
+    if (messages.length === 0) {
+      messagesEl.innerHTML = `
+        <div class="cp-empty">
+          <div class="cp-empty-icon">✦</div>
+          <div class="cp-empty-title">Ask Claude anything</div>
+          <div class="cp-empty-sub">Explain concepts, edit pages, or add new sections — Claude can see and edit this documentation.</div>
+        </div>`;
+      return;
+    }
+
+    messagesEl.innerHTML = '';
+    for (const msg of messages) {
+      messagesEl.appendChild(renderMessage(msg));
+    }
+    scrollToBottom();
+  }
+
+  function renderMessage(msg) {
+    const el = document.createElement('div');
+    el.className = `cp-msg cp-msg-${msg.role}`;
+    el.dataset.msgId = msg.id;
+
+    const bubble = document.createElement('div');
+    bubble.className = 'cp-bubble' + (msg.isError ? ' cp-error' : '');
+
+    if (msg.role === 'assistant') {
+      bubble.innerHTML = renderMarkdown(msg.content || '');
+    } else {
+      bubble.textContent = msg.content || '';
+    }
+
+    if (msg.isStreaming) {
+      const cursor = document.createElement('span');
+      cursor.className = 'cp-cursor';
+      bubble.appendChild(cursor);
+    }
+
+    el.appendChild(bubble);
+
+    if (msg.toolCalls && msg.toolCalls.length > 0) {
+      for (const tc of msg.toolCalls) {
+        el.appendChild(makeToolBadge(tc));
+      }
+    }
+
+    return el;
+  }
+
+  function makeToolBadge(tc) {
+    const badge = document.createElement('div');
+    badge.className = 'cp-tool';
+    badge.textContent = formatToolCall(tc);
+    return badge;
+  }
+
+  function formatToolCall(tc) {
+    if (tc.name === 'Read')  return `📖 Read ${tc.input.file_path || ''}`.slice(0, 60);
+    if (tc.name === 'Edit')  return `✎ Edit ${tc.input.file_path || ''}`.slice(0, 60);
+    if (tc.name === 'Write') return `✎ Write ${tc.input.file_path || ''}`.slice(0, 60);
+    if (tc.name === 'Bash')  return `$ ${tc.input.command || ''}`.slice(0, 60);
+    return `⚙ ${tc.name}`.slice(0, 60);
+  }
+
+  function updateStreamingMessage(id, content, toolCalls) {
+    const msg = messages.find(m => m.id === id);
+    if (!msg) return;
+    msg.content = content;
+    if (toolCalls) msg.toolCalls = toolCalls;
+
+    const el = messagesEl.querySelector(`[data-msg-id="${id}"]`);
+    if (!el) return;
+
+    const bubble = el.querySelector('.cp-bubble');
+    if (bubble) {
+      bubble.innerHTML = renderMarkdown(content);
+      if (msg.isStreaming) {
+        const cursor = document.createElement('span');
+        cursor.className = 'cp-cursor';
+        bubble.appendChild(cursor);
+      }
+    }
+
+    // Rebuild tool badges
+    el.querySelectorAll('.cp-tool').forEach(e => e.remove());
+    if (toolCalls && toolCalls.length > 0) {
+      for (const tc of toolCalls) { el.appendChild(makeToolBadge(tc)); }
+    }
+
+    scrollToBottom();
+  }
+
+  // ── Sending ────────────────────────────────────────────────────────────────
+
+  function handleSend() {
+    if (isSending) { stopSending(); return; }
+
+    const text = textarea.value.trim();
+    if (!text) return;
+
+    textarea.value = '';
+    textarea.style.height = 'auto';
+
+    const userMsg      = { id: uid(), role: 'user',      content: text };
+    const assistantMsg = { id: uid(), role: 'assistant', content: '', isStreaming: true, toolCalls: [] };
+
+    messages.push(userMsg, assistantMsg);
+    currentAssistantId = assistantMsg.id;
+    renderMessages();
+    setSending(true);
+
+    const ac = new AbortController();
+    abortController = ac;
+
+    let accText = '';
+    const toolCalls = [];
+
+    fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: text, page_url: window.location.pathname, model: currentModel }),
+      signal: ac.signal,
+    }).then(async (res) => {
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      let event = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            event = line.slice(7).trim();
+          } else if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+
+              if (event === 'chunk') {
+                // Text delta — only content_block_delta, never assistant chunk (avoids duplication)
+                if (data.type === 'stream_event' &&
+                    data.event?.type === 'content_block_delta' &&
+                    data.event?.delta?.type === 'text_delta') {
+                  accText += data.event.delta.text;
+                  updateStreamingMessage(currentAssistantId, accText, toolCalls);
+                }
+                // Tool calls from the assistant content block
+                if (data.type === 'assistant' && Array.isArray(data.message?.content)) {
+                  for (const block of data.message.content) {
+                    if (block.type === 'tool_use') {
+                      if (!toolCalls.find(t => t.id === block.id)) {
+                        toolCalls.push({ id: block.id, name: block.name, input: block.input || {} });
+                      }
+                    }
+                  }
+                  updateStreamingMessage(currentAssistantId, accText, toolCalls);
+                }
+              } else if (event === 'done') {
+                finishMessage(currentAssistantId, accText, toolCalls);
+              } else if (event === 'error') {
+                errorMessage(currentAssistantId, data.message || 'Unknown error');
+              }
+            } catch { /* ignore parse errors */ }
+          }
+        }
+      }
+      // Stream closed without a terminal event (e.g. connection reset)
+      if (isSending) finishMessage(currentAssistantId, accText, toolCalls);
+
+    }).catch((err) => {
+      if (err.name === 'AbortError') {
+        // User-initiated stop or page-navigate abort — finish with whatever we have
+        finishMessage(currentAssistantId, accText, toolCalls);
+      } else {
+        errorMessage(currentAssistantId, String(err));
+      }
+    });
+  }
+
+  function finishMessage(id, content, toolCalls) {
+    const msg = messages.find(m => m.id === id);
+    if (msg) { msg.content = content; msg.isStreaming = false; msg.toolCalls = toolCalls; }
+    setSending(false);
+    saveMessages();
+    renderMessages();
+  }
+
+  function errorMessage(id, text) {
+    const msg = messages.find(m => m.id === id);
+    if (msg) { msg.content = text; msg.isStreaming = false; msg.isError = true; }
+    setSending(false);
+    saveMessages();
+    renderMessages();
+  }
+
+  function stopSending() {
+    if (abortController) {
+      abortController.abort();
+      abortController = null;
+    }
+    // finishMessage will be called by the AbortError catch path
+  }
+
+  function setSending(val) {
+    isSending = val;
+    if (val) {
+      sendBtn.textContent = '■';
+      sendBtn.className = 'cp-send cp-send-stop';
+      textarea.disabled = true;
+    } else {
+      sendBtn.textContent = '↑';
+      sendBtn.className = 'cp-send cp-send-idle';
+      textarea.disabled = false;
+      textarea.focus();
+    }
+  }
+
+  // ── Unload cleanup — fix stuck isStreaming on navigate/close ───────────────
+  // `pagehide` fires reliably on all navigation and tab-close scenarios;
+  // `beforeunload` is more widely fired but pagehide covers bfcache too.
+  window.addEventListener('pagehide', () => {
+    if (isSending && currentAssistantId) {
+      const msg = messages.find(m => m.id === currentAssistantId);
+      if (msg) { msg.isStreaming = false; }
+      saveMessages();
+    }
+  });
+
+  // ── Utils ──────────────────────────────────────────────────────────────────
+
+  let _uidCounter = 0;
+  function uid() { return `${Date.now()}-${++_uidCounter}`; }
+
+  // ── Inline confirmation helper ─────────────────────────────────────────────
+  // Turns any button into a two-click confirm: first click → "Sure?", second → action.
+  // Auto-reverts after 3 s if unused.
+
+  const _confirmTimers = new WeakMap();
+
+  function withConfirm(btn, label, action) {
+    if (btn.dataset.confirming === '1') {
+      _clearConfirm(btn, label);
+      action();
+      return;
+    }
+    btn.dataset.confirming = '1';
+    btn.textContent = 'Sure?';
+    btn.classList.add('cp-btn-confirming');
+    const t = setTimeout(() => _clearConfirm(btn, label), 3000);
+    _confirmTimers.set(btn, t);
+  }
+
+  function _clearConfirm(btn, label) {
+    btn.dataset.confirming = '';
+    btn.textContent = label;
+    btn.classList.remove('cp-btn-confirming');
+    const t = _confirmTimers.get(btn);
+    if (t !== undefined) { clearTimeout(t); _confirmTimers.delete(btn); }
+  }
+
+  // ── Presenter mode ─────────────────────────────────────────────────────────
+
+  let presenterEl = null;
+  let presenterSlides = [];
+  let presenterIdx = 0;
+  let presentBtn = null;
+
+  // Split a container's children at every <hr> element.
+  function splitByHr(container) {
+    const slides = [];
+    let cur = document.createElement('div');
+    for (const child of Array.from(container.childNodes)) {
+      if (child.nodeName === 'HR') {
+        if (cur.hasChildNodes()) { slides.push(cur); cur = document.createElement('div'); }
+      } else {
+        cur.appendChild(child.cloneNode(true));
+      }
+    }
+    if (cur.hasChildNodes()) slides.push(cur);
+    return slides;
+  }
+
+  // Split at every <h2> boundary (h2 stays on its new slide).
+  function splitByH2(container) {
+    const slides = [];
+    let cur = document.createElement('div');
+    for (const child of Array.from(container.childNodes)) {
+      if (child.nodeName === 'H2' && cur.hasChildNodes()) {
+        slides.push(cur); cur = document.createElement('div');
+      }
+      cur.appendChild(child.cloneNode(true));
+    }
+    if (cur.hasChildNodes()) slides.push(cur);
+    return slides;
+  }
+
+  function buildSlides() {
+    // MkDocs Material: article content lives in .md-content__inner > .md-typeset
+    const content = document.querySelector('.md-content__inner') ||
+                    document.querySelector('article') ||
+                    document.querySelector('main');
+    if (!content) return [];
+
+    const clone = content.cloneNode(true);
+    // Strip MkDocs chrome that doesn't belong on slides
+    ['.md-content__button', '.md-source-file', '.md-feedback',
+     '.md-tags', '[data-md-component="toc"]', 'nav'].forEach(sel => {
+      clone.querySelectorAll(sel).forEach(el => el.remove());
+    });
+
+    const hasHr = !!clone.querySelector('hr');
+    const slides = hasHr ? splitByHr(clone) : splitByH2(clone);
+    // Filter empty slides
+    return slides.filter(s => s.textContent.trim().length > 0);
+  }
+
+  function hasSlidableContent() {
+    const content = document.querySelector('.md-content__inner') || document.querySelector('article');
+    if (!content) return false;
+    if (content.querySelector('hr')) return true;
+    return content.querySelectorAll('h2').length >= 2;
+  }
+
+  function openPresenter() {
+    presenterSlides = buildSlides();
+    if (!presenterSlides.length) return;
+    presenterIdx = 0;
+
+    presenterEl = document.createElement('div');
+    presenterEl.id = 'cp-presenter';
+    presenterEl.innerHTML = `
+      <div class="cp-sl-wrap">
+        <div class="cp-sl-content md-typeset"></div>
+      </div>
+      <div class="cp-sl-bar">
+        <button class="cp-sl-prev" title="Previous (←)">←</button>
+        <span class="cp-sl-counter"></span>
+        <button class="cp-sl-next" title="Next (→)">→</button>
+      </div>
+      <button class="cp-sl-exit" title="Exit (Esc)">✕ ESC</button>
+    `;
+    document.body.appendChild(presenterEl);
+
+    presenterEl.querySelector('.cp-sl-prev').addEventListener('click', () => goSlide(-1));
+    presenterEl.querySelector('.cp-sl-next').addEventListener('click', () => goSlide(+1));
+    presenterEl.querySelector('.cp-sl-exit').addEventListener('click', closePresenter);
+    // Click on dark backdrop to exit
+    presenterEl.querySelector('.cp-sl-wrap').addEventListener('click', (e) => {
+      if (e.target === e.currentTarget) closePresenter();
+    });
+    document.addEventListener('keydown', presenterKeydown);
+
+    showSlide(0);
+  }
+
+  function showSlide(idx) {
+    presenterIdx = Math.max(0, Math.min(idx, presenterSlides.length - 1));
+    const content = presenterEl.querySelector('.cp-sl-content');
+    content.innerHTML = '';
+    content.appendChild(presenterSlides[presenterIdx].cloneNode(true));
+    // Re-trigger MkDocs code block copy buttons if present
+    content.querySelectorAll('pre > code').forEach(el => el.parentElement.removeAttribute('data-copied'));
+
+    presenterEl.querySelector('.cp-sl-counter').textContent =
+      `${presenterIdx + 1} / ${presenterSlides.length}`;
+    presenterEl.querySelector('.cp-sl-prev').disabled = presenterIdx === 0;
+    presenterEl.querySelector('.cp-sl-next').disabled = presenterIdx === presenterSlides.length - 1;
+
+    // Animate slide in
+    content.classList.remove('cp-sl-anim');
+    void content.offsetWidth; // reflow
+    content.classList.add('cp-sl-anim');
+  }
+
+  function goSlide(delta) { showSlide(presenterIdx + delta); }
+
+  function closePresenter() {
+    document.removeEventListener('keydown', presenterKeydown);
+    presenterEl?.remove();
+    presenterEl = null;
+    presenterSlides = [];
+  }
+
+  function presenterKeydown(e) {
+    if (e.key === 'Escape')                              { closePresenter(); return; }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { goSlide(+1);      return; }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { goSlide(-1);      return; }
+  }
+
+  // ── Init ───────────────────────────────────────────────────────────────────
+
+  function init() {
+    if (document.getElementById('claude-docs-chat')) return;
+    loadMessages();
+    createUI();
+    renderMessages();
+    // Restore open state from previous page
+    try {
+      if (localStorage.getItem(OPEN_KEY) === '1') setOpen(true);
+    } catch { /* ignore */ }
+
+    // Present button — only shown when there's slideable content
+    // Model selector
+    const modelSelect = panel.querySelector('.cp-model-select');
+    try { currentModel = localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL; } catch { /* ignore */ }
+    modelSelect.value = currentModel;
+    modelSelect.addEventListener('change', () => {
+      currentModel = modelSelect.value;
+      try { localStorage.setItem(MODEL_KEY, currentModel); } catch { /* ignore */ }
+    });
+
+    presentBtn = document.getElementById('claude-docs-present');
+    if (hasSlidableContent()) {
+      presentBtn.classList.remove('cp-pb-hidden');
+    }
+    presentBtn.addEventListener('click', openPresenter);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+})();

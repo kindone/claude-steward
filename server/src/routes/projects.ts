@@ -235,8 +235,12 @@ const upload = multer({
       cb(null, (_req as unknown as { __uploadDir: string }).__uploadDir)
     },
     filename: (_req, file, cb) => {
-      // Strip path separators from original filename to prevent traversal
-      const safeName = file.originalname.replace(/[/\\]/g, '_')
+      // multer/busboy decodes multipart Content-Disposition header values as
+      // latin1 by default. Re-encode as utf-8 to restore the original filename
+      // (e.g. Korean, Japanese, emoji filenames arrive garbled otherwise).
+      const decoded = Buffer.from(file.originalname, 'latin1').toString('utf8')
+      // Strip path separators to prevent traversal
+      const safeName = decoded.replace(/[/\\]/g, '_')
       cb(null, safeName)
     },
   }),
