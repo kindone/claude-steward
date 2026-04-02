@@ -9,6 +9,7 @@
   const STORAGE_KEY = 'claude-docs-chat';
   const MAX_STORED = 40;
   const MODEL_KEY  = 'claude-docs-model';
+  const DRAFT_KEY  = 'claude-docs-draft';
   const MODELS = [
     { id: 'claude-haiku-3-5',  label: 'Haiku'  },
     { id: 'claude-sonnet-4-6', label: 'Sonnet' },
@@ -21,6 +22,7 @@
   let messages = [];
   let isOpen = false;
   let isSending = false;
+  let isUnloading = false;   // set true in pagehide so fetch TypeErrors are treated as clean aborts
   let currentModel = DEFAULT_MODEL;
   const OPEN_KEY = 'claude-docs-open';
   let abortController = null;
@@ -360,6 +362,7 @@
 
     textarea.value = '';
     textarea.style.height = 'auto';
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
 
     const userMsg      = { id: uid(), role: 'user',      content: text };
     const assistantMsg = { id: uid(), role: 'assistant', content: '', isStreaming: true, toolCalls: [] };
@@ -433,8 +436,15 @@
       if (isSending) finishMessage(currentAssistantId, accText, toolCalls);
 
     }).catch((err) => {
-      if (err.name === 'AbortError') {
-        // User-initiated stop or page-navigate abort — finish with whatever we have
+      // Treat as a clean finish if:
+      //   (a) user clicked Stop (AbortError from our AbortController)
+      //   (b) page is unloading — MkDocs live-reload or navigation tears down the
+      //       fetch as a TypeError ("Failed to fetch" / "Load failed" / "NetworkError")
+      //       before or after pagehide fires; isUnloading covers both orderings
+      const isCleanAbort = err.name === 'AbortError' ||
+        isUnloading ||
+        (err instanceof TypeError && /fetch|network|load failed/i.test(err.message));
+      if (isCleanAbort) {
         finishMessage(currentAssistantId, accText, toolCalls);
       } else {
         errorMessage(currentAssistantId, String(err));
@@ -484,6 +494,7 @@
   // `pagehide` fires reliably on all navigation and tab-close scenarios;
   // `beforeunload` is more widely fired but pagehide covers bfcache too.
   window.addEventListener('pagehide', () => {
+    isUnloading = true;
     if (isSending && currentAssistantId) {
       const msg = messages.find(m => m.id === currentAssistantId);
       if (msg) { msg.isStreaming = false; }
@@ -652,6 +663,95 @@
     if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { goSlide(-1);      return; }
   }
 
+  // ── Reconnect after live-reload ────────────────────────────────────────────
+  // If the page reloaded while Claude was mid-task (e.g. MkDocs live-reload
+  // triggered by an agent edit), the server kept Claude running. We check
+  // /api/chat/status and, if active, reattach to /api/chat/reconnect to resume
+  // the last assistant message in-place.
+
+  function reconnectIfActive() {
+    fetch('/api/chat/status')
+      .then(r => r.json())
+      .then(({ active }) => {
+        if (!active) return;
+        // Find the last assistant message to resume into
+        const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+        if (!lastMsg || lastMsg.role !== 'assistant') return;
+
+        // Re-mark it as streaming and re-render
+        lastMsg.isStreaming = true;
+        renderMessages();
+        setSending(true);
+        currentAssistantId = lastMsg.id;
+
+        // Rebuild accText from scratch — the replay sends ALL deltas from the start,
+        // so seeding from saved partial content would cause duplication.
+        let accText = '';
+        const toolCalls = [];
+
+        const ac = new AbortController();
+        abortController = ac;
+
+        fetch('/api/chat/reconnect', { signal: ac.signal })
+          .then(async (res) => {
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let event = '';
+
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+
+              for (const line of lines) {
+                if (line.startsWith('event: ')) {
+                  event = line.slice(7).trim();
+                } else if (line.startsWith('data: ')) {
+                  try {
+                    const data = JSON.parse(line.slice(6));
+                    if (event === 'chunk') {
+                      if (data.type === 'stream_event' &&
+                          data.event?.type === 'content_block_delta' &&
+                          data.event?.delta?.type === 'text_delta') {
+                        accText += data.event.delta.text;
+                        updateStreamingMessage(currentAssistantId, accText, toolCalls);
+                      }
+                      if (data.type === 'assistant' && Array.isArray(data.message?.content)) {
+                        for (const block of data.message.content) {
+                          if (block.type === 'tool_use' && !toolCalls.find(t => t.id === block.id)) {
+                            toolCalls.push({ id: block.id, name: block.name, input: block.input || {} });
+                          }
+                        }
+                        updateStreamingMessage(currentAssistantId, accText, toolCalls);
+                      }
+                    } else if (event === 'done') {
+                      finishMessage(currentAssistantId, accText, toolCalls);
+                    } else if (event === 'error') {
+                      errorMessage(currentAssistantId, data.message || 'Unknown error');
+                    }
+                  } catch { /* ignore parse errors */ }
+                }
+              }
+            }
+            if (isSending) finishMessage(currentAssistantId, accText, toolCalls);
+          })
+          .catch((err) => {
+            const isCleanAbort = err.name === 'AbortError' || isUnloading ||
+              (err instanceof TypeError && /fetch|network|load failed/i.test(err.message));
+            if (isCleanAbort) {
+              finishMessage(currentAssistantId, accText, toolCalls);
+            } else {
+              errorMessage(currentAssistantId, String(err));
+            }
+          });
+      })
+      .catch(() => { /* status check failed — ignore */ });
+  }
+
   // ── Init ───────────────────────────────────────────────────────────────────
 
   function init() {
@@ -664,7 +764,27 @@
       if (localStorage.getItem(OPEN_KEY) === '1') setOpen(true);
     } catch { /* ignore */ }
 
-    // Present button — only shown when there's slideable content
+    // Reconnect to any job still running after a live-reload
+    reconnectIfActive();
+
+    // Draft persistence — restore saved input, save on every keystroke
+    try {
+      const draft = localStorage.getItem(DRAFT_KEY);
+      if (draft) {
+        textarea.value = draft;
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+      }
+    } catch { /* ignore */ }
+    textarea.addEventListener('input', () => {
+      try {
+        if (textarea.value) {
+          localStorage.setItem(DRAFT_KEY, textarea.value);
+        } else {
+          localStorage.removeItem(DRAFT_KEY);
+        }
+      } catch { /* ignore */ }
+    }, { passive: true });
+
     // Model selector
     const modelSelect = panel.querySelector('.cp-model-select');
     try { currentModel = localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL; } catch { /* ignore */ }

@@ -12,8 +12,7 @@ export function startMkDocs(docsDir: string): Promise<void> {
     child = spawn(MKDOCS_BIN, [
       'serve',
       '--dev-addr', `127.0.0.1:${INTERNAL_PORT}`,
-      // livereload enabled — WS upgrades are proxied in server.ts so the browser
-      // receives reload events when Claude edits a page
+      '--livereload',   // explicit; WS upgrades are proxied in server.ts
     ], {
       cwd: docsDir,
       stdio: ['ignore', 'pipe', 'pipe'],
