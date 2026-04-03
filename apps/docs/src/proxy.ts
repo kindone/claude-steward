@@ -3,9 +3,26 @@ import type { Request, Response } from 'express'
 import httpProxy from 'http-proxy'
 import { getMkDocsPort } from './mkdocs.js'
 
-const CHAT_SCRIPT_TAG = '<script src="/chat-panel.js"></script>'
-const CHAT_STYLE_TAG = '<link rel="stylesheet" href="/chat-panel.css">'
-const INJECTION = `${CHAT_STYLE_TAG}\n${CHAT_SCRIPT_TAG}\n</head>`
+// Append mtime-based cache-buster so browsers always fetch updated panel files.
+import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+function fileMtime(name: string): number {
+  try {
+    return fs.statSync(path.join(__dirname, '..', 'public', name)).mtimeMs | 0
+  } catch { return 0 }
+}
+
+function makeInjection(): string {
+  const sv = fileMtime('chat-panel.js')
+  const cv = fileMtime('chat-panel.css')
+  const script = `<script src="/chat-panel.js?v=${sv}"></script>`
+  const style  = `<link rel="stylesheet" href="/chat-panel.css?v=${cv}">`
+  return `${style}\n${script}\n</head>`
+}
 
 // Create proxy instance — reused for all requests
 export const proxy = httpProxy.createProxyServer({
@@ -48,11 +65,12 @@ export function proxyToMkDocs(req: Request, res: Response): void {
         proxyRes.on('data', (chunk: Buffer) => chunks.push(chunk))
         proxyRes.on('end', () => {
           let html = Buffer.concat(chunks).toString('utf8')
+          const injection = makeInjection()
           // Inject before </head> if present, otherwise before </body>
           if (html.includes('</head>')) {
-            html = html.replace('</head>', INJECTION)
+            html = html.replace('</head>', injection)
           } else {
-            html = html.replace('</body>', `${CHAT_SCRIPT_TAG}\n${CHAT_STYLE_TAG}\n</body>`)
+            html = html.replace('</body>', injection.replace('</head>', '</body>'))
           }
 
           const buf = Buffer.from(html, 'utf8')

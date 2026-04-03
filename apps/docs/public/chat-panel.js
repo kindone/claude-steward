@@ -177,12 +177,14 @@
   // ── DOM ────────────────────────────────────────────────────────────────────
 
   let toggleBtn, panel, messagesEl, textarea, sendBtn;
+  let editorMode = false;   // true when the markdown editor is open
 
   function createUI() {
     const wrapper = document.createElement('div');
     wrapper.id = 'claude-docs-chat';
     wrapper.innerHTML = `
       <button id="claude-docs-present" class="cp-pb-hidden" title="Present this page">▶</button>
+      <button id="claude-docs-edit" class="cp-pb-hidden" title="Edit this page">✎</button>
       <button id="claude-docs-toggle" title="Ask Claude about this page">✦</button>
       <div id="claude-docs-panel" class="cp-hidden">
         <div class="cp-header">
@@ -238,7 +240,10 @@
       textarea.style.height = 'auto';
       textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
     });
+
   }
+
+  // Floating edit button — wired after createUI so the element exists
 
   function togglePanel() { setOpen(!isOpen); }
 
@@ -663,6 +668,105 @@
     if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { goSlide(-1);      return; }
   }
 
+  // ── Markdown editor (fullscreen overlay) ──────────────────────────────────
+
+  let editorEl = null;
+
+  function openEditor() {
+    if (editorEl) return;
+    editorMode = true;
+    document.getElementById('claude-docs-edit').classList.add('cp-edit-active');
+
+    editorEl = document.createElement('div');
+    editorEl.id = 'cp-editor';
+    editorEl.innerHTML = `
+      <div class="cp-ed-bar">
+        <span class="cp-ed-path">Loading…</span>
+        <div class="cp-ed-actions">
+          <button class="cp-ed-save">Save</button>
+          <button class="cp-ed-exit" title="Close (Esc)">✕ ESC</button>
+        </div>
+      </div>
+      <textarea class="cp-ed-textarea" spellcheck="false"></textarea>
+    `;
+    document.body.appendChild(editorEl);
+
+    const ta      = editorEl.querySelector('.cp-ed-textarea');
+    const pathEl  = editorEl.querySelector('.cp-ed-path');
+    const saveBtn = editorEl.querySelector('.cp-ed-save');
+
+    editorEl.querySelector('.cp-ed-exit').addEventListener('click', closeEditor);
+    saveBtn.addEventListener('click', saveEditor);
+    ta.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveEditor(); }
+      if (e.key === 'Escape') closeEditor();
+    });
+    document.addEventListener('keydown', editorKeydown);
+
+    fetch(`/api/file?page=${encodeURIComponent(window.location.pathname)}`)
+      .then(r => r.json())
+      .then(({ content, filePath, error }) => {
+        if (!editorEl) return; // closed before response
+        if (error) {
+          pathEl.textContent = filePath ?? 'unknown';
+          ta.placeholder = `Could not load: ${error}`;
+        } else {
+          pathEl.textContent = filePath ?? '';
+          ta.value = content;
+          ta.scrollTop = 0;
+          ta.setSelectionRange(0, 0);
+          ta.focus();
+        }
+      })
+      .catch(err => {
+        if (editorEl) editorEl.querySelector('.cp-ed-path').textContent = `Error: ${err.message}`;
+      });
+  }
+
+  function closeEditor() {
+    editorMode = false;
+    document.removeEventListener('keydown', editorKeydown);
+    document.getElementById('claude-docs-edit').classList.remove('cp-edit-active');
+    editorEl?.remove();
+    editorEl = null;
+  }
+
+  function saveEditor() {
+    if (!editorEl) return;
+    const ta      = editorEl.querySelector('.cp-ed-textarea');
+    const saveBtn = editorEl.querySelector('.cp-ed-save');
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+
+    fetch(`/api/file?page=${encodeURIComponent(window.location.pathname)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: ta.value }),
+    })
+      .then(r => r.json())
+      .then(({ ok, error }) => {
+        if (!editorEl) return;
+        if (ok) {
+          saveBtn.textContent = 'Saved ✓';
+          setTimeout(() => { if (editorEl) { saveBtn.textContent = 'Save'; saveBtn.disabled = false; } }, 1800);
+        } else {
+          saveBtn.textContent = 'Save';
+          saveBtn.disabled = false;
+          editorEl.querySelector('.cp-ed-path').textContent += '  ⚠ ' + (error ?? 'Save failed');
+        }
+      })
+      .catch(err => {
+        if (!editorEl) return;
+        editorEl.querySelector('.cp-ed-save').textContent = 'Save';
+        editorEl.querySelector('.cp-ed-save').disabled = false;
+        editorEl.querySelector('.cp-ed-path').textContent += '  ⚠ ' + err.message;
+      });
+  }
+
+  function editorKeydown(e) {
+    if (e.key === 'Escape') closeEditor();
+  }
+
   // ── Reconnect after live-reload ────────────────────────────────────────────
   // If the page reloaded while Claude was mid-task (e.g. MkDocs live-reload
   // triggered by an agent edit), the server kept Claude running. We check
@@ -799,6 +903,11 @@
       presentBtn.classList.remove('cp-pb-hidden');
     }
     presentBtn.addEventListener('click', openPresenter);
+
+    // Floating edit button — always visible (every page has a source file)
+    const editBtn = document.getElementById('claude-docs-edit');
+    editBtn.classList.remove('cp-pb-hidden');
+    editBtn.addEventListener('click', () => { if (editorMode) closeEditor(); else openEditor(); });
   }
 
   if (document.readyState === 'loading') {

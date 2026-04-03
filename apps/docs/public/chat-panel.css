@@ -449,10 +449,130 @@
 }
 .cp-send-stop:hover { background: rgba(248,113,113,0.25); }
 
+/* ── Floating edit button ─────────────────────────────────────────────────── */
+#claude-docs-edit {
+  position: fixed;
+  bottom: 120px;
+  right: 28px;
+  z-index: var(--cp-z);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(124,106,247,0.12);
+  border: 1px solid rgba(124,106,247,0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: var(--cp-accent);
+  transition: background 0.15s, transform 0.15s, box-shadow 0.15s;
+  box-shadow: 0 2px 8px rgba(124,106,247,0.15);
+}
+#claude-docs-edit:hover {
+  background: rgba(124,106,247,0.22);
+  transform: scale(1.1);
+  box-shadow: 0 4px 14px rgba(124,106,247,0.3);
+}
+#claude-docs-edit.cp-edit-active {
+  background: rgba(124,106,247,0.28);
+  box-shadow: 0 0 0 2px rgba(124,106,247,0.5), 0 4px 14px rgba(124,106,247,0.3);
+}
+
+/* ── Fullscreen markdown editor overlay ───────────────────────────────────── */
+#cp-editor {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--cp-z) + 1);
+  background: #0f1117;
+  display: flex;
+  flex-direction: column;
+  animation: cp-ed-in 0.15s ease;
+}
+@keyframes cp-ed-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cp-ed-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  background: #1a1d2e;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  flex-shrink: 0;
+  gap: 12px;
+}
+.cp-ed-path {
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 12px;
+  color: var(--cp-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.cp-ed-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.cp-ed-save {
+  background: linear-gradient(135deg, #8b7cf8, #6c5ce7);
+  border: none;
+  border-radius: 8px;
+  color: white;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--cp-font);
+  padding: 6px 16px;
+  cursor: pointer;
+  transition: opacity 0.12s;
+  box-shadow: 0 2px 8px rgba(108,92,231,0.35);
+}
+.cp-ed-save:hover    { opacity: 0.88; }
+.cp-ed-save:disabled { opacity: 0.45; cursor: default; }
+
+.cp-ed-exit {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  color: var(--cp-muted);
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  letter-spacing: 0.04em;
+  font-family: var(--cp-font);
+}
+.cp-ed-exit:hover { background: rgba(255,255,255,0.09); color: #e2e8f0; }
+
+.cp-ed-textarea {
+  flex: 1;
+  background: #0f1117;
+  color: #cdd6f4;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 32px 10% 32px;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 14px;
+  line-height: 1.75;
+  tab-size: 2;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.08) transparent;
+}
+.cp-ed-textarea::placeholder { color: var(--cp-muted); }
+.cp-ed-textarea::-webkit-scrollbar { width: 4px; }
+.cp-ed-textarea::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+
 /* ── Present button ──────────────────────────────────────────────────────── */
 #claude-docs-present {
   position: fixed;
-  bottom: 86px;
+  bottom: 164px;
   right: 28px;
   z-index: var(--cp-z);
   width: 34px;
@@ -584,6 +704,39 @@
 
 /* ── Mobile ──────────────────────────────────────────────────────────────── */
 @media (max-width: 480px) {
-  #claude-docs-panel { width: calc(100vw - 16px); right: 8px; bottom: 80px; }
+  /* Panel: stretch from safe-area top to above the toggle button.
+     Using top+bottom instead of fixed height so the header is never clipped. */
+  #claude-docs-panel {
+    top: max(env(safe-area-inset-top, 0px), 12px);
+    left: 8px;
+    right: 8px;
+    bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    height: auto;
+    transform-origin: bottom right;
+  }
+
+  /* Toggle button: respect home-indicator safe area */
+  #claude-docs-toggle {
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Edit + present buttons follow the same safe area offset */
+  #claude-docs-edit {
+    bottom: calc(120px + env(safe-area-inset-bottom, 0px));
+  }
+  #claude-docs-present {
+    bottom: calc(164px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Presenter / editor: push exit button below the status bar */
+  .cp-sl-exit {
+    top: max(env(safe-area-inset-top, 0px), 12px);
+    right: 16px;
+  }
+  .cp-ed-bar {
+    padding-top: max(calc(env(safe-area-inset-top, 0px) + 12px), 12px);
+  }
+
   .cp-sl-content { padding: 28px 22px; font-size: 0.95rem; }
 }

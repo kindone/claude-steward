@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { startMkDocs, stopMkDocs } from './mkdocs.js'
 import { proxyToMkDocs, proxyWebSocket } from './proxy.js'
 import { chatRouter, initChatDb } from './routes/chat.js'
+import { fileRouter } from './routes/file.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -54,6 +55,7 @@ app.use('/chat-panel.css', express.static(path.join(publicDir, 'chat-panel.css')
 
 // API routes
 app.use('/api', chatRouter)
+app.use('/api', fileRouter)
 
 // Everything else → proxy to MkDocs
 app.use(proxyToMkDocs)
