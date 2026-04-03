@@ -149,7 +149,7 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled }:
           onChange={(e) => { if (e.target.files?.length) addFiles(e.target.files) }}
         />
         <div
-          className={`flex-1 flex items-end gap-1 bg-[#1a1a1a] border rounded-[10px] transition-colors
+          className={`flex-1 min-w-0 flex items-end gap-1 bg-[#1a1a1a] border rounded-[10px] transition-colors
             ${dragOver ? 'border-blue-500/60 bg-blue-500/5' : draftState === 'typing' ? 'border-amber-500/50' : draftState === 'saved' ? 'border-green-600/50' : 'border-[#2a2a2a] focus-within:border-blue-600'}`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
@@ -164,7 +164,7 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled }:
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || uploading}
-              className="text-[#555] hover:text-[#888] bg-transparent border-none cursor-pointer p-2.5 pb-2.5 flex-shrink-0 transition-colors disabled:opacity-50 text-lg leading-none"
+              className="text-[#555] hover:text-[#888] bg-transparent border-none cursor-pointer px-2 py-2.5 flex-shrink-0 transition-colors disabled:opacity-50 text-sm leading-none"
               title="Attach files"
             >
               📎
@@ -172,9 +172,9 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled }:
           )}
           <textarea
             ref={textareaRef}
-            className="flex-1 bg-transparent text-[#e8e8e8] px-3.5 py-2.5 text-base font-[inherit] leading-relaxed
+            className="flex-1 bg-transparent text-[#e8e8e8] px-2.5 py-2.5 text-base font-[inherit] leading-relaxed
               resize-none outline-none border-none disabled:opacity-50"
-            placeholder={dragOver ? 'Drop files here…' : 'Message Claude… (Enter to send, Shift+Enter for newline)'}
+            placeholder={dragOver ? 'Drop files here…' : 'Message Claude…'}
             rows={3}
             disabled={disabled || uploading}
             onInput={handleInput}
@@ -193,7 +193,7 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled }:
           <button
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-[#1e2a3a] disabled:text-[#555] disabled:cursor-not-allowed
               text-white border-none px-5 rounded-[10px] cursor-pointer text-sm font-medium
-              whitespace-nowrap self-end min-h-[44px] transition-colors"
+              whitespace-nowrap flex-shrink-0 self-end min-h-[44px] transition-colors"
             disabled={uploading}
             onClick={() => void submit()}
           >

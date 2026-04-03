@@ -1014,6 +1014,7 @@ export type AppConfig = {
   slot: number | null
   status: 'stopped' | 'starting' | 'running' | 'error'
   pid: number | null
+  error: string | null
 }
 
 export async function listApps(projectId: string): Promise<AppConfig[]> {

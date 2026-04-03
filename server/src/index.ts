@@ -51,11 +51,35 @@ migrateOrphanedSessions(APP_ROOT)
 workerClient.onReconnected = recoverStreamingSessions
 workerClient.connect()
 
-// Connect to the apps sidecar. On reconnect, reset any slots left in
-// 'starting'/'running' state — the sidecar restart killed those processes.
+// Connect to the apps sidecar. On reconnect, reconcile DB slots with what the
+// sidecar actually has running. If the sidecar was restarted it will report an
+// empty list — slots that are 'running'/'starting' in the DB but absent from
+// the sidecar are marked error. Slots that ARE present are left untouched,
+// which correctly handles HTTP-server-only restarts where the sidecar never died.
+appsClient.onReconnected = () => {
+  appsClient.status().then((statusReply) => {
+    const liveIds = new Set(statusReply.apps.map((a) => a.configId))
+    const slots = appSlotQueries.listAll()
+    for (const slot of slots) {
+      if ((slot.status === 'running' || slot.status === 'starting') && slot.config_id) {
+        if (!liveIds.has(slot.config_id)) {
+          appSlotQueries.markError(slot.slot, 'sidecar restarted')
+        }
+      }
+    }
+  }).catch((err: unknown) => {
+    console.warn('[apps] failed to sync slots on reconnect:', err)
+    // Fallback: if we can't query the sidecar, assume it restarted and clear stale slots
+    appSlotQueries.resetStale()
+  })
+}
 appsClient.onCrashed = (configId, _exitCode) => {
   const slot = appSlotQueries.findByConfigId(configId)
-  if (slot) appSlotQueries.markError(slot.slot, 'process exited unexpectedly')
+  // Guard: don't overwrite an intentional 'stopped' state (shouldn't normally
+  // happen since the sidecar removes from its map before killing, but be safe).
+  if (slot && slot.status !== 'stopped') {
+    appSlotQueries.markError(slot.slot, 'process exited unexpectedly')
+  }
 }
 appsClient.connect()
 

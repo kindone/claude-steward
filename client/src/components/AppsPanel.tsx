@@ -73,10 +73,12 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
     setBusy((b) => ({ ...b, [app.id]: true }))
     try {
       await startApp(app.id)
-      await refresh()
     } catch (e) {
       setError(String(e))
     } finally {
+      // Always refresh — even on failure the server may have updated slot state
+      // (e.g. "already running" means the app IS running; refresh shows the link)
+      await refresh()
       setBusy((b) => ({ ...b, [app.id]: false }))
     }
   }
@@ -213,7 +215,7 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
                 </a>
               )}
               {app.status === 'error' && (
-                <span className="text-[11px] text-red-400">Process exited unexpectedly</span>
+                <span className="text-[11px] text-red-400">{app.error ?? 'Process exited unexpectedly'}</span>
               )}
 
               {/* Actions */}

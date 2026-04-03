@@ -12,7 +12,7 @@
 import net from 'node:net'
 import fs from 'node:fs'
 import { createInterface } from 'node:readline'
-import { spawn } from 'node:child_process'
+import { spawn, execFileSync } from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
 import { APPS_SOCKET_PATH } from './protocol.js'
 import type { AppsCommand, AppsReply } from './protocol.js'
@@ -37,11 +37,22 @@ function reply(socket: net.Socket, event: AppsReply): void {
   if (!socket.destroyed) socket.write(JSON.stringify(event) + '\n')
 }
 
-function handleCommand(socket: net.Socket, cmd: AppsCommand): void {
+async function handleCommand(socket: net.Socket, cmd: AppsCommand): Promise<void> {
   if (cmd.type === 'start') {
     if (apps.has(cmd.configId)) {
       reply(socket, { type: 'error', configId: cmd.configId, error: 'already running' })
       return
+    }
+
+    // Kill any orphaned process holding the port before spawning.
+    // This handles the case where the sidecar was restarted and lost its map
+    // but a detached child is still occupying the port.
+    try {
+      execFileSync('fuser', ['-k', `${cmd.port}/tcp`], { timeout: 2_000 })
+      // Give the process a moment to release the port
+      await new Promise<void>((r) => setTimeout(r, 200))
+    } catch {
+      // fuser exits non-zero if no process was using the port — that's fine
     }
 
     let child: ChildProcess

@@ -37,6 +37,9 @@ class AppsClient {
   /** Called when the sidecar reports an unexpected child process exit. */
   onCrashed: ((configId: string, exitCode: number | null) => void) | null = null
 
+  /** Called each time a connection to the sidecar is (re)established. */
+  onReconnected: (() => void) | null = null
+
   /** Call once on server startup. */
   connect(): void {
     if (this.started) return
@@ -51,6 +54,7 @@ class AppsClient {
       this.socket = socket
       this.connected = true
       console.log('[apps-client] connected to sidecar')
+      this.onReconnected?.()
     })
 
     socket.on('error', (err) => {

@@ -35,7 +35,7 @@ router.get('/projects/:id/apps', (req, res) => {
 
   const result = configs.map((cfg) => {
     const slot = slots.find((s) => s.config_id === cfg.id)
-    return { ...cfg, slot: slot?.slot ?? null, status: slot?.status ?? 'stopped', pid: slot?.pid ?? null }
+    return { ...cfg, slot: slot?.slot ?? null, status: slot?.status ?? 'stopped', pid: slot?.pid ?? null, error: slot?.error ?? null }
   })
 
   res.json({ apps: result })
@@ -116,16 +116,43 @@ router.post('/apps/:configId/start', async (req, res) => {
   const config = appConfigQueries.findById(req.params['configId']!)
   if (!config) { res.status(404).json({ error: 'App config not found' }); return }
 
-  // Already running?
+  if (!appsClient.isConnected()) {
+    res.status(503).json({ error: 'Apps sidecar is not available' })
+    return
+  }
+
+  // Step 1: Check whether the sidecar is already running this app (DB may be
+  // out of sync after a server restart). Port encodes slot: port = 4000 + slot.
+  // If alive, reconcile DB and return success immediately — no restart needed.
+  try {
+    const statusReply = await appsClient.status()
+    const live = statusReply.apps.find((a) => a.configId === config.id)
+    if (live) {
+      const liveSlot = live.port - 4000
+      // Bulk-clear ALL stale slots for this config (may have accumulated)
+      for (const s of appSlotQueries.listAll()) {
+        if (s.config_id === config.id && s.slot !== liveSlot) appSlotQueries.markStopped(s.slot)
+      }
+      appSlotQueries.assign(liveSlot, config.id)
+      appSlotQueries.markRunning(liveSlot, live.pid)
+      const url = `https://app${liveSlot}.steward.jradoo.com`
+      res.json({ slot: liveSlot, port: live.port, pid: live.pid, url })
+      return
+    }
+  } catch (statusErr) {
+    console.warn('[apps] pre-start status check failed:', statusErr)
+  }
+
+  // Step 2: Not running in sidecar. Check DB for a live slot.
   const existing = appSlotQueries.findByConfigId(config.id)
   if (existing && (existing.status === 'running' || existing.status === 'starting')) {
     res.status(409).json({ error: 'App is already running', slot: existing.slot })
     return
   }
 
-  if (!appsClient.isConnected()) {
-    res.status(503).json({ error: 'Apps sidecar is not available' })
-    return
+  // Step 3: Bulk-clear ALL stale slots for this config before finding a free one.
+  for (const s of appSlotQueries.listAll()) {
+    if (s.config_id === config.id) appSlotQueries.markStopped(s.slot)
   }
 
   const freeSlot = appSlotQueries.findFreeSlot()
