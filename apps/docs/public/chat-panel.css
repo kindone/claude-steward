@@ -614,27 +614,37 @@
   justify-content: center;
   width: 100%;
   height: 100%;
-  padding: 48px 24px 96px;
+  padding: 32px 24px 80px;
 }
 
 .cp-sl-content {
   width: 100%;
-  max-width: 820px;
-  max-height: calc(100vh - 160px);
+  max-width: 860px;
+  max-height: calc(100vh - 140px);
   overflow-y: auto;
-  background: #1a1d2e;
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-  padding: 48px 56px;
-  color: #eef0f8;
-  font-size: 1rem;
-  line-height: 1.7;
-  box-shadow: 0 32px 100px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06);
+  /* Light background so MkDocs md-typeset styles render naturally */
+  background: #f8f9fa;
+  border-radius: 14px;
+  padding: 36px 52px;
+  color: #1a1a2e;
+  font-size: 0.86rem;
+  line-height: 1.65;
+  box-shadow: 0 32px 100px rgba(0,0,0,0.7);
   scrollbar-width: thin;
-  scrollbar-color: rgba(255,255,255,0.08) transparent;
+  scrollbar-color: rgba(0,0,0,0.15) transparent;
 }
 .cp-sl-content::-webkit-scrollbar { width: 4px; }
-.cp-sl-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+.cp-sl-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
+
+/* Ensure md-typeset headings/links use legible dark-on-light colours */
+.cp-sl-content.md-typeset h1,
+.cp-sl-content.md-typeset h2,
+.cp-sl-content.md-typeset h3,
+.cp-sl-content.md-typeset h4 { color: #1a1a2e; }
+.cp-sl-content.md-typeset a   { color: #5f4fd4; }
+.cp-sl-content.md-typeset code,
+.cp-sl-content.md-typeset pre { background: #eef0f6; color: #2d2d44; }
+.cp-sl-content.md-typeset blockquote { border-left-color: #7c6af7; color: #444; }
 
 @keyframes cp-sl-in {
   from { opacity: 0; transform: translateY(12px); }
@@ -738,5 +748,5 @@
     padding-top: max(calc(env(safe-area-inset-top, 0px) + 12px), 12px);
   }
 
-  .cp-sl-content { padding: 28px 22px; font-size: 0.95rem; }
+  .cp-sl-content { padding: 22px 20px; font-size: 0.82rem; }
 }

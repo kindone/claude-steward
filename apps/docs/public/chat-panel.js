@@ -653,7 +653,11 @@
     content.classList.add('cp-sl-anim');
   }
 
-  function goSlide(delta) { showSlide(presenterIdx + delta); }
+  function goSlide(delta) {
+    const next = presenterIdx + delta;
+    if (next < 0 || next >= presenterSlides.length) return;
+    showSlide(next);
+  }
 
   function closePresenter() {
     document.removeEventListener('keydown', presenterKeydown);
