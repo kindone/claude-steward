@@ -45,7 +45,7 @@ initChatDb(db)
 // ── Express app ───────────────────────────────────────────────────────────────
 
 const app = express()
-app.use(express.json())
+app.use(express.json({ limit: '2mb' }))
 app.locals.docsDir = DOCS_DIR
 
 // Static: serve the chat panel assets at fixed paths

@@ -159,6 +159,36 @@
         continue;
       }
 
+      // ── Table — collect consecutive pipe rows ─────────────────────────────
+      if (/^\|/.test(line)) {
+        const rows = [];
+        while (i < lines.length && /^\|/.test(lines[i])) {
+          rows.push(lines[i]);
+          i++;
+        }
+        // Second row is the separator (---|---); if present, first row = header
+        const isSep = (r) => /^[\|\s\-:]+$/.test(r);
+        const parseRow = (r) =>
+          r.replace(/^\||\|$/g, '').split('|').map(c => renderInline(c.trim()));
+
+        let html = '<table class="cp-table"><tbody>';
+        let bodyStart = 0;
+        if (rows.length >= 2 && isSep(rows[1])) {
+          const heads = parseRow(rows[0]);
+          html = '<table class="cp-table"><thead><tr>'
+            + heads.map(h => `<th>${h}</th>`).join('')
+            + '</tr></thead><tbody>';
+          bodyStart = 2;
+        }
+        for (let r = bodyStart; r < rows.length; r++) {
+          if (isSep(rows[r])) continue;
+          html += '<tr>' + parseRow(rows[r]).map(c => `<td>${c}</td>`).join('') + '</tr>';
+        }
+        html += '</tbody></table>';
+        parts.push(html);
+        continue;
+      }
+
       // ── Blank line ─────────────────────────────────────────────────────────
       if (line.trim() === '') {
         parts.push('<div class="cp-gap"></div>');
