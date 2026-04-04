@@ -42,20 +42,20 @@ const rangeArg = process.argv[2]?.toLowerCase() ?? '';
 
 const ALL_RANGES = ['1d', '5d', '1mo', '3mo', '6mo', '1y'] as const;
 
-// ─── Zoom box mapping: duration → hours back to show smaller duration ─────────
+// ─── Zoom box mapping: duration → fraction of data to show (from right edge) ────
 
 const ZOOM_MAP: Record<string, number | null> = {
   '1d': null,              // no zoom box (finest grain)
-  '5d': 24,                // show last 24h (approximates 1d)
-  '1w': 24,                // show last 24h (approximates 1d)
-  '1mo': 7 * 24,           // show last 7 days (approximates 1w)
-  '1m': 7 * 24,
-  '3mo': 30 * 24,          // show last 30 days (approximates 1mo)
-  '3m': 30 * 24,
-  '6mo': 3 * 30 * 24,      // show last ~3 months (approximates 3mo)
-  '6m': 3 * 30 * 24,
-  '1y': 6 * 30 * 24,       // show last ~6 months (approximates 6mo)
-  '2y': 6 * 30 * 24,
+  '5d': 1/5,               // show last 1/5 (approximates 1d within 5d)
+  '1w': 1/5,               // show last 1/5 (approximates 1d within 1w)
+  '1mo': 1/4,              // show last 1/4 (approximates 1w within 1mo)
+  '1m': 1/4,
+  '3mo': 1/3,              // show last 1/3 (approximates 1mo within 3mo)
+  '3m': 1/3,
+  '6mo': 1/2,              // show last 1/2 (approximates 3mo within 6mo)
+  '6m': 1/2,
+  '1y': 1/2,               // show last 1/2 (approximates 6mo within 1y)
+  '2y': 1/2,
 };
 
 // ─── "all" mode: re-spawn once per range in parallel ─────────────────────────
@@ -162,31 +162,17 @@ function isBenchmark(sym: string) { return sym.startsWith('^'); }
 
 function calculateZoomBoxCoords(
   refSeries: SeriesData,
-  hoursBack: number,
+  fraction: number,
   chx: number,
   cchw: number,
 ): { startX: number; width: number } | null {
   const n = refSeries.closes.length;
-  if (n < 2 || hoursBack <= 0) return null;
+  if (n < 2 || fraction <= 0 || fraction > 1) return null;
 
-  const lastTs = refSeries.timestamps[n - 1];
-  const cutoffTs = lastTs - hoursBack * 3600;
-
-  // Find the index where timestamps >= cutoffTs
-  let startIdx = 0;
-  for (let i = 0; i < n; i++) {
-    if (refSeries.timestamps[i] >= cutoffTs) {
-      startIdx = i;
-      break;
-    }
-  }
-
-  // If the cutoff is before the first timestamp, show all data
-  if (startIdx === 0 && cutoffTs < refSeries.timestamps[0]) {
-    startIdx = 0;
-  }
-
+  // Show the last `fraction` of the data
+  const startIdx = Math.max(0, Math.floor(n * (1 - fraction)));
   const endIdx = n - 1;
+
   const pxS = (i: number) => chx + (i / Math.max(n - 1, 1)) * cchw;
   const startX = pxS(startIdx);
   const endX = pxS(endIdx);
