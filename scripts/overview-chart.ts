@@ -58,6 +58,22 @@ const ZOOM_MAP: Record<string, number | null> = {
   '2y': 1/2,
 };
 
+// ─── Secondary zoom box: two levels down (for large durations) ────────────────
+
+const ZOOM_MAP_SECONDARY: Record<string, number | null> = {
+  '1d': null,
+  '5d': null,
+  '1w': null,
+  '1mo': null,
+  '1m': null,
+  '3mo': 1/12,             // show last 1/12 (approximates 1w: ~7 days in ~90 days)
+  '3m': 1/12,
+  '6mo': 1/6,              // show last 1/6 (approximates 1mo: ~30 days in ~180 days)
+  '6m': 1/6,
+  '1y': 1/4,               // show last 1/4 (approximates 3mo: ~90 days in ~365 days)
+  '2y': 1/4,
+};
+
 // ─── "all" mode: re-spawn once per range in parallel ─────────────────────────
 
 if (rangeArg === 'all') {
@@ -324,6 +340,17 @@ async function mainGroupWise(groupName: string) {
       }
     }
 
+    // Secondary zoom box for group-wise charts (3mo, 6mo, 1y)
+    const zoomSecondary = ZOOM_MAP_SECONDARY[rk];
+    let zoomBoxSecondarySvg = '';
+    if (zoomSecondary !== null) {
+      const refSeriesForRange = [...dm.values()].reduce((a, b) => a.timestamps.length >= b.timestamps.length ? a : b);
+      const zoomCoords = calculateZoomBoxCoords(refSeriesForRange, zoomSecondary, chx, cchw);
+      if (zoomCoords) {
+        zoomBoxSecondarySvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${GCHART_H}" fill="rgba(255, 150, 100, 0.10)" stroke="#ff9966" stroke-width="1.5" rx="2"/>`;
+      }
+    }
+
     // Day separator lines for 1d panels in group-wise charts
     let daySeparatorSvg = '';
     if (rk === '1d') {
@@ -351,6 +378,7 @@ async function mainGroupWise(groupName: string) {
 ${gridLines.join('\n')}
 ${[...benchSyms.map(s => polylineFor(s, true)), ...mainSyms.map(s => polylineFor(s, false))].filter(Boolean).join('\n')}
 ${zoomBoxSvg}
+${zoomBoxSecondarySvg}
 ${daySeparatorSvg}
 <rect x="${chx}" y="${chy}" width="${cchw}" height="${GCHART_H}" fill="none" stroke="#30363d" stroke-width="0.5" rx="2"/>`);
   }
@@ -502,6 +530,16 @@ async function main() {
       }
     }
 
+    // Secondary zoom box: two levels down (for 3mo, 6mo, 1y)
+    const zoomSecondary = ZOOM_MAP_SECONDARY[rangeKey];
+    let zoomBoxSecondarySvg = '';
+    if (zoomSecondary !== null) {
+      const zoomCoords = calculateZoomBoxCoords(refSeries, zoomSecondary, chx, cchw);
+      if (zoomCoords) {
+        zoomBoxSecondarySvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${CHART_H}" fill="rgba(255, 150, 100, 0.10)" stroke="#ff9966" stroke-width="1.5" rx="2"/>`;
+      }
+    }
+
     // Day separator lines for 1d chart (which shows 2 days of data)
     let daySeparatorSvg = '';
     if (rangeKey === '1d') {
@@ -549,6 +587,7 @@ async function main() {
 ${gridLines.join('\n')}
 ${polylines}
 ${zoomBoxSvg}
+${zoomBoxSecondarySvg}
 ${daySeparatorSvg}
 <rect x="${chx}" y="${chy}" width="${cchw}" height="${CHART_H}" fill="none" stroke="#30363d" stroke-width="0.5" rx="2"/>
 ${legendSvg}`);
