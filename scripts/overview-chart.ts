@@ -326,6 +326,18 @@ async function mainGroupWise(groupName: string) {
         : `<polyline clip-path="url(#${clipId})" points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`;
     };
 
+    // Zoom box for group-wise charts
+    const zoomHoursBack = ZOOM_MAP[rk];
+    let zoomBoxSvg = '';
+    if (zoomHoursBack !== null) {
+      // Find refSeries for this range
+      const refSeriesForRange = [...dm.values()].reduce((a, b) => a.timestamps.length >= b.timestamps.length ? a : b);
+      const zoomCoords = calculateZoomBoxCoords(refSeriesForRange, zoomHoursBack, chx, chy);
+      if (zoomCoords) {
+        zoomBoxSvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${GCHART_H}" fill="rgba(100, 150, 255, 0.12)" stroke="#6496ff" stroke-width="1.5" rx="2"/>`;
+      }
+    }
+
     const barLabel = rc.intervalType === 'hour' ? rc.interval : rc.intervalType === 'day' ? '1d' : '1wk';
     cells.push(`
 <rect x="${cx}" y="${cy}" width="${GCELL_W}" height="${GCELL_H}" fill="#161b22" rx="3"/>
@@ -334,6 +346,7 @@ async function mainGroupWise(groupName: string) {
 <rect x="${chx}" y="${chy}" width="${cchw}" height="${GCHART_H}" fill="#0d1117" rx="2"/>
 ${gridLines.join('\n')}
 ${[...benchSyms.map(s => polylineFor(s, true)), ...mainSyms.map(s => polylineFor(s, false))].filter(Boolean).join('\n')}
+${zoomBoxSvg}
 <rect x="${chx}" y="${chy}" width="${cchw}" height="${GCHART_H}" fill="none" stroke="#30363d" stroke-width="0.5" rx="2"/>`);
   }
 
