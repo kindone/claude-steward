@@ -318,7 +318,7 @@ async function mainGroupWise(groupName: string) {
     if (zoomHoursBack !== null) {
       // Find refSeries for this range
       const refSeriesForRange = [...dm.values()].reduce((a, b) => a.timestamps.length >= b.timestamps.length ? a : b);
-      const zoomCoords = calculateZoomBoxCoords(refSeriesForRange, zoomHoursBack, chx, chy);
+      const zoomCoords = calculateZoomBoxCoords(refSeriesForRange, zoomHoursBack, chx, cchw);
       if (zoomCoords) {
         zoomBoxSvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${GCHART_H}" fill="rgba(100, 150, 255, 0.12)" stroke="#6496ff" stroke-width="1.5" rx="2"/>`;
       }
