@@ -44,6 +44,9 @@ async function runSchedule(schedule: Schedule): Promise<void> {
     console.log(`[scheduler] deleted one-shot schedule ${schedule.id}`)
   }
 
+  // Notify the client that the schedule list changed (fired/deleted)
+  broadcastEvent('schedules_changed', { sessionId: schedule.session_id })
+
   const session = sessionQueries.findById(schedule.session_id)
   if (!session) {
     console.warn(`[scheduler] session ${schedule.session_id} not found for schedule ${schedule.id} — skipping`)

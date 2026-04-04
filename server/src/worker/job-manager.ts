@@ -98,6 +98,14 @@ export class JobManager {
     }
     if (model) args.push('--model', model)
 
+    // MCP schedule tools: load steward's schedule server and block the harness
+    // cron tools (CronCreate/CronDelete) which are session-only and would confuse
+    // schedule management — CronList is allowed for read-only inspection.
+    if (process.env.MCP_CONFIG_PATH) {
+      args.push('--mcp-config', process.env.MCP_CONFIG_PATH)
+      args.push('--disallowed-tools', 'CronCreate,CronDelete')
+    }
+
     // Strip all Claude Code session vars to prevent sub-agent IPC hang
     const cleanEnv: NodeJS.ProcessEnv = {}
     for (const [key, val] of Object.entries(process.env)) {

@@ -1,9 +1,11 @@
 // Feature:     Scheduler — system prompt injection for schedule awareness
 // Arch/Design: buildScheduleFragment and buildEffectiveSystemPrompt are pure functions
-//              (modulo Date.now() for current UTC time); they inject schedule syntax
+//              (modulo Date.now() for current UTC time); they inject MCP tool descriptions
 //              and timezone context into Claude's system prompt
 // Spec:        ∀ session: buildScheduleFragment always returns a non-empty string
 //              ∀ session: fragment contains "cron" and "UTC" keywords
+//              ∀ session: fragment contains MCP tool names (schedule_create etc.)
+//              ∀ session: fragment forbids <schedule> blocks and CronCreate/CronDelete
 //              ∀ session with timezone: fragment contains the timezone string
 //              ∀ session without timezone: fragment contains a prompt to ask for timezone
 //              ∀ session: buildEffectiveSystemPrompt returns fragment + session.system_prompt
@@ -49,14 +51,35 @@ describe('buildScheduleFragment', () => {
     expect(buildScheduleFragment(makeSession())).toContain('cron')
   })
 
+  it('always contains the session_id so Claude does not need to query the DB', () => {
+    const session = makeSession({ id: 'test-session-id' })
+    expect(buildScheduleFragment(session)).toContain('test-session-id')
+  })
+
   it('always contains "UTC" keyword', () => {
     expect(buildScheduleFragment(makeSession())).toContain('UTC')
   })
 
-  it('always contains the <schedule> example block', () => {
+  it('contains MCP tool names', () => {
     const result = buildScheduleFragment(makeSession())
-    expect(result).toContain('<schedule>')
-    expect(result).toContain('</schedule>')
+    expect(result).toContain('schedule_create')
+    expect(result).toContain('schedule_list')
+    expect(result).toContain('schedule_update')
+    expect(result).toContain('schedule_delete')
+  })
+
+  it('forbids <schedule> text blocks', () => {
+    const result = buildScheduleFragment(makeSession())
+    // The fragment should tell Claude NOT to emit <schedule> blocks
+    expect(result).toContain('never emit')
+  })
+
+  it('forbids CronCreate and CronDelete', () => {
+    const result = buildScheduleFragment(makeSession())
+    expect(result).toContain('CronCreate')
+    expect(result).toContain('CronDelete')
+    // Must be in a "never call" context, not just mentioned
+    expect(result).toContain('never call CronCreate')
   })
 
   it('always contains "once" keyword (explains one-shot flag)', () => {
@@ -95,7 +118,6 @@ describe('buildScheduleFragment', () => {
   })
 
   it('current UTC time appears in output (ISO-ish format)', () => {
-    const beforeCall = new Date().toISOString().slice(0, 13) // "YYYY-MM-DDTHH"
     const result = buildScheduleFragment(makeSession())
     // The current year should appear in the fragment
     expect(result).toContain(new Date().getUTCFullYear().toString())

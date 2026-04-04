@@ -7,6 +7,7 @@ import { projectQueries, migrateOrphanedSessions } from './db/index.js'
 import { workerClient } from './worker/client.js'
 import { recoverStreamingSessions } from './worker/recovery.js'
 import { startScheduler } from './lib/scheduler.js'
+import { writeMcpConfig } from './mcp/config.js'
 import { appsClient } from './apps/client.js'
 import { appSlotQueries } from './db/index.js'
 
@@ -82,6 +83,10 @@ appsClient.onCrashed = (configId, _exitCode) => {
   }
 }
 appsClient.connect()
+
+// Write the MCP config file so Claude CLI subprocesses can load schedule tools.
+// Must run before the worker connects (which may immediately spawn Claude).
+writeMcpConfig()
 
 startScheduler()
 

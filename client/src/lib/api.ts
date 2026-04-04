@@ -597,6 +597,8 @@ export type AppEventHandlers = {
   onReload?: () => void
   /** Fired when the server sends a push notification — carries the target session/project for navigation. */
   onPushTarget?: (target: { sessionId: string; projectId: string | null }) => void
+  /** Fired when an MCP schedule tool mutates schedules — sessionId may be null for global. */
+  onSchedulesChanged?: (sessionId: string | null) => void
   /** Fired when the SSE connection is established (initial + every reconnect). */
   onConnect?: () => void
   /** Fired when the SSE connection drops unexpectedly (before the reconnect delay). */
@@ -732,6 +734,12 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
             if (pendingEvent === 'eval') void handleEval(raw)
             if (pendingEvent === 'pushTarget') {
               try { handlers.onPushTarget?.(JSON.parse(raw)) } catch { /* ignore */ }
+            }
+            if (pendingEvent === 'schedules_changed') {
+              try {
+                const { sessionId } = JSON.parse(raw) as { sessionId?: string | null }
+                handlers.onSchedulesChanged?.(sessionId ?? null)
+              } catch { /* ignore */ }
             }
             pendingEvent = ''
           }

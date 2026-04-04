@@ -526,6 +526,7 @@ const insertScheduleStmt = db.prepare(
    ON CONFLICT(session_id, label) WHERE label != '' DO UPDATE SET
      cron        = excluded.cron,
      prompt      = excluded.prompt,
+     once        = excluded.once,
      next_run_at = excluded.next_run_at,
      updated_at  = unixepoch()
    RETURNING *`

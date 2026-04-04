@@ -111,6 +111,12 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
     args.push('--model', model)
   }
 
+  // MCP schedule tools — same as the worker path.
+  if (process.env.MCP_CONFIG_PATH) {
+    args.push('--mcp-config', process.env.MCP_CONFIG_PATH)
+    args.push('--disallowed-tools', 'CronCreate,CronDelete')
+  }
+
   // Strip all Claude Code session vars. Inheriting CLAUDECODE=1 makes claude
   // think it's a sub-agent and wait for IPC from the parent session, hanging forever.
   // The spawned process will auth via ~/.claude/ stored credentials instead.

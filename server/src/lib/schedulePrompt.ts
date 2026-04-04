@@ -1,7 +1,7 @@
 /**
  * Builds the schedule-awareness fragment appended to every session's system prompt.
- * Tells Claude how to create schedules via <schedule> blocks, and provides the
- * user's timezone + current UTC time so it can convert correctly.
+ * Tells Claude to use the MCP schedule tools (not <schedule> blocks), provides the
+ * user's timezone + current UTC time, and explains cron limitations.
  */
 
 import type { Session } from '../db/index.js'
@@ -21,7 +21,6 @@ export function buildScheduleFragment(session: Session): string {
         hour: '2-digit', minute: '2-digit', hour12: false,
       })
     } catch {
-      // Invalid IANA timezone stored — fall back to UTC display
       localStr = utcStr
     }
     currentTimeLine = `Current time: ${localStr} (${session.timezone}) / ${utcStr}`
@@ -33,25 +32,28 @@ export function buildScheduleFragment(session: Session): string {
 
   return `
 ---
-You can create scheduled reminders or tasks. When the user asks you to schedule something, include a schedule block anywhere in your response (it will be hidden from the UI and processed automatically):
+You have access to MCP tools for managing steward schedules. Use these tools directly — never emit <schedule> text blocks, never call CronCreate or CronDelete (those are session-only harness tools that don't persist).
 
-<schedule>{"cron": "0 8 * * 1-5", "prompt": "Remind the user to check emails", "label": "Daily email reminder"}</schedule>
+Available tools (from the "steward-schedules" MCP server):
 
-Rules:
-- cron field must be valid 5-field cron syntax in UTC
-- prompt is the task context injected at fire time — write it as a clear instruction to yourself
-- label is a short human-readable name shown in the schedule list
-- once: true means the schedule fires exactly once then disables itself — use this for specific one-time reminders (e.g. "remind me on June 15th"). Omit or set false for recurring schedules.
-- update: true means only update an existing schedule with this label — if no matching label exists the operation is rejected and the user is warned. Use this when the user explicitly asks to update/change an existing schedule. Omit (or set false) when creating a new schedule.
-- Relative time baseline: treat "later", "from now", "in X minutes/hours" as relative to the current time unless the user explicitly states a different reference point (e.g. "30 minutes after that" or "an hour since the last reminder"). When in doubt, assume now.
-- ${currentTimeLine}
-- ${tzLine}
+- schedule_list(session_id)
+- schedule_create(session_id, cron, prompt, label, once?)
+  — cron: 5-field UTC. label: required, upsert key (same label = update in-place). once: true to fire once then delete.
+- schedule_update(id, cron?, prompt?, enabled?) — call schedule_list first if you don't know the ID
+- schedule_delete(id, session_id)
 
-Cron limitations — handle these gracefully by explaining to the user rather than producing a wrong schedule:
-- No native "except" support: enumerate allowed hours/days explicitly (e.g. "every hour 9am–5pm except 1pm" → "0 9,10,11,12,14,15,16,17 * * *")
-- No biweekly/fortnightly ("every other week") — not expressible in 5-field cron; offer two separate schedules or ask the user to pick a fixed cadence
-- No "last day of month" or "Nth weekday of month" (e.g. "second Tuesday") — not supported; suggest a fixed date instead
-- No relative timing ("3 hours after the previous task") — cron is absolute, not relative
+Current session_id: ${session.id}
+${currentTimeLine}
+${tzLine}
+Confirm schedules to the user with the human-readable time in their local timezone after creating/updating.
+
+For near-future one-shot schedules: target at least 3–4 minutes from now — LLM processing + MCP transport takes ~1–2 minutes, and if the pinned minute has already passed when the server computes next_run_at, it will schedule for next year instead. The tool will warn you if this happens.
+
+Cron limitations — explain rather than produce a wrong schedule:
+- No "except": enumerate explicitly ("9am–5pm except 1pm" → "0 9,10,11,12,14,15,16,17 * * *")
+- No biweekly — offer two schedules or a fixed cadence
+- No "last day of month" / "Nth weekday" — suggest a fixed date
+- No relative timing ("3 hours after X") — cron is absolute
 ---`
 }
 

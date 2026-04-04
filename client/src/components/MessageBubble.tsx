@@ -15,13 +15,6 @@ mermaid.initialize({ startOnLoad: false, theme: 'dark' })
 
 marked.use({ breaks: true })
 
-const SCHEDULE_BLOCK_RE = /<schedule>[\s\S]*?<\/schedule>/g
-
-/** Strip <schedule> blocks from content before rendering — they're processed server-side. */
-function stripScheduleBlocks(text: string): string {
-  return text.replace(SCHEDULE_BLOCK_RE, '').trim()
-}
-
 /** Render a markdown segment to sanitized HTML. */
 function renderMarkdown(content: string, projectId: string | null): string {
   const withKatex = preprocessKaTeX(content)
@@ -44,7 +37,7 @@ type Props = {
 }
 
 export function MessageBubble({ role, content, streaming = false, errorCode, source, toolUses, onCompact, projectId = null }: Props) {
-  const displayContent = role === 'assistant' ? stripScheduleBlocks(content) : content
+  const displayContent = content
   const isScheduled = source === 'scheduler'
   const contentRef = useRef<HTMLDivElement>(null)
   const [copied, setCopied] = useState(false)
@@ -84,12 +77,19 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
         // Insert grid before the first image's paragraph
         const firstParent = imgs[0].closest('p') ?? imgs[0].parentElement
         firstParent?.parentElement?.insertBefore(grid, firstParent)
-        // Move all images into the grid, remove now-empty parent paragraphs
+        // Move all images into the grid, remove parent paragraphs that become
+        // empty or contain only <br> / whitespace text nodes (marked wraps
+        // consecutive images in one <p> with <br> separators, so those remain).
         imgs.forEach((img) => {
           const parent = img.closest('p') ?? img.parentElement
           grid.appendChild(img)
-          if (parent && parent !== grid && parent.childNodes.length === 0) {
-            parent.remove()
+          if (parent && parent !== grid) {
+            const hasRealContent = Array.from(parent.childNodes).some((n) =>
+              n.nodeType === Node.ELEMENT_NODE
+                ? (n as Element).tagName !== 'BR'
+                : (n.textContent?.trim() ?? '') !== ''
+            )
+            if (!hasRealContent) parent.remove()
           }
         })
         // Add expand pill (shown when collapsed, hidden when expanded via CSS)

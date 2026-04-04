@@ -101,6 +101,9 @@ export default function App() {
   const [clientError, setClientError] = useState<string | null>(null)
   const [appPanel, setAppPanel] = useState<{ url: string; name: string } | null>(null)
   const [appPanelPreset, setAppPanelPreset] = useState<'half' | 'wide'>('half')
+  // Incremented whenever the MCP server notifies us that schedules changed,
+  // so ChatWindow/SchedulePanel can re-fetch without polling.
+  const [schedulesTick, setSchedulesTick] = useState(0)
 
   // Capture unhandled JS errors and promise rejections for visibility
   useEffect(() => {
@@ -237,6 +240,7 @@ export default function App() {
   const { state: connState, lastSeenAt } = useAppConnection({
     onReload: authState === 'authenticated' ? handleReload : undefined,
     onPushTarget: handlePushTarget,
+    onSchedulesChanged: () => setSchedulesTick((t) => t + 1),
   })
 
   // Load projects and meta once authenticated; restore last-used project if it still exists.
@@ -577,6 +581,7 @@ export default function App() {
                 )
               }
               onCompact={handleCompact}
+              schedulesTick={schedulesTick}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-[#666]">

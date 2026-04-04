@@ -51,6 +51,7 @@ router.post('/', (req, res) => {
   if (enabled === false) {
     scheduleQueries.update(schedule.id, { enabled: false })
   }
+  broadcastEvent('schedules_changed', { sessionId })
   res.status(201).json(schedule)
 })
 
@@ -86,6 +87,7 @@ router.patch('/:id', (req, res) => {
     enabled,
     nextRunAt: nextRun,
   })
+  broadcastEvent('schedules_changed', { sessionId: schedule.session_id })
   res.json(updated)
 })
 
@@ -97,6 +99,7 @@ router.delete('/:id', (req, res) => {
     return
   }
   scheduleQueries.delete(req.params.id)
+  broadcastEvent('schedules_changed', { sessionId: schedule.session_id })
   res.status(204).end()
 })
 

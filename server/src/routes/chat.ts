@@ -10,10 +10,6 @@ import { broadcastEvent, hasActiveClients } from '../lib/connections.js'
 import { extractToolDetail } from '../claude/toolDetail.js'
 import { workerClient } from '../worker/client.js'
 import { buildEffectiveSystemPrompt } from '../lib/schedulePrompt.js'
-import { extractScheduleBlocks } from '../lib/parseScheduleBlocks.js'
-import { scheduleQueries } from '../db/index.js'
-import { nextFireAt } from '../lib/scheduler.js'
-import { v4 as uuidv4ForSchedule } from 'uuid'
 
 /**
  * Normalize a tool_result content value to a plain string.
@@ -34,49 +30,6 @@ function normalizeToolResultContent(content: unknown): string {
 function sendSseEvent(res: Response, event: string, data: unknown): void {
   if (res.writableEnded) return
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
-}
-
-/**
- * Parse <schedule> blocks from assistant text, create the schedules, and return stripped text.
- * Called after every assistant response so natural-language scheduling works.
- */
-function processScheduleBlocks(text: string, sessionId: string): string {
-  const { schedules, strippedText } = extractScheduleBlocks(text)
-  const warnings: string[] = []
-
-  for (const s of schedules) {
-    try {
-      // update:true — only proceed if a record with this label already exists
-      if (s.update) {
-        if (!s.label) {
-          warnings.push(`⚠️ Schedule update skipped: \`update: true\` requires a label.`)
-          continue
-        }
-        const existing = scheduleQueries.findBySessionAndLabel(sessionId, s.label)
-        if (!existing) {
-          const sessionSchedules = scheduleQueries.listBySession(sessionId)
-          const labelList = sessionSchedules
-            .filter(sc => sc.label)
-            .map(sc => `- \`${sc.label}\``)
-          const hint = labelList.length
-            ? `\n\nExisting labels in this session:\n${labelList.join('\n')}`
-            : '\n\n(No labelled schedules exist in this session yet.)'
-          warnings.push(`⚠️ Schedule update skipped: no existing schedule found with label **"${s.label}"**.${hint}`)
-          console.warn(`[scheduler] update rejected — label "${s.label}" not found in session ${sessionId}`)
-          continue
-        }
-      }
-
-      const nextRun = nextFireAt(s.cron)
-      scheduleQueries.create(uuidv4ForSchedule(), sessionId, s.cron, s.prompt, nextRun, s.once, s.label)
-      console.log(`[scheduler] ${s.update ? 'updated' : 'upserted'} schedule for session ${sessionId}: ${s.label} (${s.cron})`)
-    } catch (err) {
-      console.error('[scheduler] failed to create schedule from response block:', err)
-    }
-  }
-
-  if (warnings.length === 0) return strippedText
-  return strippedText + '\n\n' + warnings.join('\n')
 }
 
 /** Truncate the first message to a readable title (max 40 chars, breaks on word boundary). */
@@ -140,7 +93,7 @@ router.post('/', (req, res) => {
   // persistMsg=true (default) for the direct-spawn path (no streaming row, insert here).
   const onComplete = (assistantText: string, persistMsg = true) => {
     unregisterChat(sessionId)
-    const cleanText = processScheduleBlocks(assistantText, sessionId)
+    const cleanText = assistantText
     if (cleanText && persistMsg) {
       messageQueries.insert(uuidv4(), sessionId, 'assistant', cleanText)
     }
@@ -248,7 +201,7 @@ router.post('/', (req, res) => {
           break
         case 'done': {
           workerClient.unsubscribe(sessionId)
-          const cleanContent = processScheduleBlocks(event.content, sessionId)
+          const cleanContent = event.content
           finalize(cleanContent, false)
           sendSseEvent(res, 'done', { session_id: event.claudeSessionId })
           if (!res.writableEnded) res.end()

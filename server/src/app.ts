@@ -14,6 +14,7 @@ import pushRouter, { vapidPublicKeyHandler } from './routes/push.js'
 import schedulesRouter from './routes/schedules.js'
 import evalRouter from './routes/eval.js'
 import appsRouter from './routes/apps.js'
+import mcpNotifyRouter from './routes/mcp.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Monorepo root — two levels up from server/src/
@@ -47,6 +48,10 @@ export function createApp() {
   // Eval relay — has its own auth (API key OR session cookie) so Claude can call it
   // with just a Bearer token without going through the login flow.
   app.use('/api/eval', evalRouter)
+
+  // MCP notify — called by the MCP schedule server subprocess (no session cookie).
+  // Auth is a shared secret header (X-MCP-Secret). Must be before requireAuth.
+  app.use('/api/mcp-notify', mcpNotifyRouter)
 
   app.use('/api', requireAuth)
   app.use('/api/chat', chatRouter)

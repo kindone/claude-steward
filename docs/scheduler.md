@@ -1,54 +1,16 @@
-# Scheduler
+# Scheduler — Architecture
 
-Scheduled conversation resume: Claude-initiated messages, natural language schedule creation, timezone-aware, push notification on fire.
-
----
-
-## Design
-
-### Schedule Creation
-
-Natural language via conversation — Claude outputs a `<schedule>` JSON block anywhere in its response. The server intercepts the block during `onComplete`, creates the schedule in the DB, and strips the block from the saved/displayed content. The client also strips it from rendered markdown reactively so it never flashes during streaming.
-
-```json
-{"cron": "0 8 * * 1-5", "prompt": "Remind the user to check emails", "label": "Daily email reminder"}
-```
-
-- `cron`: 5-field UTC cron expression
-- `prompt`: task context injected at fire time
-- `label`: human-readable name shown in the UI
-- `once: true` (optional): fire once then auto-delete
-
-### Fired Message
-
-No visible user message. The scheduler calls `sendToSession()` with `source: 'scheduler'`, which injects a rich internal user turn (not saved) and saves the assistant response with `messages.source = 'scheduler'`. The client renders a `⏰ Scheduled` indicator above those assistant bubbles.
-
-Rich context injected at fire time:
-```
-[Scheduled trigger — Monday 30 March 2026 at 08:00 (Europe/Paris) / 06:00 UTC]
-
-Recent conversation:
-User: hey, remind me at 8AM to mail Bob
-Assistant: Got it, I've set a reminder.
-
-Task: Remind the user to mail Bob
-```
-
-### Push on Fire
-
-After the scheduled message completes, if `notifyWatchers()` returns 0 (no open tab), a push notification fires. Session-targeted subscriptions are tried first; global subscriptions are the fallback. The notification URL includes `?session=<id>&project=<id>` for reliable mobile navigation.
-
-### Timezone
-
-Stored per session (`sessions.timezone TEXT`). `ChatWindow` sends `Intl.DateTimeFormat().resolvedOptions().timeZone` on mount via `PATCH /api/sessions/:id`. Claude receives the timezone in its system prompt fragment and uses it for cron conversion. If timezone is unknown when a schedule is requested, Claude asks the user to confirm it.
-
-### Cron Limitations
-
-5-field cron cannot express biweekly, "last day of month", "Nth weekday of month", or exclusions natively. Claude's system prompt includes guidance explaining these limitations and enumerating workarounds (e.g. "every weekday 9am–5pm except 1pm" → enumerate hours explicitly). See `server/src/lib/schedulePrompt.ts` for the injected fragment.
+How the steward scheduler works internally. For tool usage (how to create/manage schedules from a session), see `docs/scheduler-usage.md`.
 
 ---
 
-## Server
+## Overview
+
+Scheduled conversation resume: Claude-initiated messages, timezone-aware cron, push notification on fire. Schedules are created via MCP tool calls from within chat sessions (or via the REST API). The scheduler fires them as headless Claude invocations and notifies the client via SSE.
+
+---
+
+## Server Components
 
 ### `schedules` DB Table
 
@@ -68,7 +30,27 @@ CREATE TABLE schedules (
 )
 ```
 
-`next_run_at` is computed by `nextFireAt(cronExpr)` using `node-cron` (validation) + `cron-parser` (next date) and advanced immediately when a schedule fires to prevent double-fire on slow ticks.
+Unique index on `(session_id, label)` — enables upsert-by-label semantics in `schedule_create`.
+
+`next_run_at` is computed by `nextFireAt(cronExpr)` (node-cron validation + cron-parser next date) and advanced immediately when a schedule fires to prevent double-fire.
+
+### `lib/scheduler.ts`
+
+`startScheduler()` registers a `node-cron` tick every minute. On each tick:
+1. `scheduleQueries.listDue(now)` returns schedules where `enabled=1` and `next_run_at <= now`
+2. `markRan()` advances `next_run_at` immediately (prevents double-fire)
+3. If `once`, deletes the schedule
+4. Broadcasts `schedules_changed` SSE so the bell panel refreshes
+5. `sendToSession()` sends the prompt to the session as a headless invocation
+6. If no watchers are open → push notification fires
+
+### `lib/sendToSession.ts`
+
+Headless Claude invocation used by the scheduler (and manual run). Injects the rich scheduled-trigger context as the user turn, then calls `runClaudePrompt()`. Saves the assistant message with `source = 'scheduler'`. Calls `notifyWatchers` and `notifySubscribers` when done.
+
+### `lib/schedulePrompt.ts`
+
+`buildScheduleFragment(session)` returns the lean system prompt injection prepended to every session. Contains: MCP tool signatures, current time, user timezone, cron limitations. This is the tool usage guide — keep it concise to minimise token overhead.
 
 ### Routes (`/api/schedules`)
 
@@ -78,51 +60,88 @@ CREATE TABLE schedules (
 | `POST` | `/api/schedules` | Create schedule `{ sessionId, cron, prompt, label?, once? }` |
 | `PATCH` | `/api/schedules/:id` | Update `{ cron?, prompt?, label?, enabled? }` |
 | `DELETE` | `/api/schedules/:id` | Delete schedule |
-| `POST` | `/api/schedules/:id/run` | Manually fire a schedule immediately |
+| `POST` | `/api/schedules/:id/run` | Manually fire immediately |
+| `POST` | `/api/mcp-notify` | Internal: MCP server posts here after mutations → SSE broadcast |
 
-### `lib/scheduler.ts`
+All mutation routes broadcast `schedules_changed` SSE so the bell panel refreshes in real time.
 
-`startScheduler()` registers a `node-cron` tick every minute. On each tick:
-1. `scheduleQueries.listDue(now)` returns schedules where `enabled=1` and `next_run_at <= now`
-2. `markRan()` advances `next_run_at` immediately (prevents double-fire)
-3. If `once`, the schedule is deleted
-4. `sendToSession()` sends the prompt to the session
-5. If result content exists and no watchers are open → push notification fires
+---
 
-### `lib/sendToSession.ts`
+## MCP Server
 
-Headless Claude invocation used by the scheduler (and manual run). Injects the rich scheduled-trigger context as the user turn, then calls `runClaudePrompt()`. Saves the assistant message with `source = 'scheduler'`. Calls `notifyWatchers` and `notifySubscribers` when done.
+```
+Claude CLI subprocess
+    └── steward-schedules MCP server (stdio)
+            ├── reads/writes steward.db (WAL mode, busy_timeout=5000)
+            └── POSTs to /api/mcp-notify on mutations → schedules_changed SSE
+```
 
-### `lib/schedulePrompt.ts`
+- **Config**: `server/src/mcp/config.ts` writes `server/data/steward-mcp.json` at startup. Sets `MCP_CONFIG_PATH` and `MCP_NOTIFY_SECRET` env vars inherited by the worker.
+- **DB**: `server/src/mcp/db.ts` — separate SQLite connection in WAL mode for concurrent access.
+- **Disallowed tools**: worker (`job-manager.ts`) and direct-spawn (`process.ts`) both pass `--disallowed-tools CronCreate,CronDelete` when `MCP_CONFIG_PATH` is set.
+- **Claude Code sessions**: on every startup, `syncClaudeSettings()` in `config.ts` writes the registration into `~/.claude.json` (the file Claude Code actually reads — **not** `.claude/settings.json`). This keeps the MCP secret in sync after every PM2 restart. See [External: `~/.claude.json`](#external-claudejson) below.
 
-`buildScheduleFragment(session)` returns the system prompt injection that tells Claude how to create schedules:
-- `<schedule>` block syntax and field descriptions
-- User's timezone (or "unknown — ask user" fallback)
-- Current UTC time
-- Cron limitation guidance
+---
+
+## External: `~/.claude.json`
+
+The MCP server registration lives **outside the repo** in `~/.claude.json` (Claude Code's global config file). This file is auto-maintained by `syncClaudeSettings()` on every server startup.
+
+### What `syncClaudeSettings()` does
+
+On startup, `server/src/mcp/config.ts`:
+1. Generates (or reads from env) `MCP_NOTIFY_SECRET`
+2. Builds `mcpConfig` with `command: process.execPath` (NVM v24 node — **not** `/usr/bin/node` which is v18 and lacks `node:sqlite`)
+3. Writes `server/data/steward-mcp.json`
+4. Calls `syncClaudeSettings(mcpConfig)` which merges the entry into `~/.claude.json` under `mcpServers["steward-schedules"]`
+
+### Why this matters
+
+- `MCP_NOTIFY_SECRET` is regenerated each restart if not set as a persistent env var. `syncClaudeSettings` ensures `~/.claude.json` always has the current secret.
+- Claude Code reads `~/.claude.json` for MCP server registrations — **not** `~/.claude/settings.json`, not `.claude/settings.json`.
+- The node binary must be NVM v24+ (`process.execPath`). If the entry ever gets reset to `/usr/bin/node` (v18), the MCP server will crash silently with `node:sqlite` not found.
+
+### Recovery (if `~/.claude.json` gets corrupted or the entry disappears)
+
+```bash
+# Re-register manually — this writes to ~/.claude.json
+claude mcp add steward-schedules -s user \
+  -- /home/ubuntu/.nvm/versions/node/v24.14.0/bin/node \
+  /home/ubuntu/claude-steward/server/dist/mcp/schedule-server.js
+
+# Then set the secret to match the running server
+MCP_NOTIFY_SECRET=$(cat server/data/steward-mcp.json | \
+  python3 -c "import json,sys; print(json.load(sys.stdin)['env']['MCP_NOTIFY_SECRET'])")
+claude mcp update steward-schedules --env MCP_NOTIFY_SECRET="$MCP_NOTIFY_SECRET"
+
+# Verify
+claude mcp list
+```
+
+The next server restart will re-sync it automatically anyway.
 
 ---
 
 ## Client
 
+### Real-time Bell Panel Refresh
+
+`schedules_changed` SSE → `api.ts` `onSchedulesChanged` → `useAppConnection` → `App.tsx` increments `schedulesTick` → `ChatWindow` sums with internal `scheduleTick` → `SchedulePanel` re-fetches.
+
 ### Schedule Panel
 
-Bell icon (🔔) in the `ChatWindow` header opens/closes the schedule panel. The panel:
-- Lists all schedules for the session with label, cron expression, next-fire time, and enabled toggle
-- Delete button per row
-- Shows "Times are in: {timezone}" note
-- Schedules are created by Claude via the `<schedule>` block mechanism, not via a form in this panel
+Bell icon (🔔) in `ChatWindow` header. Lists schedules with label, cron, next-fire time, enabled toggle, delete button. Read-only — schedules are managed via MCP tools, not this panel.
 
-### `MessageBubble`
+### Fired Messages
 
-Messages with `source = 'scheduler'` render a `⏰ Scheduled` indicator above the bubble content.
+`source = 'scheduler'` messages render a `⏰ Scheduled` indicator. No visible user turn is saved.
 
-`<schedule>` blocks are stripped from rendered markdown so they never appear in the UI, even during streaming.
+### Push on Fire
 
-### Notification Tap Navigation
+After `sendToSession()` completes, if no watcher tab is open, a push notification fires. Session-targeted subscriptions tried first; global subscriptions as fallback. URL includes `?session=<id>&project=<id>` for reliable mobile navigation.
 
-`sw.js` `notificationclick` handler:
-- If the app is open: sends `postMessage({ type: 'switchSession', sessionId, url })` to the existing tab → `App.tsx` handles it by calling `setActiveSessionId()` directly (same project) or falling back to `window.location.href = url` (cross-project)
-- If the app is closed: calls `clients.openWindow(url)` where `url` includes `?session=<id>&project=<id>`
+---
 
-On fresh open with URL params, `App.tsx` reads them into `pendingSessionIdRef` and `pendingProjectIdRef` (refs, not state, so they survive multiple effect re-runs). The projects effect prefers `?project=` over localStorage; the sessions effect consumes `pendingSessionIdRef` only after a real project is loaded.
+## Timezone
+
+Stored per session (`sessions.timezone`). `ChatWindow` sends `Intl.DateTimeFormat().resolvedOptions().timeZone` on mount via `PATCH /api/sessions/:id`. All cron expressions are stored and evaluated in UTC.

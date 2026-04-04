@@ -79,9 +79,11 @@ type Props = {
   onPermissionModeChange?: (mode: PermissionMode) => void
   onModelChange?: (model: string | null) => void
   onCompact?: (newSessionId: string) => void
+  /** Incremented by App when the server emits a schedules_changed SSE event. */
+  schedulesTick?: number
 }
 
-export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact }: Props) {
+export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact, schedulesTick = 0 }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -633,7 +635,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         )}
 
         {scheduleOpen && (
-          <SchedulePanel sessionId={sessionId} timezone={timezone} refreshTick={scheduleTick} />
+          <SchedulePanel sessionId={sessionId} timezone={timezone} refreshTick={scheduleTick + schedulesTick} />
         )}
       </div>
 
