@@ -74,6 +74,36 @@ const ZOOM_MAP_SECONDARY: Record<string, number | null> = {
   '2y': 1/4,
 };
 
+// ─── Zoom box labels ───────────────────────────────────────────────────────────
+
+const ZOOM_LABEL: Record<string, string | null> = {
+  '1d': null,
+  '5d': '2d',
+  '1w': '2d',
+  '1mo': '1w',
+  '1m': '1w',
+  '3mo': '1mo',
+  '3m': '1mo',
+  '6mo': '3mo',
+  '6m': '3mo',
+  '1y': '6mo',
+  '2y': '6mo',
+};
+
+const ZOOM_LABEL_SECONDARY: Record<string, string | null> = {
+  '1d': null,
+  '5d': null,
+  '1w': null,
+  '1mo': null,
+  '1m': null,
+  '3mo': '1w',
+  '3m': '1w',
+  '6mo': '1mo',
+  '6m': '1mo',
+  '1y': '3mo',
+  '2y': '3mo',
+};
+
 // ─── "all" mode: re-spawn once per range in parallel ─────────────────────────
 
 if (rangeArg === 'all') {
@@ -330,24 +360,32 @@ async function mainGroupWise(groupName: string) {
 
     // Zoom box for group-wise charts
     const zoomHoursBack = ZOOM_MAP[rk];
+    const zoomLabel = ZOOM_LABEL[rk];
     let zoomBoxSvg = '';
     if (zoomHoursBack !== null) {
       // Find refSeries for this range
       const refSeriesForRange = [...dm.values()].reduce((a, b) => a.timestamps.length >= b.timestamps.length ? a : b);
       const zoomCoords = calculateZoomBoxCoords(refSeriesForRange, zoomHoursBack, chx, cchw);
-      if (zoomCoords) {
-        zoomBoxSvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${GCHART_H}" fill="rgba(100, 150, 255, 0.12)" stroke="#6496ff" stroke-width="1.5" rx="2"/>`;
+      if (zoomCoords && zoomLabel) {
+        const labelX = zoomCoords.startX + 3;
+        const labelY = chy + 9;
+        zoomBoxSvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${GCHART_H}" fill="rgba(100, 150, 255, 0.12)" stroke="#6496ff" stroke-width="1.5" rx="2"/>` +
+                     `<text x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" fill="#6496ff" font-family="monospace" font-size="8" font-weight="bold">${zoomLabel}</text>`;
       }
     }
 
     // Secondary zoom box for group-wise charts (3mo, 6mo, 1y)
     const zoomSecondary = ZOOM_MAP_SECONDARY[rk];
+    const zoomLabelSecondary = ZOOM_LABEL_SECONDARY[rk];
     let zoomBoxSecondarySvg = '';
     if (zoomSecondary !== null) {
       const refSeriesForRange = [...dm.values()].reduce((a, b) => a.timestamps.length >= b.timestamps.length ? a : b);
       const zoomCoords = calculateZoomBoxCoords(refSeriesForRange, zoomSecondary, chx, cchw);
-      if (zoomCoords) {
-        zoomBoxSecondarySvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${GCHART_H}" fill="rgba(255, 150, 100, 0.10)" stroke="#ff9966" stroke-width="1.5" rx="2"/>`;
+      if (zoomCoords && zoomLabelSecondary) {
+        const labelX = zoomCoords.startX + 3;
+        const labelY = chy + 9;
+        zoomBoxSecondarySvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${GCHART_H}" fill="rgba(255, 150, 100, 0.10)" stroke="#ff9966" stroke-width="1.5" rx="2"/>` +
+                              `<text x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" fill="#ff9966" font-family="monospace" font-size="8" font-weight="bold">${zoomLabelSecondary}</text>`;
       }
     }
 
@@ -522,21 +560,29 @@ async function main() {
 
     // Zoom box: show smaller duration range dynamically
     const zoomHoursBack = ZOOM_MAP[rangeKey];
+    const zoomLabel = ZOOM_LABEL[rangeKey];
     let zoomBoxSvg = '';
     if (zoomHoursBack !== null) {
       const zoomCoords = calculateZoomBoxCoords(refSeries, zoomHoursBack, chx, cchw);
-      if (zoomCoords) {
-        zoomBoxSvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${CHART_H}" fill="rgba(100, 150, 255, 0.12)" stroke="#6496ff" stroke-width="1.5" rx="2"/>`;
+      if (zoomCoords && zoomLabel) {
+        const labelX = zoomCoords.startX + 3;
+        const labelY = chy + 9;
+        zoomBoxSvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${CHART_H}" fill="rgba(100, 150, 255, 0.12)" stroke="#6496ff" stroke-width="1.5" rx="2"/>` +
+                     `<text x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" fill="#6496ff" font-family="monospace" font-size="8" font-weight="bold">${zoomLabel}</text>`;
       }
     }
 
     // Secondary zoom box: two levels down (for 3mo, 6mo, 1y)
     const zoomSecondary = ZOOM_MAP_SECONDARY[rangeKey];
+    const zoomLabelSecondary = ZOOM_LABEL_SECONDARY[rangeKey];
     let zoomBoxSecondarySvg = '';
     if (zoomSecondary !== null) {
       const zoomCoords = calculateZoomBoxCoords(refSeries, zoomSecondary, chx, cchw);
-      if (zoomCoords) {
-        zoomBoxSecondarySvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${CHART_H}" fill="rgba(255, 150, 100, 0.10)" stroke="#ff9966" stroke-width="1.5" rx="2"/>`;
+      if (zoomCoords && zoomLabelSecondary) {
+        const labelX = zoomCoords.startX + 3;
+        const labelY = chy + 9;
+        zoomBoxSecondarySvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${CHART_H}" fill="rgba(255, 150, 100, 0.10)" stroke="#ff9966" stroke-width="1.5" rx="2"/>` +
+                              `<text x="${labelX.toFixed(1)}" y="${labelY.toFixed(1)}" fill="#ff9966" font-family="monospace" font-size="8" font-weight="bold">${zoomLabelSecondary}</text>`;
       }
     }
 
