@@ -42,6 +42,22 @@ const rangeArg = process.argv[2]?.toLowerCase() ?? '';
 
 const ALL_RANGES = ['1d', '5d', '1mo', '3mo', '6mo', '1y'] as const;
 
+// ─── Zoom box mapping: duration → hours back to show smaller duration ─────────
+
+const ZOOM_MAP: Record<string, number | null> = {
+  '1d': null,              // no zoom box (finest grain)
+  '5d': 24,                // show last 24h (approximates 1d)
+  '1w': 24,                // show last 24h (approximates 1d)
+  '1mo': 7 * 24,           // show last 7 days (approximates 1w)
+  '1m': 7 * 24,
+  '3mo': 30 * 24,          // show last 30 days (approximates 1mo)
+  '3m': 30 * 24,
+  '6mo': 3 * 30 * 24,      // show last ~3 months (approximates 3mo)
+  '6m': 3 * 30 * 24,
+  '1y': 6 * 30 * 24,       // show last ~6 months (approximates 6mo)
+  '2y': 6 * 30 * 24,
+};
+
 // ─── "all" mode: re-spawn once per range in parallel ─────────────────────────
 
 if (rangeArg === 'all') {
@@ -141,6 +157,43 @@ function fmtDate(ts: number) {
 }
 
 function isBenchmark(sym: string) { return sym.startsWith('^'); }
+
+// ─── Zoom box helper ──────────────────────────────────────────────────────────
+
+function calculateZoomBoxCoords(
+  refSeries: SeriesData,
+  hoursBack: number,
+  chx: number,
+  cchw: number,
+): { startX: number; width: number } | null {
+  const n = refSeries.closes.length;
+  if (n < 2 || hoursBack <= 0) return null;
+
+  const lastTs = refSeries.timestamps[n - 1];
+  const cutoffTs = lastTs - hoursBack * 3600;
+
+  // Find the index where timestamps >= cutoffTs
+  let startIdx = 0;
+  for (let i = 0; i < n; i++) {
+    if (refSeries.timestamps[i] >= cutoffTs) {
+      startIdx = i;
+      break;
+    }
+  }
+
+  // If the cutoff is before the first timestamp, show all data
+  if (startIdx === 0 && cutoffTs < refSeries.timestamps[0]) {
+    startIdx = 0;
+  }
+
+  const endIdx = n - 1;
+  const pxS = (i: number) => chx + (i / Math.max(n - 1, 1)) * cchw;
+  const startX = pxS(startIdx);
+  const endX = pxS(endIdx);
+  const width = endX - startX;
+
+  return width > 0 ? { startX, width } : null;
+}
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 
@@ -421,6 +474,16 @@ async function main() {
       ...mainSyms.map(s => polylineFor(s, false)),
     ].join('\n');
 
+    // Zoom box: show smaller duration range dynamically
+    const zoomHoursBack = ZOOM_MAP[rangeKey];
+    let zoomBoxSvg = '';
+    if (zoomHoursBack !== null) {
+      const zoomCoords = calculateZoomBoxCoords(refSeries, zoomHoursBack, chx, cchw);
+      if (zoomCoords) {
+        zoomBoxSvg = `<rect x="${zoomCoords.startX.toFixed(1)}" y="${chy.toFixed(1)}" width="${zoomCoords.width.toFixed(1)}" height="${CHART_H}" fill="rgba(100, 150, 255, 0.12)" stroke="#6496ff" stroke-width="1.5" rx="2"/>`;
+      }
+    }
+
     // Compact legend: ticker + final % (main tickers only, 2 rows max)
     const legendTop = chy + CHART_H + 7;
     const itemW     = (CELL_W - 2) / LEG_COLS;
@@ -449,6 +512,7 @@ async function main() {
 <rect x="${chx}" y="${chy}" width="${cchw}" height="${CHART_H}" fill="#0d1117" rx="2"/>
 ${gridLines.join('\n')}
 ${polylines}
+${zoomBoxSvg}
 <rect x="${chx}" y="${chy}" width="${cchw}" height="${CHART_H}" fill="none" stroke="#30363d" stroke-width="0.5" rx="2"/>
 ${legendSvg}`);
   }
