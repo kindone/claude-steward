@@ -18,6 +18,21 @@ import type { WorkerEvent } from './protocol.js'
 
 const RECOVERY_TIMEOUT_MS = 30_000
 
+/**
+ * Normalize a tool_result content value to a plain string.
+ * The Claude API allows content to be either a string or an array of text blocks.
+ */
+function normalizeToolResultContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return (content as Array<{ type?: string; text?: string }>)
+      .filter((b) => b?.type === 'text')
+      .map((b) => b.text ?? '')
+      .join('\n')
+  }
+  return String(content ?? '')
+}
+
 export function recoverStreamingSessions(): void {
   const streaming = messageQueries.listStreaming()
 
@@ -95,7 +110,7 @@ export function recoverStreamingSessions(): void {
               if (block.type === 'tool_result' && block.tool_use_id) {
                 const existing = toolCallsMap.get(block.tool_use_id as string)
                 if (existing) {
-                  existing.output = (block.content as string) ?? ''
+                  existing.output = normalizeToolResultContent(block.content)
                   existing.isError = (block.is_error as boolean) ?? false
                 }
               }

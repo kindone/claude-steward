@@ -13,6 +13,21 @@ import type { WorkerEvent } from './protocol.js'
 // Allow overriding the claude binary path via env var, with ~/.local/bin fallback
 const CLAUDE_BIN = process.env.CLAUDE_PATH ?? `${process.env.HOME ?? '/usr/local'}/.local/bin/claude`
 
+/**
+ * Normalize a tool_result content value to a plain string.
+ * The Claude API allows content to be either a string or an array of text blocks.
+ */
+function normalizeToolResultContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return (content as Array<{ type?: string; text?: string }>)
+      .filter((b) => b?.type === 'text')
+      .map((b) => b.text ?? '')
+      .join('\n')
+  }
+  return String(content ?? '')
+}
+
 // How often to flush accumulated text to worker.db (ms)
 const FLUSH_INTERVAL_MS = 3_000
 
@@ -165,14 +180,14 @@ export class JobManager {
             const tid = block.tool_use_id as string
             const existing = toolCallsMap.get(tid)
             if (existing) {
-              existing.output = (block.content as string) ?? ''
+              existing.output = normalizeToolResultContent(block.content)
               existing.isError = (block.is_error as boolean) ?? false
             }
             this.onEvent({
               type: 'tool_result',
               sessionId,
               toolUseId: tid,
-              output: block.content as string,
+              output: normalizeToolResultContent(block.content),
               isError: block.is_error as boolean,
             })
           }

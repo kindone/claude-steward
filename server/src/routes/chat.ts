@@ -15,6 +15,22 @@ import { scheduleQueries } from '../db/index.js'
 import { nextFireAt } from '../lib/scheduler.js'
 import { v4 as uuidv4ForSchedule } from 'uuid'
 
+/**
+ * Normalize a tool_result content value to a plain string.
+ * The Claude API allows content to be either a string or an array of text blocks.
+ * Storing an array as-is would cause React error #31 when rendered on the client.
+ */
+function normalizeToolResultContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return (content as Array<{ type?: string; text?: string }>)
+      .filter((b) => b?.type === 'text')
+      .map((b) => b.text ?? '')
+      .join('\n')
+  }
+  return String(content ?? '')
+}
+
 function sendSseEvent(res: Response, event: string, data: unknown): void {
   if (res.writableEnded) return
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
@@ -216,7 +232,7 @@ router.post('/', (req, res) => {
               if (block.type === 'tool_result' && block.tool_use_id) {
                 const existing = toolCallsMap.get(block.tool_use_id as string)
                 if (existing) {
-                  existing.output = (block.content as string) ?? ''
+                  existing.output = normalizeToolResultContent(block.content)
                   existing.isError = (block.is_error as boolean) ?? false
                 }
               }

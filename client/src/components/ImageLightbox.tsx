@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 export type LightboxContent =
   | { type: 'img'; src: string; alt: string }
   | { type: 'svg'; markup: string }
+  | { type: 'gallery'; images: Array<{ src: string; alt: string }>; startIndex: number }
 
 type Props = {
   content: LightboxContent
@@ -14,6 +15,23 @@ export function ImageLightbox({ content, onClose }: Props) {
   const overlayRef = useRef<HTMLDivElement>(null)
   const [isDragging, setIsDragging] = useState(false)
 
+  // Gallery state — only used when content.type === 'gallery'
+  const [galleryIdx, setGalleryIdx] = useState(
+    content.type === 'gallery' ? content.startIndex : 0
+  )
+
+  const isGallery = content.type === 'gallery'
+  const galleryImages = isGallery ? content.images : null
+  const totalImages = galleryImages?.length ?? 0
+
+  // Derived src/alt for the currently displayed image
+  const currentSrc = isGallery
+    ? (galleryImages![galleryIdx]?.src ?? '')
+    : content.type === 'img' ? content.src : ''
+  const currentAlt = isGallery
+    ? (galleryImages![galleryIdx]?.alt ?? '')
+    : content.type === 'img' ? content.alt : ''
+
   // Use refs for scale/offset so the wheel handler never needs to be re-attached.
   const scaleRef = useRef(1)
   const offsetRef = useRef({ x: 0, y: 0 })
@@ -22,20 +40,41 @@ export function ImageLightbox({ content, onClose }: Props) {
   // Separate display state that drives re-renders — written from both wheel and drag.
   const [transform, setTransform] = useState({ scale: 1, x: 0, y: 0 })
 
-  // Reset state whenever content changes (new image/SVG opened).
-  useEffect(() => {
+  const resetView = useCallback(() => {
     scaleRef.current = 1
     offsetRef.current = { x: 0, y: 0 }
     setTransform({ scale: 1, x: 0, y: 0 })
-    setIsDragging(false)
-  }, [content])
+  }, [])
 
-  // Escape key to close.
+  // Reset state whenever content changes (new image/SVG opened).
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    resetView()
+    setIsDragging(false)
+    if (content.type === 'gallery') setGalleryIdx(content.startIndex)
+  }, [content, resetView])
+
+  // Reset view when navigating within a gallery
+  useEffect(() => {
+    resetView()
+    setIsDragging(false)
+  }, [galleryIdx, resetView])
+
+  // Navigate to previous/next image in gallery
+  const goTo = useCallback((idx: number) => {
+    setGalleryIdx(idx)
+  }, [])
+
+  // Escape key to close; arrow keys for gallery navigation.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return }
+      if (!isGallery) return
+      if (e.key === 'ArrowLeft')  { setGalleryIdx(i => Math.max(0, i - 1)); e.preventDefault() }
+      if (e.key === 'ArrowRight') { setGalleryIdx(i => Math.min(totalImages - 1, i + 1)); e.preventDefault() }
+    }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, isGallery, totalImages])
 
   // Wheel-to-zoom — must be non-passive so preventDefault() works.
   // Reads scale/offset from refs to avoid re-attaching on every state change.
@@ -87,11 +126,9 @@ export function ImageLightbox({ content, onClose }: Props) {
     setIsDragging(false)
   }
 
-  function resetView(e: React.MouseEvent) {
+  function handleResetView(e: React.MouseEvent) {
     e.stopPropagation()
-    scaleRef.current = 1
-    offsetRef.current = { x: 0, y: 0 }
-    setTransform({ scale: 1, x: 0, y: 0 })
+    resetView()
   }
 
   return createPortal(
@@ -120,11 +157,35 @@ export function ImageLightbox({ content, onClose }: Props) {
         className="absolute top-4 right-16 z-10 h-9 px-3 flex items-center
                    bg-[#1a1a1a] border border-[#333] rounded-full text-[#666]
                    hover:text-[#aaa] cursor-pointer text-xs transition-colors"
-        onClick={resetView}
+        onClick={handleResetView}
         title="Reset zoom"
       >
         1:1
       </button>
+
+      {/* Gallery prev/next navigation */}
+      {isGallery && galleryIdx > 0 && (
+        <button
+          className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center
+                     bg-[#1a1a1a] border border-[#333] rounded-full text-[#888]
+                     hover:text-white hover:border-[#666] cursor-pointer text-lg transition-colors"
+          onClick={(e) => { e.stopPropagation(); goTo(galleryIdx - 1) }}
+          aria-label="Previous image"
+        >
+          ‹
+        </button>
+      )}
+      {isGallery && galleryIdx < totalImages - 1 && (
+        <button
+          className="absolute right-16 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center
+                     bg-[#1a1a1a] border border-[#333] rounded-full text-[#888]
+                     hover:text-white hover:border-[#666] cursor-pointer text-lg transition-colors"
+          onClick={(e) => { e.stopPropagation(); goTo(galleryIdx + 1) }}
+          aria-label="Next image"
+        >
+          ›
+        </button>
+      )}
 
       {/* Content — transform via CSS, drag handled here */}
       <div
@@ -139,25 +200,53 @@ export function ImageLightbox({ content, onClose }: Props) {
         onMouseDown={handleMouseDown}
         onClick={(e) => e.stopPropagation()}
       >
-        {content.type === 'img' ? (
-          <img
-            src={content.src}
-            alt={content.alt}
-            style={{ maxWidth: '90vw', maxHeight: '85vh', display: 'block', objectFit: 'contain' }}
-            draggable={false}
-          />
-        ) : (
+        {content.type === 'svg' ? (
           <div
             style={{ maxWidth: '90vw', maxHeight: '85vh' }}
             dangerouslySetInnerHTML={{ __html: content.markup }}
           />
+        ) : (
+          <img
+            key={currentSrc}
+            src={currentSrc}
+            alt={currentAlt}
+            style={{ maxWidth: '90vw', maxHeight: '85vh', display: 'block', objectFit: 'contain' }}
+            draggable={false}
+          />
         )}
       </div>
 
-      {/* Hint text */}
+      {/* Bottom hint / gallery counter */}
       <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-[#555] select-none pointer-events-none whitespace-nowrap">
-        scroll to zoom · drag to pan · click outside to close
+        {isGallery
+          ? `${galleryIdx + 1} / ${totalImages}  ·  scroll to zoom · drag to pan · ← → to navigate`
+          : 'scroll to zoom · drag to pan · click outside to close'}
       </p>
+
+      {/* Thumbnail strip for galleries */}
+      {isGallery && galleryImages && galleryImages.length > 1 && (
+        <div
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-1.5 items-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {galleryImages.map((img, i) => (
+            <button
+              key={i}
+              onClick={(e) => { e.stopPropagation(); goTo(i) }}
+              className={`w-10 h-10 rounded overflow-hidden border-2 transition-all cursor-pointer p-0
+                ${i === galleryIdx ? 'border-blue-500 opacity-100' : 'border-[#333] opacity-50 hover:opacity-80'}`}
+              aria-label={`Go to image ${i + 1}`}
+            >
+              <img
+                src={img.src}
+                alt={img.alt}
+                className="w-full h-full object-cover"
+                draggable={false}
+              />
+            </button>
+          ))}
+        </div>
+      )}
     </div>,
     document.body
   )

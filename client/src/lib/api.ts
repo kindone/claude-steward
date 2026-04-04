@@ -753,6 +753,23 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
 
 export type ClaudeErrorCode = 'session_expired' | 'context_limit' | 'process_error' | 'http_error' | 'connection_lost'
 
+/**
+ * Normalize a tool_result content value to a plain string.
+ * The Claude API allows content to be either a string or an array of text blocks
+ * (e.g. [{type:'text', text:'...'}]). Coerce to string so callers never receive
+ * an object/array, which would cause React error #31 when rendered.
+ */
+function normalizeToolResultContent(content: unknown): string {
+  if (typeof content === 'string') return content
+  if (Array.isArray(content)) {
+    return content
+      .filter((b): b is { type: string; text: string } => typeof b === 'object' && b !== null && b.type === 'text')
+      .map((b) => b.text)
+      .join('\n')
+  }
+  return String(content ?? '')
+}
+
 /** A single tool invocation with the key detail extracted from its input. */
 export type ToolCall = {
   id: string
@@ -915,7 +932,7 @@ export function sendMessage(
                     if (block.type === 'tool_result' && block.tool_use_id !== undefined) {
                       handlers.onToolResult?.(
                         block.tool_use_id,
-                        (block as unknown as { content: string }).content ?? '',
+                        normalizeToolResultContent((block as unknown as { content: unknown }).content),
                         block.is_error ?? false,
                       )
                     }

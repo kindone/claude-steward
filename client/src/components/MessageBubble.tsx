@@ -50,6 +50,8 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
   const [copied, setCopied] = useState(false)
   const [toolsOpen, setToolsOpen] = useState(false)
   const [lightbox, setLightbox] = useState<LightboxContent | null>(null)
+  /** Whether the image gallery grid is expanded (false = collapsed, showing first image + count pill). */
+  const [galleryExpanded, setGalleryExpanded] = useState(false)
   /** Per-message SVG cache: graph source → rendered SVG string. */
   const mermaidCache = useRef<Map<string, string>>(new Map())
 
@@ -62,11 +64,52 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
   // pattern: it fires synchronously after every render before paint, so hljs
   // re-applies before the user sees unstyled code. The :not(.hljs) selector
   // skips already-highlighted blocks, making each pass cheap.
+  //
+  // Also builds an image gallery grid when there are 3+ images and streaming
+  // has finished — images are moved into a flex container for a compact look.
   useLayoutEffect(() => {
-    if (contentRef.current && role === 'assistant' && !errorCode) {
-      contentRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
-        hljs.highlightElement(block as HTMLElement)
-      })
+    if (!contentRef.current || role !== 'assistant' || errorCode) return
+
+    // hljs
+    contentRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
+      hljs.highlightElement(block as HTMLElement)
+    })
+
+    // Gallery grid: only build once streaming ends, and only once per render cycle
+    if (!streaming && !contentRef.current.querySelector('.img-gallery-grid')) {
+      const imgs = Array.from(contentRef.current.querySelectorAll<HTMLImageElement>('img'))
+      if (imgs.length > 2) {
+        const grid = document.createElement('div')
+        grid.className = 'img-gallery-grid'
+        // Insert grid before the first image's paragraph
+        const firstParent = imgs[0].closest('p') ?? imgs[0].parentElement
+        firstParent?.parentElement?.insertBefore(grid, firstParent)
+        // Move all images into the grid, remove now-empty parent paragraphs
+        imgs.forEach((img) => {
+          const parent = img.closest('p') ?? img.parentElement
+          grid.appendChild(img)
+          if (parent && parent !== grid && parent.childNodes.length === 0) {
+            parent.remove()
+          }
+        })
+        // Add expand pill (shown when collapsed, hidden when expanded via CSS)
+        const pill = document.createElement('button')
+        pill.className = 'img-gallery-expand'
+        pill.dataset.count = String(imgs.length)
+        pill.textContent = `+${imgs.length - 1} more`
+        grid.appendChild(pill)
+        // Add collapse button (shown when expanded, hidden when collapsed via CSS)
+        const collapse = document.createElement('button')
+        collapse.className = 'img-gallery-collapse'
+        collapse.textContent = 'show less'
+        grid.appendChild(collapse)
+      }
+    }
+
+    // Sync collapsed/expanded state onto existing grid (runs every render)
+    const grid = contentRef.current?.querySelector<HTMLElement>('.img-gallery-grid')
+    if (grid) {
+      grid.classList.toggle('is-collapsed', !galleryExpanded)
     }
   }) // intentionally no deps — must run after every render
 
@@ -118,10 +161,27 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
 
   function handleContentClick(e: React.MouseEvent<HTMLDivElement>) {
     const target = e.target as Element
-    // img click — open lightbox with the image src
-    const img = target.closest('img')
+
+    // Expand / collapse pill clicks
+    if (target.closest('.img-gallery-expand')) { setGalleryExpanded(true);  return }
+    if (target.closest('.img-gallery-collapse')) { setGalleryExpanded(false); return }
+
+    // img click — open gallery lightbox if 3+ images, else single lightbox
+    const img = target.closest('img') as HTMLImageElement | null
     if (img) {
-      setLightbox({ type: 'img', src: (img as HTMLImageElement).src, alt: img.getAttribute('alt') ?? '' })
+      const grid = contentRef.current?.querySelector('.img-gallery-grid')
+      if (grid) {
+        // Gallery mode: collect all images in order and find the clicked index
+        const allImgs = Array.from(grid.querySelectorAll<HTMLImageElement>('img'))
+        const idx = allImgs.indexOf(img)
+        setLightbox({
+          type: 'gallery',
+          images: allImgs.map((i) => ({ src: i.src, alt: i.getAttribute('alt') ?? '' })),
+          startIndex: Math.max(0, idx),
+        })
+      } else {
+        setLightbox({ type: 'img', src: img.src, alt: img.getAttribute('alt') ?? '' })
+      }
       return
     }
     // svg click — target may be an inner <path>/<g>/etc., walk up to <svg> root
@@ -261,7 +321,14 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
                       </div>
                       {call.output && (
                         <pre className="mt-1 text-[11px] text-[#555] bg-[#0d0d0d] border border-[#1a1a1a] rounded px-2 py-1.5 overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all">
-                          {call.output.length > 2000 ? call.output.slice(0, 2000) + '\n… (truncated)' : call.output}
+                          {(() => {
+                            // Safety guard: output should always be a string, but Claude API
+                            // tool_result content can be an array of blocks — normalize defensively.
+                            const out = typeof call.output === 'string'
+                              ? call.output
+                              : JSON.stringify(call.output)
+                            return out.length > 2000 ? out.slice(0, 2000) + '\n… (truncated)' : out
+                          })()}
                         </pre>
                       )}
                     </div>
