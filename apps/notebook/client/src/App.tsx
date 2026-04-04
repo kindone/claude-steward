@@ -11,6 +11,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [aiRunningCellId, setAiRunningCellId] = useState<string | null>(null)
   const [runningAll, setRunningAll] = useState(false)
+  const [mobileTab, setMobileTab] = useState<'cells' | 'chat'>('cells')
 
   useEffect(() => {
     listCells()
@@ -89,12 +90,37 @@ export default function App() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Cell panel */}
-      <div className="flex-1 overflow-y-auto min-w-0 flex flex-col">
+    <div className="flex flex-col h-[100dvh] overflow-hidden md:flex-row">
+
+      {/* Mobile tab bar */}
+      <div className="flex md:hidden border-b border-[var(--color-border)] bg-[var(--color-surface)] flex-shrink-0">
+        <button
+          onClick={() => setMobileTab('cells')}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+            mobileTab === 'cells'
+              ? 'text-[var(--color-accent)] border-b-2 border-[var(--color-accent)]'
+              : 'text-[var(--color-muted)]'
+          }`}
+        >
+          Cells
+        </button>
+        <button
+          onClick={() => setMobileTab('chat')}
+          className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+            mobileTab === 'chat'
+              ? 'text-[var(--color-accent)] border-b-2 border-[var(--color-accent)]'
+              : 'text-[var(--color-muted)]'
+          }`}
+        >
+          AI Chat
+        </button>
+      </div>
+
+      {/* Cell panel — tab-controlled on mobile, always visible on tablet+ */}
+      <div className={`${mobileTab === 'cells' ? 'flex' : 'hidden'} md:flex flex-col flex-1 overflow-hidden min-w-0`}>
 
         {/* Header */}
-        <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] sticky top-0 z-10">
+        <div className="flex items-center gap-3 px-4 py-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] flex-shrink-0">
           <h1 className="text-sm font-semibold text-[var(--color-text)] flex-shrink-0">Notebook</h1>
           <span className="text-xs text-[var(--color-muted)] flex-shrink-0">
             {sorted.length} cell{sorted.length !== 1 ? 's' : ''}
@@ -117,8 +143,8 @@ export default function App() {
           </button>
         </div>
 
-        {/* Cells */}
-        <div className="p-4 space-y-3">
+        {/* Cells — scrollable within panel */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {sorted.length === 0 && (
             <div className="text-center text-[var(--color-muted)] text-sm py-12">
               <p>No cells yet.</p>
@@ -144,8 +170,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* Chat panel */}
-      <div className="w-[360px] min-w-[280px] border-l border-[var(--color-border)] flex flex-col h-full flex-shrink-0">
+      {/* Chat panel — tab-controlled on mobile, fixed sidebar on tablet+ */}
+      <div className={`${mobileTab === 'chat' ? 'flex' : 'hidden'} md:flex flex-col w-full md:w-[260px] lg:w-[340px] md:border-l border-[var(--color-border)] flex-shrink-0 overflow-hidden`}>
         <ChatPanel
           onCellRunByAI={setAiRunningCellId}
           onCellUpdatedByAI={() => {}}

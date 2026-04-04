@@ -156,7 +156,8 @@ export function ChatPanel({ onCellRunByAI, onCellUpdatedByAI }: Props) {
       </div>
 
       {/* Input */}
-      <div className="border-t border-[var(--color-border)] p-3">
+      <div className="border-t border-[var(--color-border)] p-3 flex-shrink-0"
+           style={{ paddingBottom: 'max(12px, env(safe-area-inset-bottom, 12px))' }}>
         <div className="flex gap-2">
           <textarea
             value={input}
@@ -167,7 +168,7 @@ export function ChatPanel({ onCellRunByAI, onCellUpdatedByAI }: Props) {
                 handleSend()
               }
             }}
-            placeholder="Ask Claude… (Enter to send, Shift+Enter for newline)"
+            placeholder="Ask Claude…"
             rows={2}
             className="flex-1 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-lg px-3 py-2 text-sm text-[var(--color-text)] placeholder:text-[var(--color-muted)] resize-none outline-none focus:border-[var(--color-accent)]"
           />

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import type { Cell as CellType, Language, OutputLine, CompileResult } from '../types'
 import { streamKernelRun, updateCell, deleteCell } from '../api'
+import { CodeMirrorEditor } from './CodeMirrorEditor'
 
 const LANG_LABELS: Record<Language, string> = {
   python: 'Python',
@@ -248,7 +249,7 @@ export function Cell({ cell, onUpdate, onDelete, onMoveUp, onMoveDown, canMoveUp
           onClick={() => setMdPreview(false)}
           dangerouslySetInnerHTML={{ __html: source ? `<p class="mb-2">${renderMarkdown(source)}</p>` : '<span class="text-[var(--color-muted)] text-xs">Empty — click to edit</span>' }}
         />
-      ) : (
+      ) : isMarkdown ? (
         <textarea
           ref={textareaRef}
           value={source}
@@ -256,9 +257,17 @@ export function Cell({ cell, onUpdate, onDelete, onMoveUp, onMoveDown, canMoveUp
           onKeyDown={handleKeyDown}
           onBlur={handleSave}
           spellCheck={false}
-          placeholder={isMarkdown ? '# Markdown content…' : `# ${LANG_LABELS[cell.language]} code`}
+          placeholder="# Markdown content…"
           className="w-full bg-transparent text-[var(--color-text)] p-3 resize-none outline-none leading-relaxed min-h-[80px]"
           style={{ height: 'auto' }}
+        />
+      ) : (
+        <CodeMirrorEditor
+          value={source}
+          language={cell.language}
+          onChange={handleSourceChange}
+          onRun={handleRun}
+          onBlur={handleSave}
         />
       )}
 
