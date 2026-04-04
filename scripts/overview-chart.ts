@@ -46,8 +46,8 @@ const ALL_RANGES = ['1d', '5d', '1mo', '3mo', '6mo', '1y'] as const;
 
 const ZOOM_MAP: Record<string, number | null> = {
   '1d': null,              // no zoom box (finest grain)
-  '5d': 1/5,               // show last 1/5 (approximates 1d within 5d)
-  '1w': 1/5,               // show last 1/5 (approximates 1d within 1w)
+  '5d': 2/5,               // show last 2/5 (1d chart actually shows 2d of data)
+  '1w': 2/5,               // show last 2/5 (1d chart actually shows 2d of data)
   '1mo': 1/4,              // show last 1/4 (approximates 1w within 1mo)
   '1m': 1/4,
   '3mo': 1/3,              // show last 1/3 (approximates 1mo within 3mo)
