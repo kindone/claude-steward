@@ -324,6 +324,24 @@ async function mainGroupWise(groupName: string) {
       }
     }
 
+    // Day separator lines for 1d panels in group-wise charts
+    let daySeparatorSvg = '';
+    if (rk === '1d') {
+      const refSeriesForRange = [...dm.values()].reduce((a, b) => a.timestamps.length >= b.timestamps.length ? a : b);
+      const dayBoundaries: number[] = [];
+      for (let i = 1; i < refSeriesForRange.timestamps.length; i++) {
+        if (refSeriesForRange.timestamps[i] - refSeriesForRange.timestamps[i - 1] > 7200) {
+          dayBoundaries.push(i);
+        }
+      }
+      const n = refSeriesForRange.timestamps.length;
+      const pxS = (i: number) => chx + (i / Math.max(n - 1, 1)) * cchw;
+      daySeparatorSvg = dayBoundaries.map(idx => {
+        const x = pxS(idx);
+        return `<line x1="${x.toFixed(1)}" y1="${chy.toFixed(1)}" x2="${x.toFixed(1)}" y2="${(chy + GCHART_H).toFixed(1)}" stroke="#58a6ff" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>`;
+      }).join('\n');
+    }
+
     const barLabel = rc.intervalType === 'hour' ? rc.interval : rc.intervalType === 'day' ? '1d' : '1wk';
     cells.push(`
 <rect x="${cx}" y="${cy}" width="${GCELL_W}" height="${GCELL_H}" fill="#161b22" rx="3"/>
@@ -333,6 +351,7 @@ async function mainGroupWise(groupName: string) {
 ${gridLines.join('\n')}
 ${[...benchSyms.map(s => polylineFor(s, true)), ...mainSyms.map(s => polylineFor(s, false))].filter(Boolean).join('\n')}
 ${zoomBoxSvg}
+${daySeparatorSvg}
 <rect x="${chx}" y="${chy}" width="${cchw}" height="${GCHART_H}" fill="none" stroke="#30363d" stroke-width="0.5" rx="2"/>`);
   }
 
@@ -483,6 +502,24 @@ async function main() {
       }
     }
 
+    // Day separator lines for 1d chart (which shows 2 days of data)
+    let daySeparatorSvg = '';
+    if (rangeKey === '1d') {
+      const dayBoundaries: number[] = [];
+      for (let i = 1; i < refSeries.timestamps.length; i++) {
+        // Gap > 2 hours indicates day boundary (overnight gap)
+        if (refSeries.timestamps[i] - refSeries.timestamps[i - 1] > 7200) {
+          dayBoundaries.push(i);
+        }
+      }
+      const n = refSeries.timestamps.length;
+      const pxS = (i: number) => chx + (i / Math.max(n - 1, 1)) * cchw;
+      daySeparatorSvg = dayBoundaries.map(idx => {
+        const x = pxS(idx);
+        return `<line x1="${x.toFixed(1)}" y1="${chy.toFixed(1)}" x2="${x.toFixed(1)}" y2="${(chy + CHART_H).toFixed(1)}" stroke="#58a6ff" stroke-width="1" stroke-dasharray="3,3" opacity="0.4"/>`;
+      }).join('\n');
+    }
+
     // Compact legend: ticker + final % (main tickers only, 2 rows max)
     const legendTop = chy + CHART_H + 7;
     const itemW     = (CELL_W - 2) / LEG_COLS;
@@ -512,6 +549,7 @@ async function main() {
 ${gridLines.join('\n')}
 ${polylines}
 ${zoomBoxSvg}
+${daySeparatorSvg}
 <rect x="${chx}" y="${chy}" width="${cchw}" height="${CHART_H}" fill="none" stroke="#30363d" stroke-width="0.5" rx="2"/>
 ${legendSvg}`);
   }
