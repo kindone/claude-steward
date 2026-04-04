@@ -87,6 +87,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [streamingTool, setStreamingTool] = useState<string | null>(null)
+  const [focusTrigger, setFocusTrigger] = useState(0)
   const [promptOpen, setPromptOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState(systemPrompt ?? '')
   const [compacting, setCompacting] = useState(false)
@@ -127,6 +128,15 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
    *  doesn't incorrectly mark the user as scrolling and block streaming auto-scroll. */
   const skipNextScrollRef = useRef(false)
   const cancelRef = useRef<(() => void) | null>(null)
+  const prevStreamingRef = useRef(false)
+
+  // Re-focus input whenever streaming transitions true → false
+  useEffect(() => {
+    if (prevStreamingRef.current && !streaming) {
+      setFocusTrigger((t) => t + 1)
+    }
+    prevStreamingRef.current = streaming
+  }, [streaming])
   /** True while we have an active sendMessage() — poll must not overwrite the optimistic assistant bubble. */
   const streamingFromSendRef = useRef(false)
   /** Accumulates tool calls (with detail) as assistant chunks arrive during the current send. */
@@ -710,6 +720,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         sessionId={sessionId}
         projectId={projectId}
         onSend={handleSend}
+        focusTrigger={focusTrigger}
         onStop={() => {
           streamingFromSendRef.current = false
           // Tell the server to kill the Claude subprocess before aborting the SSE fetch.

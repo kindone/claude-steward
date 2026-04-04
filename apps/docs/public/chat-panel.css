@@ -644,40 +644,47 @@
   padding: 32px 24px 80px;
 }
 
+/* Positioning shell — no padding/scroll here, layers handle that */
 .cp-sl-content {
+  position: relative;
   width: 100%;
   max-width: 860px;
-  max-height: calc(100vh - 140px);
-  overflow-y: auto;
-  /* Light background so MkDocs md-typeset styles render naturally */
+  height: min(72vh, calc(100vh - 140px));
   background: #f8f9fa;
   border-radius: 14px;
+  box-shadow: 0 32px 100px rgba(0,0,0,0.7);
+  overflow: hidden;
+}
+
+/* Each slide is an absolute layer that fills the shell */
+.cp-sl-layer {
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
   padding: 36px 52px;
   color: #1a1a2e;
   font-size: 0.86rem;
   line-height: 1.65;
-  box-shadow: 0 32px 100px rgba(0,0,0,0.7);
   scrollbar-width: thin;
   scrollbar-color: rgba(0,0,0,0.15) transparent;
 }
-.cp-sl-content::-webkit-scrollbar { width: 4px; }
-.cp-sl-content::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
+.cp-sl-layer::-webkit-scrollbar { width: 4px; }
+.cp-sl-layer::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
+
+/* Clear first/last child margins — md-typeset headings carry top margin
+   that creates phantom space at top and pushes content past max-height */
+.cp-sl-layer > div > *:first-child { margin-top: 0 !important; }
+.cp-sl-layer > div > *:last-child  { margin-bottom: 0 !important; }
 
 /* Ensure md-typeset headings/links use legible dark-on-light colours */
-.cp-sl-content.md-typeset h1,
-.cp-sl-content.md-typeset h2,
-.cp-sl-content.md-typeset h3,
-.cp-sl-content.md-typeset h4 { color: #1a1a2e; }
-.cp-sl-content.md-typeset a   { color: #5f4fd4; }
-.cp-sl-content.md-typeset code,
-.cp-sl-content.md-typeset pre { background: #eef0f6; color: #2d2d44; }
-.cp-sl-content.md-typeset blockquote { border-left-color: #7c6af7; color: #444; }
-
-@keyframes cp-sl-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.cp-sl-content.cp-sl-anim { animation: cp-sl-in 0.2s ease; }
+.cp-sl-layer.md-typeset h1,
+.cp-sl-layer.md-typeset h2,
+.cp-sl-layer.md-typeset h3,
+.cp-sl-layer.md-typeset h4 { color: #1a1a2e; }
+.cp-sl-layer.md-typeset a   { color: #5f4fd4; }
+.cp-sl-layer.md-typeset code,
+.cp-sl-layer.md-typeset pre { background: #eef0f6; color: #2d2d44; }
+.cp-sl-layer.md-typeset blockquote { border-left-color: #7c6af7; color: #444; }
 
 .cp-sl-bar {
   position: fixed;
@@ -712,6 +719,29 @@
 .cp-sl-next:hover:not(:disabled) { background: rgba(255,255,255,0.1); }
 .cp-sl-prev:disabled,
 .cp-sl-next:disabled { color: #30344a; cursor: default; }
+
+.cp-sl-sep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255,255,255,0.1);
+  margin: 0 4px;
+}
+
+.cp-sl-fs {
+  background: none;
+  border: none;
+  color: #8892aa;
+  cursor: pointer;
+  font-size: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.1s, color 0.1s;
+}
+.cp-sl-fs:hover { background: rgba(255,255,255,0.1); color: #e2e8f0; }
 
 .cp-sl-counter {
   font-size: 12px;
@@ -775,5 +805,5 @@
     padding-top: max(calc(env(safe-area-inset-top, 0px) + 12px), 12px);
   }
 
-  .cp-sl-content { padding: 22px 20px; font-size: 0.82rem; }
+  .cp-sl-layer { padding: 22px 20px; font-size: 0.82rem; }
 }

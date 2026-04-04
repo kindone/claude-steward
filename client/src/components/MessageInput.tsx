@@ -7,6 +7,7 @@ type Props = {
   onSend: (message: string) => void
   onStop?: () => void
   disabled: boolean
+  focusTrigger?: number
 }
 
 function draftKey(sessionId: string) {
@@ -15,10 +16,16 @@ function draftKey(sessionId: string) {
 
 type DraftState = 'idle' | 'typing' | 'saved'
 
-export function MessageInput({ sessionId, projectId, onSend, onStop, disabled }: Props) {
+export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, focusTrigger }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [draftState, setDraftState] = useState<DraftState>('idle')
+
+  // Re-focus textarea when streaming ends (focusTrigger increments) or on mount
+  useEffect(() => {
+    if (focusTrigger === undefined) return
+    textareaRef.current?.focus()
+  }, [focusTrigger])
 
   // File attachment state
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
@@ -117,7 +124,10 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled }:
 
     if (!message) return
     onSend(message)
-    if (textareaRef.current) textareaRef.current.value = ''
+    if (textareaRef.current) {
+      textareaRef.current.value = ''
+      textareaRef.current.focus()
+    }
     try { localStorage.removeItem(draftKey(sessionId)) } catch { /* ignore */ }
     setDraftState('idle')
   }

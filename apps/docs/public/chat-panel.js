@@ -574,6 +574,7 @@
   let presenterEl = null;
   let presenterSlides = [];
   let presenterIdx = 0;
+  let presenterFullscreen = false;
   let presentBtn = null;
 
   // Split a container's children at every <hr> element.
@@ -647,6 +648,8 @@
         <button class="cp-sl-prev" title="Previous (←)">←</button>
         <span class="cp-sl-counter"></span>
         <button class="cp-sl-next" title="Next (→)">→</button>
+        <span class="cp-sl-sep"></span>
+        <button class="cp-sl-fs" title="Fullscreen (F)">⛶</button>
       </div>
       <button class="cp-sl-exit" title="Exit (Esc)">✕ ESC</button>
     `;
@@ -655,32 +658,64 @@
     presenterEl.querySelector('.cp-sl-prev').addEventListener('click', () => goSlide(-1));
     presenterEl.querySelector('.cp-sl-next').addEventListener('click', () => goSlide(+1));
     presenterEl.querySelector('.cp-sl-exit').addEventListener('click', closePresenter);
+    presenterEl.querySelector('.cp-sl-fs').addEventListener('click', togglePresenterFullscreen);
     // Click on dark backdrop to exit
     presenterEl.querySelector('.cp-sl-wrap').addEventListener('click', (e) => {
       if (e.target === e.currentTarget) closePresenter();
     });
-    document.addEventListener('keydown', presenterKeydown);
+    // capture:true so we run before MkDocs keyboard handlers
+    document.addEventListener('keydown', presenterKeydown, { capture: true });
+    document.addEventListener('fullscreenchange', onPresenterFullscreenChange);
 
     showSlide(0);
+  }
+
+  function togglePresenterFullscreen() {
+    if (document.fullscreenElement) {
+      document.exitFullscreen();
+    } else {
+      presenterEl.requestFullscreen().catch(() => {});
+    }
+  }
+
+  function onPresenterFullscreenChange() {
+    presenterFullscreen = !!document.fullscreenElement;
+    const btn = presenterEl?.querySelector('.cp-sl-fs');
+    if (!btn) return;
+    btn.textContent = presenterFullscreen ? '⤡' : '⛶';
+    btn.title = presenterFullscreen ? 'Exit fullscreen' : 'Fullscreen (F)';
   }
 
   function showSlide(idx) {
     presenterIdx = Math.max(0, Math.min(idx, presenterSlides.length - 1));
     const content = presenterEl.querySelector('.cp-sl-content');
-    content.innerHTML = '';
-    content.appendChild(presenterSlides[presenterIdx].cloneNode(true));
+
+    // Fade out ALL existing layers (handles rapid navigation without accumulation)
+    content.querySelectorAll('.cp-sl-layer').forEach(layer => {
+      layer.style.transition = 'opacity 0.22s ease';
+      layer.style.opacity = '0';
+      setTimeout(() => layer.remove(), 240);
+    });
+
+    // Incoming layer: new slide fades in beneath
+    const newLayer = document.createElement('div');
+    newLayer.className = 'cp-sl-layer md-typeset';
+    newLayer.style.opacity = '0';
+    newLayer.appendChild(presenterSlides[presenterIdx].cloneNode(true));
     // Re-trigger MkDocs code block copy buttons if present
-    content.querySelectorAll('pre > code').forEach(el => el.parentElement.removeAttribute('data-copied'));
+    newLayer.querySelectorAll('pre > code').forEach(el => el.parentElement.removeAttribute('data-copied'));
+    content.appendChild(newLayer);
 
     presenterEl.querySelector('.cp-sl-counter').textContent =
       `${presenterIdx + 1} / ${presenterSlides.length}`;
     presenterEl.querySelector('.cp-sl-prev').disabled = presenterIdx === 0;
     presenterEl.querySelector('.cp-sl-next').disabled = presenterIdx === presenterSlides.length - 1;
 
-    // Animate slide in
-    content.classList.remove('cp-sl-anim');
-    void content.offsetWidth; // reflow
-    content.classList.add('cp-sl-anim');
+    // Fade in new layer
+    requestAnimationFrame(() => {
+      newLayer.style.transition = 'opacity 0.22s ease';
+      newLayer.style.opacity = '1';
+    });
   }
 
   function goSlide(delta) {
@@ -690,16 +725,26 @@
   }
 
   function closePresenter() {
-    document.removeEventListener('keydown', presenterKeydown);
+    document.removeEventListener('keydown', presenterKeydown, { capture: true });
+    document.removeEventListener('fullscreenchange', onPresenterFullscreenChange);
+    if (document.fullscreenElement) document.exitFullscreen();
     presenterEl?.remove();
     presenterEl = null;
     presenterSlides = [];
+    presenterFullscreen = false;
   }
 
   function presenterKeydown(e) {
-    if (e.key === 'Escape')                              { closePresenter(); return; }
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { goSlide(+1);      return; }
-    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { goSlide(-1);      return; }
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      // If browser is in fullscreen, Esc exits fullscreen only — keep presenter open
+      if (presenterFullscreen) return;
+      closePresenter();
+      return;
+    }
+    if (e.key === 'f' || e.key === 'F')                  { togglePresenterFullscreen(); return; }
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.stopPropagation(); goSlide(+1); return; }
+    if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   { e.stopPropagation(); goSlide(-1); return; }
   }
 
   // ── Markdown editor (fullscreen overlay) ──────────────────────────────────
