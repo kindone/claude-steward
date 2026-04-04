@@ -244,10 +244,10 @@ async function mainGroupWise(groupName: string) {
       if (d) toPercent(d.closes).forEach(p => { if (p !== null) cellPcts.push(p); });
     }
     cellPcts.sort((a, b) => a - b);
-    const cp05 = cellPcts[Math.floor(cellPcts.length * 0.05)] ?? -5;
-    const cp95 = cellPcts[Math.floor(cellPcts.length * 0.95)] ?? 5;
-    const yPad = (cp95 - cp05) * 0.06;
-    const { axisMin, axisMax, step } = niceAxis(cp05 - yPad, cp95 + yPad);
+    const cpMin = Math.min(...cellPcts, -5);
+    const cpMax = Math.max(...cellPcts, 5);
+    const yPad = (cpMax - cpMin) * 0.06;
+    const { axisMin, axisMax, step } = niceAxis(cpMin - yPad, cpMax + yPad);
     const yRange = axisMax - axisMin || 1;
     const pyC = (pct: number) => chy + (1 - (pct - axisMin) / yRange) * GCHART_H;
 
@@ -342,10 +342,10 @@ async function main() {
     toPercent(s.closes).forEach(p => { if (p !== null) allPcts.push(p); });
   }
   allPcts.sort((a, b) => a - b);
-  const p05  = allPcts[Math.floor(allPcts.length * 0.05)] ?? -10;
-  const p95  = allPcts[Math.floor(allPcts.length * 0.95)] ?? 10;
-  const yPad = (p95 - p05) * 0.06;
-  const { axisMin, axisMax, step } = niceAxis(p05 - yPad, p95 + yPad);
+  const pMin = Math.min(...allPcts, -10);
+  const pMax = Math.max(...allPcts, 10);
+  const yPad = (pMax - pMin) * 0.06;
+  const { axisMin, axisMax, step } = niceAxis(pMin - yPad, pMax + yPad);
   const yRange = axisMax - axisMin;
 
   console.log(`\nShared Y-axis: ${fmtPct(axisMin)} → ${fmtPct(axisMax)}  (step ${step}%)`);
