@@ -20,6 +20,7 @@
     "chokidar": "^4.0.3",
     "codemirror": "^6.0.2",
     "express": "^5.1.0",
+    "mermaid": "^11.14.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },

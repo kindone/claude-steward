@@ -23,3 +23,19 @@ textarea, pre, code {
   font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
   font-size: 13px;
 }
+
+/* Prevent background scroll when a cell is in fullscreen mode */
+body.nb-fullscreen {
+  overflow: hidden;
+}
+
+/* Mermaid diagram containers */
+.nb-mermaid {
+  overflow-x: auto;
+}
+
+.nb-mermaid svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
