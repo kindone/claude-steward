@@ -131,9 +131,12 @@ export type Session = {
   permission_mode: PermissionMode
   timezone: string | null
   model: string | null
+  compacted_from: string | null
   created_at: number
   updated_at: number
 }
+
+export type ChainSegment = Session & { compactSummary: string | null }
 
 export type Message = {
   id: string
@@ -1036,7 +1039,7 @@ export function stopChat(sessionId: string): void {
  * Compact a session: summarizes it via Claude and creates a new session
  * primed with that summary. Returns the new session ID.
  */
-export async function compactSession(sessionId: string): Promise<{ sessionId: string }> {
+export async function compactSession(sessionId: string): Promise<{ sessionId: string; summary: string }> {
   const res = await fetch(`/api/sessions/${sessionId}/compact`, {
     method: 'POST',
     headers: JSON_HEADERS,
@@ -1046,7 +1049,17 @@ export async function compactSession(sessionId: string): Promise<{ sessionId: st
     const body = await res.text()
     throw new Error(`Compact failed: ${body}`)
   }
-  return res.json() as Promise<{ sessionId: string }>
+  return res.json() as Promise<{ sessionId: string; summary: string }>
+}
+
+/** Fetch the full chain of sessions (root → current) that this session belongs to. */
+export async function getSessionChain(sessionId: string): Promise<ChainSegment[]> {
+  const res = await fetch(`/api/sessions/${sessionId}/chain`, {
+    headers: JSON_HEADERS,
+    ...credentialsOpt,
+  })
+  if (!res.ok) throw new Error('Failed to load session chain')
+  return res.json() as Promise<ChainSegment[]>
 }
 
 // ── Mini-apps ─────────────────────────────────────────────────────────────────

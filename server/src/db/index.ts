@@ -157,6 +157,9 @@ try {
 try {
   db.exec(`ALTER TABLE sessions ADD COLUMN model TEXT`)
 } catch { /* already exists */ }
+try {
+  db.exec(`ALTER TABLE sessions ADD COLUMN compacted_from TEXT REFERENCES sessions(id)`)
+} catch { /* already exists */ }
 
 // ── Mini-app tables ───────────────────────────────────────────────────────────
 
@@ -226,6 +229,7 @@ export type Session = {
   permission_mode: PermissionMode
   timezone: string | null
   model: string | null
+  compacted_from: string | null
   created_at: number
   updated_at: number
 }
@@ -310,6 +314,21 @@ const updateModelStmt = db.prepare(
   `UPDATE sessions SET model = ?, updated_at = unixepoch() WHERE id = ?`
 )
 const deleteSessionStmt = db.prepare(`DELETE FROM sessions WHERE id = ?`)
+const setCompactedFromStmt = db.prepare(
+  `UPDATE sessions SET compacted_from = ? WHERE id = ?`
+)
+// Walk from a root session forward through the chain (root → child → grandchild…).
+// Returns all sessions in chronological order.
+const getChainStmt = db.prepare(`
+  WITH RECURSIVE chain(id, title, system_prompt, permission_mode, model, timezone, compacted_from, created_at, updated_at) AS (
+    SELECT id, title, system_prompt, permission_mode, model, timezone, compacted_from, created_at, updated_at
+    FROM sessions WHERE id = ?
+    UNION ALL
+    SELECT s.id, s.title, s.system_prompt, s.permission_mode, s.model, s.timezone, s.compacted_from, s.created_at, s.updated_at
+    FROM sessions s JOIN chain c ON s.compacted_from = c.id
+  )
+  SELECT * FROM chain ORDER BY created_at ASC
+`)
 
 export const sessionQueries = {
   create: (id: string, title: string, projectId?: string | null, systemPrompt?: string | null) =>
@@ -331,6 +350,9 @@ export const sessionQueries = {
     updateTimezoneStmt.run(timezone, id),
   updateModel: (model: string | null, id: string) =>
     updateModelStmt.run(model, id),
+  setCompactedFrom: (newId: string, fromId: string) =>
+    setCompactedFromStmt.run(fromId, newId),
+  getChain: (rootId: string) => getChainStmt.all(rootId) as Session[],
   delete: (id: string) => deleteSessionStmt.run(id),
 }
 

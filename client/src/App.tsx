@@ -283,7 +283,9 @@ export default function App() {
     setLoading(true)
     setActiveSessionId(null)
     listSessions(activeProjectId)
-      .then((data) => {
+      .then((all) => {
+        const compactedFromIds = new Set(all.map((s) => s.compacted_from).filter(Boolean))
+        const data = all.filter((s) => !compactedFromIds.has(s.id))
         setSessions(data)
         if (data.length > 0) {
           const pendingId = pendingSessionIdRef.current
@@ -394,11 +396,14 @@ export default function App() {
     setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)))
   }
 
-  async function handleCompact(newSessionId: string) {
+  async function handleCompact(_newSessionId: string) {
     if (!activeProjectId) return
+    // Refresh sidebar — but filter out past chain segments (sessions whose id is
+    // referenced as compacted_from by another session). They appear in the ChatWindow
+    // chain view instead, so showing them in the sidebar is redundant and confusing.
     const updated = await listSessions(activeProjectId)
-    setSessions(updated)
-    setActiveSessionId(newSessionId)
+    const compactedFromIds = new Set(updated.map((s) => s.compacted_from).filter(Boolean))
+    setSessions(updated.filter((s) => !compactedFromIds.has(s.id)))
   }
 
   // Keyboard shortcuts

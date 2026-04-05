@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, updateSessionTimezone, toolDisplayName, toolDisplayDetail, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, getSessionChain, updateSessionTimezone, toolDisplayName, toolDisplayDetail, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
+import { CompactDivider } from './CompactDivider'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
@@ -107,10 +108,16 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   const [promptOpen, setPromptOpen] = useState(false)
   const [promptDraft, setPromptDraft] = useState(systemPrompt ?? '')
   const [compacting, setCompacting] = useState(false)
+  const [compactError, setCompactError] = useState<string | null>(null)
   const [lastUsage, setLastUsage] = useState<UsageInfo | null>(null)
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const [scheduleTick, setScheduleTick] = useState(0)
   const [debugOpen, setDebugOpen] = useState(false)
+  const [chainInfoOpen, setChainInfoOpen] = useState(false)
+  // Past segments: frozen messages from compacted predecessors, shown above dividers.
+  const [pastSegments, setPastSegments] = useState<(ChainSegment & { messages: Message[] })[]>([])
+  // The tail session this ChatWindow is currently sending to (may differ from sessionId prop after compact).
+  const [currentSessionId, setCurrentSessionId] = useState(sessionId)
   // Ref-only bottom tracking — avoids React re-renders on scroll settle (which caused
   // mobile stutter by interrupting momentum deceleration). Button visibility is toggled
   // via direct DOM class manipulation instead.
@@ -199,11 +206,36 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
 
   async function handleCompact() {
     setCompacting(true)
+    setCompactError(null)
     try {
-      const { sessionId: newId } = await compactSession(sessionId)
+      const { sessionId: newId, summary } = await compactSession(currentSessionId)
+
+      // Snapshot current tail as a frozen past segment
+      const newSegment: ChainSegment & { messages: Message[] } = {
+        id: currentSessionId,
+        title: '[Compacted Session]',
+        claude_session_id: null,
+        project_id: null,
+        system_prompt: null,
+        permission_mode: 'acceptEdits',
+        timezone: null,
+        model: null,
+        compacted_from: null,
+        created_at: Math.floor(Date.now() / 1000),
+        updated_at: Math.floor(Date.now() / 1000),
+        compactSummary: summary,
+        messages: [...messages],
+      }
+      setPastSegments((prev) => [...prev, newSegment])
+      setCurrentSessionId(newId)
+      setMessages([])
+      setHasMore(false)
+
+      // Notify App to add the new session to the sidebar (no re-mount — no setActiveSessionId)
       onCompact?.(newId)
     } catch (err) {
       console.error('[compact] failed:', err)
+      setCompactError(err instanceof Error ? err.message : 'Compact failed')
     } finally {
       setCompacting(false)
     }
@@ -295,8 +327,30 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
     let cancelled = false
     let cancelWatch: (() => void) | null = null
 
-    // Persistent subscription: re-fetch whenever another client finalizes a message.
-    // Skipped while this client's own sendMessage is streaming (optimistic bubble must not be overwritten).
+    // Reset chain state when root session changes
+    setPastSegments([])
+    setCurrentSessionId(sessionId)
+
+    // Load the full chain (in case this session is the tail of a compacted chain)
+    getSessionChain(sessionId).then(async (chain) => {
+      if (cancelled || chain.length === 0) return
+      const tail = chain[chain.length - 1]
+      const tailId = tail.id
+      if (!cancelled) setCurrentSessionId(tailId)
+
+      // Load messages for all past segments (frozen — no pagination needed)
+      if (chain.length > 1) {
+        const past = await Promise.all(
+          chain.slice(0, -1).map(async (seg) => {
+            const page = await getMessages(seg.id, { limit: 200 })
+            return { ...seg, messages: page.messages.map(dbMessageToLocal) }
+          })
+        )
+        if (!cancelled) setPastSegments(past)
+      }
+    }).catch(() => { /* chain endpoint may not exist for older sessions — ignore */ })
+
+    // Persistent subscription on the tail session
     const cancelSubscription = subscribeToSession(sessionId, async () => {
       if (cancelled || streamingFromSendRef.current) return
       try {
@@ -372,7 +426,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
     const oldestId = messages[0].id
     setLoadingOlder(true)
     try {
-      const page = await getMessages(sessionId, { before: oldestId })
+      const page = await getMessages(currentSessionId, { before: oldestId })
       if (page.messages.length === 0) { setHasMore(false); return }
       // Save scroll anchor so prepending doesn't jump to bottom
       const container = scrollContainerRef.current
@@ -417,7 +471,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
     ])
     setStreaming(true)
 
-    cancelRef.current = sendMessage(sessionId, text, {
+    cancelRef.current = sendMessage(currentSessionId, text, {
       onTitle,
       onActivity,
       onUsage: (usage) => setLastUsage(usage),
@@ -463,10 +517,10 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
           // Server restarted mid-stream — don't mark as error yet.
           // The worker is likely still running; switch to watchSession and wait for recovery.
           cancelRef.current = watchSession(
-            sessionId,
+            currentSessionId,
             async () => {
               try {
-                const fresh = await getMessages(sessionId)
+                const fresh = await getMessages(currentSessionId)
                 setMessages(fresh.messages.map(dbMessageToLocal))
                 setHasMore(fresh.hasMore)
               } finally {
@@ -529,6 +583,17 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             >
               ⏰<span className="hidden sm:inline"> Schedule</span>
             </button>
+
+            {/* Chain info button — shown when this session is part of a compacted chain */}
+            {pastSegments.length > 0 && (
+              <button
+                className={`bg-transparent border border-[#222] hover:border-[#444] rounded cursor-pointer text-xs px-2 py-1.5 transition-colors ${chainInfoOpen ? 'text-blue-400 border-blue-500/40' : 'text-[#444] hover:text-[#888]'}`}
+                onClick={() => setChainInfoOpen((o) => !o)}
+                title="Session chain — this conversation spans multiple compacted sessions"
+              >
+                ⊡ {pastSegments.length + 1}
+              </button>
+            )}
 
             {/* Compact button */}
             <button
@@ -609,6 +674,34 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
           </div>
         )}
 
+        {chainInfoOpen && pastSegments.length > 0 && (
+          <div className="px-3 pb-3 flex flex-col gap-1">
+            <p className="text-[10px] text-[#333] uppercase tracking-wider pb-1">Session chain ({pastSegments.length + 1} segments)</p>
+            {pastSegments.map((seg, i) => (
+              <div key={seg.id} className="flex items-center gap-2 text-[11px] text-[#444]">
+                <span className="text-[#2a2a2a]">{i + 1}.</span>
+                <span className="flex-1 truncate">{seg.title || 'Session'}</span>
+                <span className="text-[#333] flex-shrink-0">
+                  {new Date(seg.created_at * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' })}
+                </span>
+                <span className="text-[#2a2a2a] flex-shrink-0">{seg.messages.length} msgs</span>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 text-[11px] text-blue-500">
+              <span className="text-[#2a2a2a]">{pastSegments.length + 1}.</span>
+              <span className="flex-1">Current session</span>
+              <span className="text-[#333] flex-shrink-0">{messages.length} msgs</span>
+            </div>
+          </div>
+        )}
+
+        {compactError && (
+          <div className="px-3 pb-2 flex items-center gap-2 text-xs text-red-400">
+            <span>⚠ Compact failed: {compactError}</span>
+            <button onClick={() => setCompactError(null)} className="text-red-600 hover:text-red-400">✕</button>
+          </div>
+        )}
+
         {promptOpen && (
           <div className="px-3 pb-3 flex flex-col gap-2">
             <textarea
@@ -666,7 +759,47 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             </button>
           </div>
         )}
-        {messages.length === 0 && !hasMore && (
+
+        {/* Past compacted segments with dividers */}
+        {pastSegments.map((seg, segIdx) => (
+          <div key={seg.id}>
+            {seg.messages.map((m, i) => {
+              const prev = i === 0 ? undefined : seg.messages[i - 1]
+              const showDateSep = m.createdAt != null && (
+                prev == null || prev.createdAt == null ||
+                formatDateLabel(prev.createdAt) !== formatDateLabel(m.createdAt)
+              )
+              return (
+                <div key={m.id} className="flex flex-col gap-5 mb-5">
+                  {showDateSep && (
+                    <div className="flex items-center gap-3 select-none">
+                      <div className="flex-1 h-px bg-[#1e1e1e]" />
+                      <span className="text-[11px] text-[#3a3a3a]">{formatDateLabel(m.createdAt!)}</span>
+                      <div className="flex-1 h-px bg-[#1e1e1e]" />
+                    </div>
+                  )}
+                  <MessageBubble
+                    role={m.role}
+                    content={m.content}
+                    streaming={false}
+                    errorCode={m.errorCode}
+                    source={m.source}
+                    toolUses={m.toolUses}
+                    projectId={projectId}
+                    createdAt={m.createdAt}
+                  />
+                </div>
+              )
+            })}
+            <CompactDivider
+              fromTitle={seg.title}
+              summary={seg.compactSummary}
+              compactedAt={pastSegments[segIdx + 1]?.created_at ?? Math.floor(Date.now() / 1000)}
+            />
+          </div>
+        ))}
+
+        {messages.length === 0 && !hasMore && pastSegments.length === 0 && (
           <div className="flex items-center justify-center flex-1 text-[#444] text-sm">
             <p>Start a conversation with Claude.</p>
           </div>

@@ -216,13 +216,48 @@ router.post('/:id/compact', async (req, res) => {
 
   const newId = uuidv4()
   const basePrompt = session.system_prompt ? `${session.system_prompt}\n\n---\n\n` : ''
-  const systemPrompt = `${basePrompt}Previous conversation summary:\n${summary.trim()}`
+  const summaryTrimmed = summary.trim()
+  const systemPrompt = `${basePrompt}Previous conversation summary:\n${summaryTrimmed}`
   const newSession = sessionQueries.create(newId, `[Compacted] ${session.title}`, session.project_id, systemPrompt)
   if (session.permission_mode !== 'acceptEdits') {
     sessionQueries.updatePermissionMode(session.permission_mode, newId)
   }
+  // Link new session back to its parent so chains are reconstructable
+  sessionQueries.setCompactedFrom(newId, req.params.id)
 
-  res.status(201).json({ sessionId: newSession.id })
+  res.status(201).json({ sessionId: newSession.id, summary: summaryTrimmed })
+})
+
+router.get('/:id/chain', (req, res) => {
+  const session = sessionQueries.findById(req.params.id)
+  if (!session) { res.status(404).json({ error: 'Session not found' }); return }
+
+  // Walk backward to find the root of the chain
+  let root = session
+  const visited = new Set<string>()
+  while (root.compacted_from && !visited.has(root.compacted_from)) {
+    visited.add(root.id)
+    const parent = sessionQueries.findById(root.compacted_from)
+    if (!parent) break
+    root = parent
+  }
+
+  // Walk forward from root to get the full ordered chain
+  const chain = sessionQueries.getChain(root.id)
+
+  // Extract compact summaries from system_prompt for each non-root segment
+  const result = chain.map((s) => {
+    const SUMMARY_PREFIX = 'Previous conversation summary:\n'
+    const promptAfterSep = s.system_prompt?.includes('\n\n---\n\n')
+      ? s.system_prompt.split('\n\n---\n\n').slice(1).join('\n\n---\n\n')
+      : s.system_prompt ?? ''
+    const compactSummary = promptAfterSep.startsWith(SUMMARY_PREFIX)
+      ? promptAfterSep.slice(SUMMARY_PREFIX.length)
+      : null
+    return { ...s, compactSummary }
+  })
+
+  res.json(result)
 })
 
 router.delete('/:id', (req, res) => {
