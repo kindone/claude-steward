@@ -57,6 +57,8 @@ export function SessionSidebar({
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
   const editInputRef = useRef<HTMLInputElement>(null)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
   const [activeTab, setActiveTab] = useState<'sessions' | 'files' | 'terminal' | 'apps'>(() => {
     try { return (localStorage.getItem('steward:sidebarTab') as 'sessions' | 'files' | 'terminal' | 'apps') ?? 'sessions' }
     catch { return 'sessions' }
@@ -71,8 +73,21 @@ export function SessionSidebar({
     if (editingId) editInputRef.current?.select()
   }, [editingId])
 
-  function startEditing(e: React.MouseEvent, session: Session) {
+  function closeMenu() {
+    setOpenMenuId(null)
+    setMenuPos(null)
+  }
+
+  function handleMenuOpen(e: React.MouseEvent, id: string) {
     e.stopPropagation()
+    if (openMenuId === id) { closeMenu(); return }
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setMenuPos({ x: rect.right, y: rect.bottom })
+    setOpenMenuId(id)
+  }
+
+  function startEditing(session: Session) {
+    closeMenu()
     setPendingDeleteId(null)
     setEditingId(session.id)
     setEditValue(session.title)
@@ -90,13 +105,14 @@ export function SessionSidebar({
   }
 
   function handleSessionClick(id: string) {
+    closeMenu()
     setPendingDeleteId(null)
     onSelectSession(id)
   }
 
-  function handleDeleteClick(e: React.MouseEvent, id: string) {
-    e.stopPropagation()
-    setPendingDeleteId(pendingDeleteId === id ? null : id)
+  function handleDeleteFromMenu(id: string) {
+    closeMenu()
+    setPendingDeleteId(id)
   }
 
   function handleConfirmDelete(e: React.MouseEvent, id: string) {
@@ -257,21 +273,23 @@ export function SessionSidebar({
                   </span>
                 ) : (
                   <>
-                    <span
-                      className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap select-none"
-                      onDoubleClick={(e) => startEditing(e, s)}
-                      title="Double-click to rename"
-                    >
+                    <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap select-none">
                       {s.title}
                     </span>
+                    {/* 3-dot menu button — always visible on touch, visible on hover on pointer devices */}
                     <button
-                      className="flex-shrink-0 bg-transparent border-none cursor-pointer text-[15px] leading-none px-1 py-0.5 rounded transition-colors
-                        text-transparent group-hover:text-[#444] [@media(hover:none)]:text-[#444]
-                        hover:!text-red-500 hover:bg-red-500/10"
-                      onClick={(e) => handleDeleteClick(e, s.id)}
-                      title="Delete session"
+                      className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded transition-colors
+                        text-transparent group-hover:text-[#555] [@media(hover:none)]:text-[#555]
+                        hover:!text-[#aaa] hover:!bg-[#2a2a2a]"
+                      onClick={(e) => handleMenuOpen(e, s.id)}
+                      title="Session options"
+                      aria-label="Session options"
                     >
-                      ×
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+                        <circle cx="8" cy="2.5" r="1.5"/>
+                        <circle cx="8" cy="8" r="1.5"/>
+                        <circle cx="8" cy="13.5" r="1.5"/>
+                      </svg>
                     </button>
                   </>
                 )}
@@ -332,6 +350,48 @@ export function SessionSidebar({
           </button>
         )}
       </div>
+
+      {/* 3-dot dropdown menu — fixed position to escape scrollable container */}
+      {openMenuId && menuPos && (() => {
+        const session = sessions.find((s) => s.id === openMenuId)
+        if (!session) return null
+        return (
+          <>
+            {/* Backdrop to close menu */}
+            <div className="fixed inset-0 z-40" onClick={closeMenu} />
+            {/* Menu */}
+            <div
+              className="fixed z-50 bg-[#1c1c1c] border border-[#2e2e2e] rounded-lg shadow-2xl py-1 min-w-[140px] overflow-hidden"
+              style={{ right: window.innerWidth - menuPos.x, top: menuPos.y + 4 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                className="w-full text-left px-3 py-2 text-[13px] text-[#ccc] hover:bg-[#2a2a2a] hover:text-[#e8e8e8] transition-colors flex items-center gap-2.5"
+                onClick={() => startEditing(session)}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Rename
+              </button>
+              <div className="h-px bg-[#2e2e2e] mx-2 my-1" />
+              <button
+                className="w-full text-left px-3 py-2 text-[13px] text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors flex items-center gap-2.5"
+                onClick={() => handleDeleteFromMenu(session.id)}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="3 6 5 6 21 6"/>
+                  <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                  <path d="M10 11v6M14 11v6"/>
+                  <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                </svg>
+                Delete
+              </button>
+            </div>
+          </>
+        )
+      })()}
     </aside>
   )
 }

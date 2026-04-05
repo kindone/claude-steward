@@ -62,10 +62,12 @@ describe('SessionSidebar', () => {
 
   it('calls onDeleteSession with confirmation', async () => {
     const { onDeleteSession } = renderSidebar()
-    // First click sets pending state (shows inline Yes/No)
-    const deleteButtons = screen.getAllByTitle('Delete session')
-    await userEvent.click(deleteButtons[0])
-    // Second click confirms
+    // Open 3-dot menu for the first session
+    const menuButtons = screen.getAllByTitle('Session options')
+    await userEvent.click(menuButtons[0])
+    // Click Delete in the dropdown
+    await userEvent.click(screen.getByRole('button', { name: /Delete/i }))
+    // Inline confirm appears — click Yes
     await userEvent.click(screen.getByRole('button', { name: 'Yes' }))
     expect(onDeleteSession).toHaveBeenCalledWith('ses-1')
   })
