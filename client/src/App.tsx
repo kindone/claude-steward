@@ -282,6 +282,7 @@ export default function App() {
   useEffect(() => {
     setLoading(true)
     setActiveSessionId(null)
+    setSessions([])
     listSessions(activeProjectId)
       .then((all) => {
         const compactedFromIds = new Set(all.map((s) => s.compacted_from).filter(Boolean))
