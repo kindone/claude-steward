@@ -21,7 +21,11 @@
       "Bash(node scripts/*)",
       "Bash(npx tsc*)",
       "Bash(pm2 status*)",
-      "Bash(pm2 logs*)"
+      "Bash(pm2 logs*)",
+      "mcp__steward-schedules__schedule_list",
+      "mcp__steward-schedules__schedule_create",
+      "mcp__steward-schedules__schedule_update",
+      "mcp__steward-schedules__schedule_delete"
     ],
     "deny": [
       "Bash(git push*)",
