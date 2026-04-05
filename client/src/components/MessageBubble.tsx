@@ -34,9 +34,10 @@ type Props = {
   toolUses?: ToolCall[]
   onCompact?: () => void
   projectId?: string | null
+  createdAt?: number
 }
 
-export function MessageBubble({ role, content, streaming = false, errorCode, source, toolUses, onCompact, projectId = null }: Props) {
+export function MessageBubble({ role, content, streaming = false, errorCode, source, toolUses, onCompact, projectId = null, createdAt }: Props) {
   const displayContent = content
   const isScheduled = source === 'scheduler'
   const contentRef = useRef<HTMLDivElement>(null)
@@ -249,14 +250,23 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
     )
   }
 
+  const timeLabel = !streaming && createdAt != null
+    ? new Date(createdAt * 1000).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+    : null
+
   return (
     <div className={`max-w-[820px] w-full flex flex-col
       ${role === 'user' ? 'self-end items-end' : 'self-start items-start'}`}
     >
       {role === 'user' ? (
-        <p className="bg-[#1e3a5f] px-3.5 py-2.5 rounded-[14px_14px_2px_14px] whitespace-pre-wrap break-words text-sm leading-relaxed max-w-[600px]">
-          {displayContent}
-        </p>
+        <>
+          <p className="bg-[#1e3a5f] px-3.5 py-2.5 rounded-[14px_14px_2px_14px] whitespace-pre-wrap break-words text-sm leading-relaxed max-w-[600px]">
+            {displayContent}
+          </p>
+          {timeLabel && (
+            <span className="mt-1 text-[10px] text-[#3a3a3a] select-none">{timeLabel}</span>
+          )}
+        </>
       ) : (
         <>
           {isScheduled && (
@@ -296,6 +306,9 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
               </button>
             )}
           </div>
+          {timeLabel && (
+            <span className="mt-1 text-[10px] text-[#3a3a3a] select-none">{timeLabel}</span>
+          )}
           {!streaming && toolUses && toolUses.length > 0 && (
             <div className="mt-1.5 w-full">
               <button

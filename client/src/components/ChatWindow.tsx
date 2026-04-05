@@ -30,6 +30,7 @@ type Message = {
   source?: string | null
   /** Tool calls made while generating this message, in invocation order. */
   toolUses?: ToolCall[]
+  createdAt?: number
 }
 
 function dbMessageToLocal(m: ApiMessage): Message {
@@ -45,7 +46,20 @@ function dbMessageToLocal(m: ApiMessage): Message {
       : m.is_error ? (m.error_code as ClaudeErrorCode ?? 'process_error') : undefined,
     source: m.source,
     toolUses,
+    createdAt: m.created_at,
   }
+}
+
+/** Format a Unix timestamp (seconds) as a date label, e.g. "April 5" or "Today" / "Yesterday". */
+function formatDateLabel(unixSec: number): string {
+  const d = new Date(unixSec * 1000)
+  const today = new Date()
+  const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  if (sameDay(d, today)) return 'Today'
+  if (sameDay(d, yesterday)) return 'Yesterday'
+  return d.toLocaleDateString([], { month: 'long', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })
 }
 
 /** Small inline component: shows a monospace ID with a copy button. */
@@ -657,19 +671,36 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             <p>Start a conversation with Claude.</p>
           </div>
         )}
-        {messages.map((m) => (
-          <MessageBubble
-            key={m.id}
-            role={m.role}
-            content={m.content}
-            streaming={m.streaming}
-            errorCode={m.errorCode}
-            source={m.source}
-            toolUses={m.toolUses}
-            onCompact={m.errorCode === 'context_limit' ? handleCompact : undefined}
-            projectId={projectId}
-          />
-        ))}
+        {messages.map((m, i) => {
+          const prev = messages[i - 1]
+          const showDateSep = m.createdAt != null && (
+            prev == null ||
+            prev.createdAt == null ||
+            formatDateLabel(prev.createdAt) !== formatDateLabel(m.createdAt)
+          )
+          return (
+            <div key={m.id} className="flex flex-col gap-5">
+              {showDateSep && (
+                <div className="flex items-center gap-3 select-none">
+                  <div className="flex-1 h-px bg-[#1e1e1e]" />
+                  <span className="text-[11px] text-[#3a3a3a]">{formatDateLabel(m.createdAt!)}</span>
+                  <div className="flex-1 h-px bg-[#1e1e1e]" />
+                </div>
+              )}
+              <MessageBubble
+                role={m.role}
+                content={m.content}
+                streaming={m.streaming}
+                errorCode={m.errorCode}
+                source={m.source}
+                toolUses={m.toolUses}
+                onCompact={m.errorCode === 'context_limit' ? handleCompact : undefined}
+                projectId={projectId}
+                createdAt={m.createdAt}
+              />
+            </div>
+          )
+        })}
         {streaming && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 flex-wrap">
             <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse flex-shrink-0" />
