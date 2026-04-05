@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, updateSessionTimezone, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, updateSessionTimezone, toolDisplayName, toolDisplayDetail, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
@@ -709,8 +709,10 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             {/* Assembled tool calls with detail (muted, completed) */}
             {streamingToolUses.map((call, i) => (
               <span key={i} className="text-[11px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#555] max-w-[280px] truncate">
-                <span className="text-[#777]">{call.name}</span>
-                {call.detail && <span className="text-[#444]">: {call.detail}</span>}
+                <span className="text-[#777]">{toolDisplayName(call.name, call.detail)}</span>
+                {toolDisplayDetail(call.name, call.detail) && (
+                  <span className="text-[#444]">: {toolDisplayDetail(call.name, call.detail)}</span>
+                )}
               </span>
             ))}
             {/* Currently streaming tool input (blue, active) */}

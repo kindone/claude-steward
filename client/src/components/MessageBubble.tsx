@@ -6,6 +6,7 @@ import mermaid from 'mermaid'
 import 'highlight.js/styles/github-dark.css'
 import 'katex/dist/katex.min.css'
 import type { ClaudeErrorCode, ToolCall } from '../lib/api'
+import { toolDisplayName, toolDisplayDetail } from '../lib/api'
 import { splitContent, buildMarkedOptions, preprocessKaTeX } from '../lib/markdownRenderer'
 import { HtmlPreview } from './HtmlPreview'
 import { ImageLightbox, type LightboxContent } from './ImageLightbox'
@@ -316,7 +317,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
                 className="flex items-center gap-1.5 text-[11px] text-[#555] hover:text-[#888] transition-colors cursor-pointer bg-transparent border-none p-0"
               >
                 <span className={`inline-block transition-transform duration-150 ${toolsOpen ? 'rotate-90' : ''}`}>▶</span>
-                <span>{toolUses.map((c) => c.name).join(' · ')}</span>
+                <span>{toolUses.map((c) => toolDisplayName(c.name, c.detail)).join(' · ')}</span>
               </button>
               {toolsOpen && (
                 <div className="mt-1.5 flex flex-col gap-1 pl-3.5">
@@ -324,11 +325,11 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
                     <div key={i} className="flex flex-col gap-0.5 min-w-0">
                       <div className="flex items-baseline gap-1.5 min-w-0">
                         <span className="text-[11px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#666] flex-shrink-0">
-                          {call.name}
+                          {toolDisplayName(call.name, call.detail)}
                         </span>
-                        {call.detail && (
+                        {toolDisplayDetail(call.name, call.detail) && (
                           <span className="text-[11px] text-[#444] truncate" title={call.detail}>
-                            {call.detail}
+                            {toolDisplayDetail(call.name, call.detail)}
                           </span>
                         )}
                       </div>

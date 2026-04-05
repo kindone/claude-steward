@@ -788,6 +788,31 @@ export type ToolCall = {
   isError?: boolean
 }
 
+/**
+ * For display purposes: when a tool is "Bash", return the executable name
+ * (first token of the command) so the badge says "git" / "npm" / etc.
+ * Falls back to the raw tool name for all other tools.
+ */
+export function toolDisplayName(name: string, detail?: string): string {
+  if (name === 'Bash' && detail) {
+    const first = detail.trimStart().split(/\s+/)[0]
+    return first || name
+  }
+  return name
+}
+
+/**
+ * For display purposes: when a tool is "Bash", strip the leading executable
+ * from the detail so it isn't shown twice (badge already has it).
+ */
+export function toolDisplayDetail(name: string, detail?: string): string | undefined {
+  if (name === 'Bash' && detail) {
+    const rest = detail.trimStart().replace(/^\S+\s*/, '')
+    return rest || undefined
+  }
+  return detail
+}
+
 /** Pull the most useful field out of a tool's input object. */
 function extractToolDetail(name: string, input: Record<string, unknown>): string | undefined {
   const str = (v: unknown) => (typeof v === 'string' ? v.trim() : undefined)

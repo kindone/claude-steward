@@ -10,6 +10,7 @@ import { SessionSidebar } from './components/SessionSidebar'
 import { ChatWindow } from './components/ChatWindow'
 import { AppViewPanel } from './components/AppViewPanel'
 import AuthPage from './components/AuthPage'
+import { ErrorConsole } from './components/ErrorConsole'
 import { useAppConnection, type ConnState } from './hooks/useAppConnection'
 
 type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
@@ -61,13 +62,14 @@ function saveLastState(projectId: string | null, sessionId: string | null): void
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
 
-type EBProps = { children: ReactNode; onError: (msg: string) => void }
+type EBProps = { children: ReactNode; onError: (msg: string, stack?: string) => void }
 type EBState = { crashed: boolean }
 
 class ErrorBoundary extends Component<EBProps, EBState> {
   state: EBState = { crashed: false }
   componentDidCatch(error: Error, info: ErrorInfo) {
-    this.props.onError(`React render error: ${error.message} (${info.componentStack?.trim().split('\n')[0] ?? ''})`)
+    const stack = [error.stack, info.componentStack].filter(Boolean).join('\n\n--- Component stack ---\n')
+    this.props.onError(`React render error: ${error.message}`, stack || undefined)
   }
   static getDerivedStateFromError() { return { crashed: false } }
   render() { return this.props.children }
@@ -98,7 +100,7 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [restarting, setRestarting] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [clientError, setClientError] = useState<string | null>(null)
+  const [clientErrors, setClientErrors] = useState<import('./components/ErrorConsole').ErrorEntry[]>([])
   const [appPanel, setAppPanel] = useState<{ url: string; name: string } | null>(null)
   const [appPanelPreset, setAppPanelPreset] = useState<'half' | 'wide'>('half')
   // Incremented whenever the MCP server notifies us that schedules changed,
@@ -106,13 +108,24 @@ export default function App() {
   const [schedulesTick, setSchedulesTick] = useState(0)
 
   // Capture unhandled JS errors and promise rejections for visibility
+  const pushError = useCallback((message: string, stack?: string) => {
+    setClientErrors((prev) => [
+      ...prev,
+      { id: `${Date.now()}-${Math.random()}`, timestamp: Date.now(), message, stack },
+    ])
+  }, [])
+
   useEffect(() => {
-    const onError = (e: ErrorEvent) => setClientError(e.message ?? 'Unknown error')
-    const onUnhandled = (e: PromiseRejectionEvent) => setClientError(String(e.reason?.message ?? e.reason ?? 'Unhandled rejection'))
+    const onError = (e: ErrorEvent) => pushError(e.message ?? 'Unknown error', e.error?.stack)
+    const onUnhandled = (e: PromiseRejectionEvent) => {
+      const reason = e.reason
+      const msg = String(reason?.message ?? reason ?? 'Unhandled rejection')
+      pushError(msg, reason?.stack)
+    }
     window.addEventListener('error', onError)
     window.addEventListener('unhandledrejection', onUnhandled)
     return () => { window.removeEventListener('error', onError); window.removeEventListener('unhandledrejection', onUnhandled) }
-  }, [])
+  }, [pushError])
 
   // Keep sessionsRef in sync so the SW message handler always has the latest list
   useEffect(() => { sessionsRef.current = sessions }, [sessions])
@@ -441,15 +454,14 @@ export default function App() {
   }
 
   return (
-    <ErrorBoundary onError={(msg) => setClientError(msg)}>
+    <ErrorBoundary onError={pushError}>
     <div className="flex h-dvh relative overflow-hidden bg-[#0d0d0d] text-[#e8e8e8]">
-      {/* Client error banner — unhandled JS exceptions and React render errors */}
-      {clientError && (
-        <div className="fixed top-0 inset-x-0 z-[9998] bg-red-900/90 border-b border-red-700 px-4 py-2 flex items-start gap-3 text-sm text-red-100">
-          <span className="flex-1 font-mono text-xs leading-relaxed break-all">{clientError}</span>
-          <button onClick={() => setClientError(null)} className="flex-shrink-0 text-red-300 hover:text-white leading-none text-lg">✕</button>
-        </div>
-      )}
+      {/* Client error console — unhandled JS exceptions and React render errors */}
+      <ErrorConsole
+        errors={clientErrors}
+        onDismiss={(id) => setClientErrors((prev) => prev.filter((e) => e.id !== id))}
+        onClearAll={() => setClientErrors([])}
+      />
 
       {/* Push notification toast — shown when a push arrives while the app is in the foreground */}
       {pushToast && (
