@@ -276,13 +276,16 @@ export default function App() {
 
   // Load sessions whenever the active project changes; restore last-used session if it still exists.
   // pendingSessionIdRef holds a ?session= param from a push notification tap — it takes priority
-  // over localStorage. We only consume (clear) the ref once we have a real project context so that
-  // the null-project run (which fetches all sessions as a loading placeholder) doesn't steal the
-  // ref before the correct project's sessions are loaded.
+  // over localStorage. Skip the fetch when activeProjectId is null (project still loading) to avoid
+  // a flash of all-session data before the real project run clears it.
   useEffect(() => {
     setLoading(true)
     setActiveSessionId(null)
     setSessions([])
+    if (activeProjectId === null) {
+      setLoading(false)
+      return
+    }
     listSessions(activeProjectId)
       .then((all) => {
         const compactedFromIds = new Set(all.map((s) => s.compacted_from).filter(Boolean))
@@ -295,12 +298,7 @@ export default function App() {
           const restored = data.find((s) => s.id === targetId)
           if (restored) {
             setActiveSessionId(restored.id)
-            // Only consume the ref when we have a real project context — the null-project run
-            // fetches all sessions so it finds the session too, but we must not clear the ref
-            // there or the subsequent real-project run won't know which session to restore.
-            if (activeProjectId !== null) {
-              pendingSessionIdRef.current = null
-            }
+            pendingSessionIdRef.current = null
           } else {
             setActiveSessionId(data[0].id)
           }
