@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import type { Session, Project } from '../lib/api'
 import { ProjectPicker } from './ProjectPicker'
 import { FileTree } from './FileTree'
@@ -285,10 +286,10 @@ export function SessionSidebar({
                       title="Session options"
                       aria-label="Session options"
                     >
-                      <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-                        <circle cx="8" cy="2.5" r="1.5"/>
-                        <circle cx="8" cy="8" r="1.5"/>
-                        <circle cx="8" cy="13.5" r="1.5"/>
+                      <svg width="14" height="4" viewBox="0 0 14 4" fill="currentColor">
+                        <circle cx="2" cy="2" r="1.5"/>
+                        <circle cx="7" cy="2" r="1.5"/>
+                        <circle cx="12" cy="2" r="1.5"/>
                       </svg>
                     </button>
                   </>
@@ -351,17 +352,17 @@ export function SessionSidebar({
         )}
       </div>
 
-      {/* 3-dot dropdown menu — fixed position to escape scrollable container */}
+      {/* 3-dot dropdown — portalled to document.body to escape the sidebar's transform stacking context */}
       {openMenuId && menuPos && (() => {
         const session = sessions.find((s) => s.id === openMenuId)
         if (!session) return null
-        return (
+        return createPortal(
           <>
             {/* Backdrop to close menu */}
-            <div className="fixed inset-0 z-40" onClick={closeMenu} />
+            <div className="fixed inset-0 z-[9990]" onClick={closeMenu} />
             {/* Menu */}
             <div
-              className="fixed z-50 bg-[#1c1c1c] border border-[#2e2e2e] rounded-lg shadow-2xl py-1 min-w-[140px] overflow-hidden"
+              className="fixed z-[9991] bg-[#1c1c1c] border border-[#2e2e2e] rounded-lg shadow-2xl py-1 min-w-[140px] overflow-hidden"
               style={{ right: window.innerWidth - menuPos.x, top: menuPos.y + 4 }}
               onClick={(e) => e.stopPropagation()}
             >
@@ -389,7 +390,8 @@ export function SessionSidebar({
                 Delete
               </button>
             </div>
-          </>
+          </>,
+          document.body
         )
       })()}
     </aside>
