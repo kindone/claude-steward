@@ -119,6 +119,12 @@ export default function App() {
     const onError = (e: ErrorEvent) => pushError(e.message ?? 'Unknown error', e.error?.stack)
     const onUnhandled = (e: PromiseRejectionEvent) => {
       const reason = e.reason
+      // Browsers (especially Safari) fire extra unhandledrejection events from
+      // internal stream machinery when a fetch body is aborted. These are benign
+      // and already handled by our isAbortError guards — suppress them here.
+      if (reason instanceof Error) {
+        if (reason.name === 'AbortError' || reason.message?.includes('BodyStreamBuffer was aborted')) return
+      }
       const msg = String(reason?.message ?? reason ?? 'Unhandled rejection')
       pushError(msg, reason?.stack)
     }
