@@ -66,15 +66,19 @@ App
 └── ChatWindow  (keyed on sessionId — remounts on session switch)
     ├── session header bar   (always visible: ⚙ Prompt toggle left, ⊡ Compact + 🔔 Push + 🕐 Schedules + Plan/Edit/Full right)
     │   ├── token usage row  (shown after first response: "N ctx · M out · $X.XXXX"; ctx = input + cache_read + cache_creation; hover for breakdown)
+    │   ├── chain info button  (⊡ N; shown when past chain segments exist; opens drawer listing all compacted predecessors with timestamps)
     │   ├── system prompt editor  (collapsible; textarea + Save/Cancel/Clear + char counter, turns yellow above 2 000)
     │   └── schedule panel   (collapsible; list schedules with toggle/delete; next-fire display; "Times are in: {tz}" note)
     ├── "↑ Load older messages" button  (shown when hasMore=true; fetches cursor page)
+    ├── [past chain segments]  (frozen message lists from compacted predecessors, each followed by a CompactDivider)
+    │   └── CompactDivider   ("⊡ Compacted · <date>"; expandable to show the compaction summary)
     ├── MessageBubble[]      (one per message; streaming + error states + copy button)
     │   ├── rich content rendering  (mermaid SVG, KaTeX math, sandboxed HTML preview, inline images)
-    │   ├── tool history strip   (collapsed by default; ▶ Bash · Read · Edit; click to expand with full command detail)
+    │   ├── tool history strip   (collapsed by default; ▶ git · Read · Edit; Bash shows the executable name)
+    │   ├── timestamp label  (shown below each bubble: "2:34 PM"; date separator inserted between messages on different days)
     │   ├── ⏰ Scheduled indicator  (shown above bubbles where messages.source = 'scheduler')
     │   └── "Compact & Continue" button  (shown only on context_limit error bubbles)
-    ├── streaming indicator  (pulsing dots; assembled calls shown as "Bash: git log …"; active tool shown in blue)
+    ├── streaming indicator  (pulsing dots; assembled calls shown as "git: log …"; active tool shown in blue)
     ├── ↓ scroll-to-bottom button  (floating; appears when scrolled >100px from bottom; hidden during streaming if already at bottom)
     └── MessageInput         (textarea + Send/Stop)
 ```
@@ -106,7 +110,13 @@ Key refs (not state, so they don't trigger re-renders):
 | `pendingSessionIdRef` | Reads `?session=` URL param once on mount (set by push notification tap); persists across multiple sessions-effect runs until the target session is confirmed active |
 | `pendingProjectIdRef` | Reads `?project=` URL param once on mount; used in the projects-loading effect to prefer the notification's project over localStorage |
 
-`ChatWindow` manages its own local state (messages, streaming flag, active tool name, accumulated tool calls) and is fully reset on session switch via React's `key` prop.
+`ChatWindow` manages its own local state (messages, streaming flag, active tool name, accumulated tool calls, compact chain) and is fully reset on session switch via React's `key` prop.
+
+**Compact chain state** — `ChatWindow` maintains two additional pieces of state to support in-place compaction:
+- `currentSessionId` — the tail of the compact chain (where new messages are sent). Starts equal to the `sessionId` prop (root) and advances to each new session after compaction. `sendMessage` and `loadOlder` always target this ID, not the `sessionId` prop.
+- `pastSegments` — frozen `{ segment: ChainSegment, messages: Message[] }[]` arrays for each compacted predecessor. On mount, `getSessionChain()` is called to reconstruct the full chain (needed after page refresh). After each compact, the current messages are frozen into `pastSegments` and `currentSessionId` advances.
+
+Past segments are rendered above the live messages, each followed by a `CompactDivider`. The `sessionId` prop remains the stable root anchor that `key` uses for remounting.
 
 **Scroll behaviour** — a `scrollBehaviorRef` controls when and how the view scrolls to the bottom:
 - `'instant'` on initial message load (snaps to bottom unconditionally)
@@ -140,6 +150,7 @@ iOS-specific: iOS Safari doesn't fire SW `notificationclick`, so push tap naviga
 - **Inline delete confirmation** — clicking × shows "Delete? Yes / No" within the row; no browser dialog.
 - **Clear all** — appears in the section header when 2+ sessions exist; uses `window.confirm` for this destructive bulk action.
 - **Session count badge** — displayed next to the "Sessions" label.
+- **Chain segment filtering** — sessions whose `id` is referenced as `compacted_from` by another session are excluded from the sidebar. Compacted predecessors appear only in the in-chat chain view (past segment panels + CompactDivider); showing them in the sidebar would be redundant and confusing.
 
 ### Keyboard shortcuts
 
@@ -320,7 +331,8 @@ All functions accept/return typed objects and throw on non-OK responses.
 | `watchSession(sessionId, onDone, onError?)` | `EventSource` on `GET /watch`; returns cancel fn |
 | `sendMessage(sessionId, text, handlers)` | Starts chat SSE; returns cancel fn. See `ChunkHandler` below |
 | `stopChat(sessionId)` | `DELETE /api/chat/:id` — kills the subprocess; fire-and-forget |
-| `compactSession(sessionId)` | `POST /api/sessions/:id/compact` — summarizes session via Claude, forks new session primed with summary; returns `{ sessionId: string }` |
+| `compactSession(sessionId)` | `POST /api/sessions/:id/compact` — summarizes session via Claude, forks new session primed with summary; returns `{ sessionId: string, summary: string }` |
+| `getSessionChain(sessionId)` | `GET /api/sessions/:id/chain` — returns `ChainSegment[]` for the full compact chain rooted at this session (or its ancestor) |
 | `getVapidPublicKey()` | `GET /api/push/vapid-public-key` → `string` |
 | `savePushSubscription(sub, sessionId?)` | `POST /api/push/subscribe` with `PushSubscription` + optional session scope |
 | `deletePushSubscription(endpoint)` | `DELETE /api/push/subscribe` |
@@ -337,6 +349,7 @@ All functions accept/return typed objects and throw on non-OK responses.
 | Type | Fields |
 |---|---|
 | `ToolCall` | `name: string`, `detail?: string` — one assembled tool invocation |
+| `ChainSegment` | `Session & { compactSummary: string \| null }` — one segment in a compact chain, with summary extracted from the session's system prompt |
 | `ChunkHandler` | All SSE callbacks for `sendMessage`: `onTextDelta`, `onTitle`, `onDone`, `onError`, `onToolActivity`, `onToolCall`, `onActivity`, `onUsage` |
 | `UsageInfo` | `input_tokens`, `output_tokens`, `cache_read_input_tokens?`, `cache_creation_input_tokens?`, `total_cost_usd?` — fired via `onUsage` when the result chunk arrives |
 | `ClaudeErrorCode` | `'context_limit' \| 'session_expired' \| 'process_error' \| 'http_error' \| 'connection_lost'` |

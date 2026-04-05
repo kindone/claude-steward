@@ -73,7 +73,8 @@ The `createApp()` / `listen` split exists so tests can import `createApp()` with
 | `PATCH` | `/api/projects/:id/files` | ✓ | Atomic file write with optimistic locking |
 | `POST` | `/api/projects/:id/exec` | ✓ | SSE; streams shell command output (see [Terminal](terminal.md)) |
 | `GET` | `/api/sessions/:id/subscribe` | ✓ | SSE; persistent multi-client sync — sends `event: updated` on every message finalize; used by idle tabs to stay in sync without polling |
-| `POST` | `/api/sessions/:id/compact` | ✓ | Summarise session via Claude, fork new session with summary as system prompt; returns `{ sessionId }` |
+| `POST` | `/api/sessions/:id/compact` | ✓ | Summarise session via Claude, fork new session with summary as system prompt; returns `{ sessionId, summary }`. New session has `compacted_from` set to the source session ID. |
+| `GET` | `/api/sessions/:id/chain` | ✓ | Walk `compacted_from` links back to root, then return all segments in order with `compactSummary` extracted from each session's system prompt. Used by `ChatWindow` on mount to reconstruct a chain after page refresh. |
 | `GET` | `/api/schedules` | ✓ | List schedules; `?sessionId=` filter |
 | `POST` | `/api/schedules` | ✓ | Create schedule `{ sessionId, cron, prompt, label?, once? }` |
 | `PATCH` | `/api/schedules/:id` | ✓ | Update `{ cron?, prompt?, label?, enabled? }` |

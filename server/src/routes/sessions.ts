@@ -218,7 +218,7 @@ router.post('/:id/compact', async (req, res) => {
   const basePrompt = session.system_prompt ? `${session.system_prompt}\n\n---\n\n` : ''
   const summaryTrimmed = summary.trim()
   const systemPrompt = `${basePrompt}Previous conversation summary:\n${summaryTrimmed}`
-  const newSession = sessionQueries.create(newId, `[Compacted] ${session.title}`, session.project_id, systemPrompt)
+  const newSession = sessionQueries.create(newId, session.title, session.project_id, systemPrompt)
   if (session.permission_mode !== 'acceptEdits') {
     sessionQueries.updatePermissionMode(session.permission_mode, newId)
   }
