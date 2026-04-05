@@ -189,8 +189,20 @@ router.post('/:id/compact', async (req, res) => {
     return
   }
 
-  const transcript = relevant
-    .map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`)
+  // Build transcript from most-recent messages first, capped at ~80K chars so
+  // the prompt fits within Claude's context window (leaves room for the preamble
+  // and the generated summary).
+  const TRANSCRIPT_CHAR_LIMIT = 80_000
+  const lines = relevant.map((m) => `${m.role === 'user' ? 'User' : 'Assistant'}: ${m.content.trim()}`)
+  let transcriptChars = 0
+  let startIdx = lines.length
+  while (startIdx > 0 && transcriptChars + lines[startIdx - 1].length + 2 < TRANSCRIPT_CHAR_LIMIT) {
+    startIdx--
+    transcriptChars += lines[startIdx].length + 2
+  }
+  const skipped = startIdx
+  const transcript = (skipped > 0 ? [`[${skipped} earlier message(s) omitted for length]`, ''] : [])
+    .concat(lines.slice(startIdx))
     .join('\n\n')
 
   const prompt = [

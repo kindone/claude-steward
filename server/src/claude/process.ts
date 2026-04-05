@@ -283,8 +283,9 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
  */
 export function runClaudePrompt(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
+    // Pass prompt via stdin to avoid E2BIG when the transcript is large.
+    // With CI=true and stdin piped, Claude auto-detects non-interactive mode.
     const args = [
-      '--print', prompt,
       '--output-format', 'stream-json',
       '--verbose',
       '--include-partial-messages',
@@ -304,8 +305,11 @@ export function runClaudePrompt(prompt: string): Promise<string> {
     const child = spawn(CLAUDE_BIN, args, {
       env: { ...cleanEnv, CI: 'true' },
       shell: false,
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     })
+
+    child.stdin.write(prompt)
+    child.stdin.end()
 
     const rl = createInterface({ input: child.stdout, crlfDelay: Infinity })
     let accumulated = ''
