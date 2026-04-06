@@ -160,6 +160,12 @@ try {
 try {
   db.exec(`ALTER TABLE sessions ADD COLUMN compacted_from TEXT REFERENCES sessions(id)`)
 } catch { /* already exists */ }
+try {
+  db.exec(`ALTER TABLE schedules ADD COLUMN condition TEXT`)
+} catch { /* already exists */ }
+try {
+  db.exec(`ALTER TABLE schedules ADD COLUMN expires_at INTEGER`)
+} catch { /* already exists */ }
 
 // ── Mini-app tables ───────────────────────────────────────────────────────────
 
@@ -201,7 +207,9 @@ export type Schedule = {
   prompt: string
   label: string
   enabled: number
-  once: number   // 1 = disable after first fire, 0 = recurring
+  once: number        // 1 = delete after first fire, 0 = recurring
+  condition: string | null  // JSON-encoded ScheduleCondition, null = no condition
+  expires_at: number | null // unix seconds, null = no expiry
   last_run_at: number | null
   next_run_at: number | null
   created_at: number
@@ -543,12 +551,14 @@ export const pushSubscriptionQueries = {
 // ── Schedule queries ──────────────────────────────────────────────────────────
 
 const insertScheduleStmt = db.prepare(
-  `INSERT INTO schedules (id, session_id, cron, prompt, label, enabled, once, next_run_at)
-   VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+  `INSERT INTO schedules (id, session_id, cron, prompt, label, enabled, once, condition, expires_at, next_run_at)
+   VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
    ON CONFLICT(session_id, label) WHERE label != '' DO UPDATE SET
      cron        = excluded.cron,
      prompt      = excluded.prompt,
      once        = excluded.once,
+     condition   = excluded.condition,
+     expires_at  = excluded.expires_at,
      next_run_at = excluded.next_run_at,
      updated_at  = unixepoch()
    RETURNING *`
@@ -562,11 +572,13 @@ const findScheduleBySessionAndLabelStmt = db.prepare(
   `SELECT * FROM schedules WHERE session_id = ? AND label = ? AND label != '' LIMIT 1`
 )
 const listDueSchedulesStmt = db.prepare(
-  `SELECT * FROM schedules WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ?`
+  `SELECT * FROM schedules WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ?
+   AND (expires_at IS NULL OR expires_at > ?)`
 )
 const updateScheduleStmt = db.prepare(
   `UPDATE schedules SET cron = COALESCE(?, cron), prompt = COALESCE(?, prompt),
-   enabled = COALESCE(?, enabled), next_run_at = COALESCE(?, next_run_at),
+   enabled = COALESCE(?, enabled), condition = COALESCE(?, condition),
+   expires_at = COALESCE(?, expires_at), next_run_at = COALESCE(?, next_run_at),
    updated_at = unixepoch() WHERE id = ? RETURNING *`
 )
 const markScheduleRanStmt = db.prepare(
@@ -576,18 +588,20 @@ const deleteScheduleStmt = db.prepare(`DELETE FROM schedules WHERE id = ?`)
 const deleteSchedulesBySessionStmt = db.prepare(`DELETE FROM schedules WHERE session_id = ?`)
 
 export const scheduleQueries = {
-  create: (id: string, sessionId: string, cron: string, prompt: string, nextRunAt: number | null, once = false, label = '') =>
-    insertScheduleStmt.get(id, sessionId, cron, prompt, label, once ? 1 : 0, nextRunAt) as Schedule,
+  create: (id: string, sessionId: string, cron: string, prompt: string, nextRunAt: number | null, once = false, label = '', condition: string | null = null, expiresAt: number | null = null) =>
+    insertScheduleStmt.get(id, sessionId, cron, prompt, label, once ? 1 : 0, condition, expiresAt, nextRunAt) as Schedule,
   list: () => listSchedulesStmt.all() as Schedule[],
   listBySession: (sessionId: string) => listSchedulesBySessionStmt.all(sessionId) as Schedule[],
   findById: (id: string) => findScheduleByIdStmt.get(id) as Schedule | undefined,
   findBySessionAndLabel: (sessionId: string, label: string) =>
     findScheduleBySessionAndLabelStmt.get(sessionId, label) as Schedule | undefined,
-  listDue: (now: number) => listDueSchedulesStmt.all(now) as Schedule[],
-  update: (id: string, patch: { cron?: string; prompt?: string; enabled?: boolean; nextRunAt?: number | null }) =>
+  listDue: (now: number) => listDueSchedulesStmt.all(now, now) as Schedule[],
+  update: (id: string, patch: { cron?: string; prompt?: string; enabled?: boolean; nextRunAt?: number | null; condition?: string | null; expiresAt?: number | null }) =>
     updateScheduleStmt.get(
       patch.cron ?? null, patch.prompt ?? null,
       patch.enabled !== undefined ? (patch.enabled ? 1 : 0) : null,
+      patch.condition !== undefined ? patch.condition : null,
+      patch.expiresAt !== undefined ? patch.expiresAt : null,
       patch.nextRunAt !== undefined ? patch.nextRunAt : null,
       id
     ) as Schedule,

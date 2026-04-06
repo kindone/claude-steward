@@ -349,8 +349,11 @@ export type Schedule = {
   session_id: string
   cron: string
   prompt: string
+  label: string
   enabled: number
-  once: number   // 1 = fires once then disables, 0 = recurring
+  once: number        // 1 = fires once then deletes, 0 = recurring
+  condition: string | null  // JSON-encoded ScheduleCondition
+  expires_at: number | null // unix seconds
   last_run_at: number | null
   next_run_at: number | null
   created_at: number

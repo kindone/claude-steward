@@ -39,12 +39,14 @@ const findBySessionAndLabelStmt = db.prepare(
 )
 
 const upsertStmt = db.prepare(
-  `INSERT INTO schedules (id, session_id, cron, prompt, label, enabled, once, next_run_at)
-   VALUES (?, ?, ?, ?, ?, 1, ?, ?)
+  `INSERT INTO schedules (id, session_id, cron, prompt, label, enabled, once, condition, expires_at, next_run_at)
+   VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)
    ON CONFLICT(session_id, label) WHERE label != '' DO UPDATE SET
      cron        = excluded.cron,
      prompt      = excluded.prompt,
      once        = excluded.once,
+     condition   = excluded.condition,
+     expires_at  = excluded.expires_at,
      next_run_at = excluded.next_run_at,
      updated_at  = unixepoch()
    RETURNING *`
@@ -55,6 +57,8 @@ const updateStmt = db.prepare(
    SET cron        = COALESCE(?, cron),
        prompt      = COALESCE(?, prompt),
        enabled     = COALESCE(?, enabled),
+       condition   = COALESCE(?, condition),
+       expires_at  = COALESCE(?, expires_at),
        next_run_at = COALESCE(?, next_run_at),
        updated_at  = unixepoch()
    WHERE id = ?
@@ -73,6 +77,8 @@ export type ScheduleRow = {
   label: string | null
   enabled: number
   once: number
+  condition: string | null    // JSON-encoded ScheduleCondition, null = no condition
+  expires_at: number | null   // unix seconds, null = no expiry
   last_run_at: number | null
   next_run_at: number | null
   created_at: number
@@ -100,17 +106,21 @@ export const mcpScheduleDb = {
     label: string,
     once: boolean,
     nextRunAt: number | null,
+    condition: string | null,
+    expiresAt: number | null,
   ): ScheduleRow =>
-    upsertStmt.get(id, sessionId, cronExpr, prompt, label, once ? 1 : 0, nextRunAt) as ScheduleRow,
+    upsertStmt.get(id, sessionId, cronExpr, prompt, label, once ? 1 : 0, condition, expiresAt, nextRunAt) as ScheduleRow,
 
   update: (
     id: string,
-    patch: { cron?: string; prompt?: string; enabled?: boolean; nextRunAt?: number | null },
+    patch: { cron?: string; prompt?: string; enabled?: boolean; nextRunAt?: number | null; condition?: string | null; expiresAt?: number | null },
   ): ScheduleRow | undefined =>
     updateStmt.get(
       patch.cron ?? null,
       patch.prompt ?? null,
       patch.enabled !== undefined ? (patch.enabled ? 1 : 0) : null,
+      patch.condition !== undefined ? patch.condition : null,
+      patch.expiresAt !== undefined ? patch.expiresAt : null,
       patch.nextRunAt !== undefined ? patch.nextRunAt : null,
       id,
     ) as ScheduleRow | undefined,

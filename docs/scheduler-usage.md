@@ -8,8 +8,8 @@ How to create and manage schedules from a session. For internals, see `docs/sche
 
 ```
 schedule_list(session_id)
-schedule_create(session_id, cron, prompt, label, once?)
-schedule_update(id, cron?, prompt?, enabled?)
+schedule_create(session_id, cron, prompt, label, once?, condition?, expires_at?)
+schedule_update(id, cron?, prompt?, enabled?, condition?, expires_at?)
 schedule_delete(id, session_id)
 ```
 
@@ -34,6 +34,42 @@ schedule_create(
 - `label` is the upsert key: calling `schedule_create` with an existing label **updates** it in-place. No need to delete first.
 - `prompt` is a clear instruction written to yourself — it's injected verbatim at fire time.
 - Confirm back to the user with the local-timezone time, not UTC.
+
+## Complex schedules: condition field
+
+For patterns cron can't express natively, pass a `condition` object. The cron fires on its normal cadence; the condition skips the run if not met.
+
+```
+// Every 10 days from Apr 6
+schedule_create(..., cron="0 9 * * *", condition={"type":"every_n_days","n":10,"ref":"2026-04-06"})
+
+// Biweekly (every 14 days)
+schedule_create(..., cron="0 9 * * 1", condition={"type":"every_n_days","n":14,"ref":"2026-04-06"})
+
+// Last day of each month
+schedule_create(..., cron="0 9 * * *", condition={"type":"last_day_of_month"})
+
+// 2nd Tuesday of each month
+schedule_create(..., cron="0 9 * * 2", condition={"type":"nth_weekday","n":2,"weekday":2})
+```
+
+Supported condition types:
+| Type | Required fields | Meaning |
+|---|---|---|
+| `every_n_days` | `n`, `ref` (YYYY-MM-DD) | Every N days from the anchor date |
+| `last_day_of_month` | — | Last day of each calendar month |
+| `nth_weekday` | `n` (1–5), `weekday` (0=Sun…6=Sat) | Nth occurrence of weekday in month |
+
+## Expiring schedules: expires_at field
+
+For "run until X" patterns, pass `expires_at` as an ISO 8601 datetime. The schedule auto-deletes after the last fire before the expiry.
+
+```
+// Every 3 minutes until 5pm today
+schedule_create(..., cron="*/3 * * * *", expires_at="2026-04-06T17:00:00+09:00")
+```
+
+The tool warns if `expires_at` is before the first fire (0 fires) or would result in only 1 fire.
 
 ## Updating a schedule
 
@@ -71,12 +107,12 @@ schedule_list(session_id)
 
 **Always convert the user's local time to UTC before writing the cron expression.**
 
-## Cron limitations
+## Cron notes
 
 - **No "except"** — enumerate hours explicitly: "9am–5pm except 1pm" → `0 9,10,11,12,14,15,16,17 * * *`
-- **No biweekly** — offer two separate schedules or a fixed cadence
-- **No "last day of month"** — suggest a fixed date
 - **No relative timing** ("3 hours after X") — cron is absolute only
+- **Biweekly / every N days / last day of month / Nth weekday** — use `condition` field (see above)
+- **"Until X time"** — use `expires_at` field (see above)
 
 ---
 

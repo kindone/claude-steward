@@ -31,9 +31,79 @@ export function nextFireAt(cronExpr: string): number | null {
   }
 }
 
+/**
+ * Count how many times a cron expression fires between firstFire and expiresAt (inclusive).
+ * Caps at maxCheck to avoid iterating dense schedules indefinitely.
+ */
+export function countFiresBeforeExpiry(cronExpr: string, firstFire: number, expiresAt: number, maxCheck = 3): number {
+  if (firstFire > expiresAt) return 0
+  let count = 0
+  try {
+    const interval = CronExpressionParser.parse(cronExpr, {
+      tz: 'UTC',
+      currentDate: new Date((firstFire - 1) * 1000),
+    })
+    while (count < maxCheck) {
+      const ts = Math.floor(interval.next().getTime() / 1000)
+      if (ts > expiresAt) break
+      count++
+    }
+  } catch { /* ignore */ }
+  return count
+}
+
+// ── Condition types ───────────────────────────────────────────────────────────
+
+export type ScheduleCondition =
+  | { type: 'every_n_days'; n: number; ref: string }  // ref = YYYY-MM-DD UTC date anchor
+  | { type: 'last_day_of_month' }
+  | { type: 'nth_weekday'; n: number; weekday: number }  // weekday: 0=Sun … 6=Sat
+
+/**
+ * Evaluate whether a fire-time condition is met for the given UTC datetime.
+ * Returns true if the condition passes (schedule should fire).
+ * Unknown condition types default to true (non-blocking forward compatibility).
+ */
+export function evaluateCondition(condition: ScheduleCondition, now: Date): boolean {
+  switch (condition.type) {
+    case 'every_n_days': {
+      const ref = new Date(condition.ref + 'T00:00:00Z')
+      const daysDiff = Math.floor((now.getTime() - ref.getTime()) / 86_400_000)
+      return daysDiff >= 0 && daysDiff % condition.n === 0
+    }
+    case 'last_day_of_month': {
+      const tomorrow = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1))
+      return tomorrow.getUTCDate() === 1
+    }
+    case 'nth_weekday': {
+      if (now.getUTCDay() !== condition.weekday) return false
+      return Math.ceil(now.getUTCDate() / 7) === condition.n
+    }
+    default:
+      return true
+  }
+}
+
 async function runSchedule(schedule: Schedule): Promise<void> {
   const now = Math.floor(Date.now() / 1000)
+  const nowDate = new Date()
   const nextRun = nextFireAt(schedule.cron)
+
+  // Evaluate condition — if false, advance next_run_at but skip firing.
+  // This keeps the schedule alive for the next cron tick without double-firing.
+  if (schedule.condition) {
+    let condition: ScheduleCondition | null = null
+    try {
+      condition = JSON.parse(schedule.condition) as ScheduleCondition
+    } catch {
+      console.warn(`[scheduler] schedule ${schedule.id} has malformed condition JSON — firing anyway`)
+    }
+    if (condition && !evaluateCondition(condition, nowDate)) {
+      scheduleQueries.markRan(schedule.id, now, nextRun)
+      broadcastEvent('schedules_changed', { sessionId: schedule.session_id })
+      return
+    }
+  }
 
   // Advance next_run_at immediately to prevent double-fire if the tick is slow
   scheduleQueries.markRan(schedule.id, now, nextRun)
@@ -42,6 +112,10 @@ async function runSchedule(schedule: Schedule): Promise<void> {
   if (schedule.once) {
     scheduleQueries.delete(schedule.id)
     console.log(`[scheduler] deleted one-shot schedule ${schedule.id}`)
+  } else if (schedule.expires_at !== null && nextRun !== null && nextRun > schedule.expires_at) {
+    // This was the last fire before expiry — clean up so it doesn't linger
+    scheduleQueries.delete(schedule.id)
+    console.log(`[scheduler] schedule ${schedule.id} expired after this fire — deleted`)
   }
 
   // Notify the client that the schedule list changed (fired/deleted)

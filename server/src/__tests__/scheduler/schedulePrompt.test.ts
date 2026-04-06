@@ -87,11 +87,15 @@ describe('buildScheduleFragment', () => {
     expect(buildScheduleFragment(makeSession())).toContain('once')
   })
 
-  it('always contains cron limitations guidance', () => {
+  it('always contains cron notes/guidance', () => {
     const result = buildScheduleFragment(makeSession())
-    expect(result).toContain('biweekly')
-    expect(result).toContain('last day of month')
+    // "except" enumeration workaround still documented
     expect(result).toContain('except')
+    // condition field for complex patterns
+    expect(result).toContain('every_n_days')
+    expect(result).toContain('last_day_of_month')
+    expect(result).toContain('nth_weekday')
+    expect(result).toContain('expires_at')
   })
 
   it('includes timezone when session.timezone is set', () => {

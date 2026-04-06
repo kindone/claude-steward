@@ -22,7 +22,9 @@ CREATE TABLE schedules (
   prompt      TEXT NOT NULL,
   label       TEXT,
   enabled     INTEGER NOT NULL DEFAULT 1,
-  once        INTEGER NOT NULL DEFAULT 0,   -- auto-delete after firing
+  once        INTEGER NOT NULL DEFAULT 0,   -- auto-delete after first fire
+  condition   TEXT,                         -- JSON ScheduleCondition, null = no condition
+  expires_at  INTEGER,                      -- unix seconds; auto-delete when now > expires_at
   last_run_at INTEGER,
   next_run_at INTEGER,                      -- pre-computed next UTC unix timestamp
   created_at  INTEGER NOT NULL DEFAULT (unixepoch()),
@@ -34,15 +36,30 @@ Unique index on `(session_id, label)` — enables upsert-by-label semantics in `
 
 `next_run_at` is computed by `nextFireAt(cronExpr)` (node-cron validation + cron-parser next date) and advanced immediately when a schedule fires to prevent double-fire.
 
+`listDue(now)` filters out expired schedules: `expires_at IS NULL OR expires_at > now`.
+
 ### `lib/scheduler.ts`
 
 `startScheduler()` registers a `node-cron` tick every minute. On each tick:
-1. `scheduleQueries.listDue(now)` returns schedules where `enabled=1` and `next_run_at <= now`
-2. `markRan()` advances `next_run_at` immediately (prevents double-fire)
-3. If `once`, deletes the schedule
-4. Broadcasts `schedules_changed` SSE so the bell panel refreshes
-5. `sendToSession()` sends the prompt to the session as a headless invocation
-6. If no watchers are open → push notification fires
+1. `scheduleQueries.listDue(now)` returns enabled, due, non-expired schedules
+2. **Condition check**: if `schedule.condition` is set, `evaluateCondition(condition, now)` is called. If false → advance `next_run_at` and return without firing.
+3. `markRan()` advances `next_run_at` immediately (prevents double-fire)
+4. If `once`, deletes the schedule. If `expires_at` is set and `nextRun > expires_at`, deletes (last fire reached).
+5. Broadcasts `schedules_changed` SSE so the bell panel refreshes
+6. `sendToSession()` sends the prompt to the session as a headless invocation
+7. If no watchers are open → push notification fires
+
+**Exported pure functions** (testable):
+- `nextFireAt(cronExpr)` — next UTC unix timestamp for a cron, or null if invalid
+- `evaluateCondition(condition, now)` — returns true if the condition passes for the given UTC date
+- `countFiresBeforeExpiry(cronExpr, firstFire, expiresAt)` — used by MCP server for expiry warnings
+
+**Condition types** (`ScheduleCondition`):
+```typescript
+{ type: 'every_n_days'; n: number; ref: string }   // ref = YYYY-MM-DD UTC anchor
+{ type: 'last_day_of_month' }
+{ type: 'nth_weekday'; n: number; weekday: number } // weekday: 0=Sun … 6=Sat
+```
 
 ### `lib/sendToSession.ts`
 
@@ -130,7 +147,15 @@ The next server restart will re-sync it automatically anyway.
 
 ### Schedule Panel
 
-Bell icon (🔔) in `ChatWindow` header. Lists schedules with label, cron, next-fire time, enabled toggle, delete button. Read-only — schedules are managed via MCP tools, not this panel.
+Bell icon (🔔) in `ChatWindow` header. Lists schedules with:
+- **Label** as primary identifier (falls back to truncated prompt)
+- **Natural language cron description** via `cronstrue`, shifted to the session's local timezone (e.g. "At 18:00, Monday through Friday" instead of "At 09:00 UTC"). Relative crons (`*/5 * * * *`) are timezone-agnostic and shown without conversion. Falls back to "(UTC)" label if shift can't be computed.
+- **Condition description** in plain English if set (e.g. "Every other week (from 2026-04-06)")
+- **Expiry** in amber if `expires_at` is set (e.g. "Until Apr 30 at 5:00 PM KST")
+- **Next / last run** times in local timezone with abbreviation (e.g. "Mon, Apr 7, 6:00 PM KST")
+- Enabled toggle, run-now (▶), delete (×)
+
+Read-only — schedules are managed via MCP tools, not this panel.
 
 ### Fired Messages
 

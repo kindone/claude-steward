@@ -26,7 +26,7 @@ import {
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
 import { mcpScheduleDb } from './db.js'
-import { nextFireAt } from '../lib/scheduler.js'
+import { nextFireAt, countFiresBeforeExpiry, type ScheduleCondition } from '../lib/scheduler.js'
 
 // ── Notification helper ────────────────────────────────────────────────────────
 
@@ -79,6 +79,27 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           prompt:     { type: 'string', description: 'Task context injected at fire time — write as a clear instruction to yourself.' },
           label:      { type: 'string', description: 'Short human-readable name shown in the UI. Used as the upsert key.' },
           once:       { type: 'boolean', description: 'If true, the schedule fires once then deletes itself.' },
+          condition:  {
+            type: 'object',
+            description: 'Optional fire-time condition for patterns cron cannot express natively. ' +
+              'Supported types: ' +
+              '{"type":"every_n_days","n":<number>,"ref":"<YYYY-MM-DD>"} for every N days or biweekly (n=14); ' +
+              '{"type":"last_day_of_month"} to fire only on the last day of each month; ' +
+              '{"type":"nth_weekday","n":<1-5>,"weekday":<0-6>} for the Nth occurrence of a weekday (0=Sun). ' +
+              'The cron still fires on its normal cadence; the condition skips the run if not met.',
+            properties: {
+              type:    { type: 'string' },
+              n:       { type: 'number' },
+              ref:     { type: 'string' },
+              weekday: { type: 'number' },
+            },
+            required: ['type'],
+          },
+          expires_at: {
+            type: 'string',
+            description: 'ISO 8601 datetime after which the schedule auto-deletes, e.g. "2026-04-06T17:00:00+09:00". ' +
+              'Use for "every X until Y" patterns. The schedule fires while now < expires_at, then is deleted automatically.',
+          },
         },
         required: ['session_id', 'cron', 'prompt', 'label'],
       },
@@ -91,10 +112,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: {
         type: 'object',
         properties: {
-          id:      { type: 'string',  description: 'The schedule ID to update.' },
-          cron:    { type: 'string',  description: 'New 5-field UTC cron expression.' },
-          prompt:  { type: 'string',  description: 'New prompt/task context.' },
-          enabled: { type: 'boolean', description: 'Enable or disable the schedule.' },
+          id:         { type: 'string',  description: 'The schedule ID to update.' },
+          cron:       { type: 'string',  description: 'New 5-field UTC cron expression.' },
+          prompt:     { type: 'string',  description: 'New prompt/task context.' },
+          enabled:    { type: 'boolean', description: 'Enable or disable the schedule.' },
+          condition:  {
+            type: 'object',
+            description: 'Replace the fire-time condition. Same format as schedule_create.',
+            properties: {
+              type: { type: 'string' }, n: { type: 'number' },
+              ref: { type: 'string' }, weekday: { type: 'number' },
+            },
+            required: ['type'],
+          },
+          expires_at: { type: 'string', description: 'New ISO 8601 expiry datetime.' },
         },
         required: ['id'],
       },
@@ -129,12 +160,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             text: rows.length === 0
               ? 'No schedules found for this session.'
               : JSON.stringify(rows.map(r => ({
-                  id:         r.id,
-                  label:      r.label ?? '(unlabelled)',
-                  cron:       r.cron,
-                  prompt:     r.prompt,
-                  enabled:    r.enabled === 1,
-                  once:       r.once === 1,
+                  id:          r.id,
+                  label:       r.label ?? '(unlabelled)',
+                  cron:        r.cron,
+                  prompt:      r.prompt,
+                  enabled:     r.enabled === 1,
+                  once:        r.once === 1,
+                  condition:   r.condition ? JSON.parse(r.condition) : null,
+                  expires_at:  r.expires_at ? new Date(r.expires_at * 1000).toISOString() : null,
                   next_run_at: r.next_run_at,
                 })), null, 2),
           }],
@@ -156,20 +189,55 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const nextRun = nextFireAt(cronExpr)
         if (nextRun === null) throw new Error(`Invalid cron expression: "${cronExpr}"`)
 
-        // Warn if the next fire time looks further than expected — this catches the common
-        // mistake where a pinned day/month (e.g. "46 15 4 4 *") is computed after the
-        // target minute has already passed, causing cron-parser to return next year.
+        // Parse and validate optional condition
+        let conditionJson: string | null = null
+        if (args.condition != null) {
+          const c = args.condition as Record<string, unknown>
+          if (!c.type || typeof c.type !== 'string') throw new Error('condition.type is required')
+          if (c.type === 'every_n_days') {
+            if (typeof c.n !== 'number' || c.n < 1) throw new Error('every_n_days requires n >= 1')
+            if (typeof c.ref !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(c.ref)) throw new Error('every_n_days requires ref as YYYY-MM-DD')
+          } else if (c.type === 'nth_weekday') {
+            if (typeof c.n !== 'number' || c.n < 1 || c.n > 5) throw new Error('nth_weekday requires n between 1 and 5')
+            if (typeof c.weekday !== 'number' || c.weekday < 0 || c.weekday > 6) throw new Error('nth_weekday requires weekday 0–6 (0=Sun)')
+          } else if (c.type !== 'last_day_of_month') {
+            throw new Error(`Unknown condition type: "${c.type}". Supported: every_n_days, last_day_of_month, nth_weekday`)
+          }
+          conditionJson = JSON.stringify(c)
+        }
+
+        // Parse optional expires_at (ISO string → unix seconds)
+        let expiresAt: number | null = null
+        if (args.expires_at != null) {
+          const ts = Date.parse(String(args.expires_at))
+          if (isNaN(ts)) throw new Error(`expires_at must be a valid ISO 8601 datetime, got: "${args.expires_at}"`)
+          expiresAt = Math.floor(ts / 1000)
+        }
+
+        // Warn if the next fire time looks further than expected (pinned day/month past the target minute)
         const nowSec = Math.floor(Date.now() / 1000)
         const secsUntilFire = nextRun - nowSec
         const suspiciouslyFar = secsUntilFire > 60 * 60 * 24 * 7 // > 1 week
         const hasPinnedDayMonth = !cronExpr.split(' ').slice(2, 4).every(f => f === '*')
 
-        const row = mcpScheduleDb.upsert(randomUUID(), sessionId, cronExpr, prompt, label, once, nextRun)
+        const row = mcpScheduleDb.upsert(randomUUID(), sessionId, cronExpr, prompt, label, once, nextRun, conditionJson, expiresAt)
         await notifyChanged(sessionId)
 
         let text = `Schedule created: "${label}" (${cronExpr})\nID: ${row.id}\nNext run: ${row.next_run_at ? new Date(row.next_run_at * 1000).toISOString() : 'unknown'}`
+        if (conditionJson) {
+          text += `\nCondition: ${conditionJson}`
+        }
+        if (expiresAt) {
+          text += `\nExpires: ${new Date(expiresAt * 1000).toISOString()}`
+          const firesLeft = countFiresBeforeExpiry(cronExpr, nextRun, expiresAt)
+          if (firesLeft === 0) {
+            text += `\n\n⚠️ WARNING: expires_at is before (or at) the first fire time — this schedule will never fire. Check your timezone conversion or adjust expires_at.`
+          } else if (firesLeft === 1) {
+            text += `\n\n⚠️ NOTE: This schedule will fire only once before expires_at. If you intended more fires, verify the cron expression or extends_at value.`
+          }
+        }
         if (suspiciouslyFar && hasPinnedDayMonth) {
-          text += `\n\n⚠️ WARNING: next_run_at is ${Math.round(secsUntilFire / 86400)} day(s) from now. If you intended a near-future one-shot, the target minute may have already passed by the time the server processed this call. Delete this schedule and recreate it targeting at least 3–4 minutes from now.`
+          text += `\n\n⚠️ WARNING: next_run_at is ${Math.round(secsUntilFire / 86400)} day(s) from now. If you intended a near-future one-shot, the target minute may have already passed. Delete this schedule and recreate it targeting at least 3–4 minutes from now.`
         }
 
         return { content: [{ type: 'text', text }] }
@@ -182,12 +250,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         const existing = mcpScheduleDb.findById(id)
         if (!existing) throw new Error(`No schedule found with id "${id}"`)
 
-        const patch: { cron?: string; prompt?: string; enabled?: boolean; nextRunAt?: number | null } = {}
+        const patch: { cron?: string; prompt?: string; enabled?: boolean; nextRunAt?: number | null; condition?: string | null; expiresAt?: number | null } = {}
         if (typeof args.cron    === 'string')  { patch.cron = args.cron.trim(); patch.nextRunAt = nextFireAt(patch.cron) }
         if (typeof args.prompt  === 'string')  patch.prompt  = args.prompt.trim()
         if (typeof args.enabled === 'boolean') patch.enabled = args.enabled
+        if (args.condition != null) {
+          const c = args.condition as Record<string, unknown>
+          if (!c.type || typeof c.type !== 'string') throw new Error('condition.type is required')
+          patch.condition = JSON.stringify(c)
+        }
+        if (args.expires_at != null) {
+          const ts = Date.parse(String(args.expires_at))
+          if (isNaN(ts)) throw new Error(`expires_at must be a valid ISO 8601 datetime, got: "${args.expires_at}"`)
+          patch.expiresAt = Math.floor(ts / 1000)
+        }
 
-        if (Object.keys(patch).length === 0) throw new Error('No fields to update — provide at least one of: cron, prompt, enabled')
+        if (Object.keys(patch).length === 0) throw new Error('No fields to update — provide at least one of: cron, prompt, enabled, condition, expires_at')
 
         const updated = mcpScheduleDb.update(id, patch)
         if (!updated) throw new Error('Update failed — schedule may have been deleted')
@@ -196,7 +274,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return {
           content: [{
             type: 'text',
-            text: `Schedule updated: "${updated.label ?? id}"\nCron: ${updated.cron}\nEnabled: ${updated.enabled === 1}\nNext run: ${updated.next_run_at ? new Date(updated.next_run_at * 1000).toISOString() : 'unknown'}`,
+            text: `Schedule updated: "${updated.label ?? id}"\nCron: ${updated.cron}\nEnabled: ${updated.enabled === 1}\nCondition: ${updated.condition ?? 'none'}\nExpires: ${updated.expires_at ? new Date(updated.expires_at * 1000).toISOString() : 'never'}\nNext run: ${updated.next_run_at ? new Date(updated.next_run_at * 1000).toISOString() : 'unknown'}`,
           }],
         }
       }

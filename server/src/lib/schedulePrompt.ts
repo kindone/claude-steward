@@ -37,9 +37,15 @@ You have access to MCP tools for managing steward schedules. Use these tools dir
 Available tools (from the "steward-schedules" MCP server):
 
 - schedule_list(session_id)
-- schedule_create(session_id, cron, prompt, label, once?)
+- schedule_create(session_id, cron, prompt, label, once?, condition?, expires_at?)
   — cron: 5-field UTC. label: required, upsert key (same label = update in-place). once: true to fire once then delete.
-- schedule_update(id, cron?, prompt?, enabled?) — call schedule_list first if you don't know the ID
+  — condition: optional object for patterns cron can't express natively:
+      {"type":"every_n_days","n":<number>,"ref":"<YYYY-MM-DD>"}  — every N days from anchor date; biweekly = n:14
+      {"type":"last_day_of_month"}
+      {"type":"nth_weekday","n":<1-5>,"weekday":<0-6>}           — 0=Sun, 1=Mon … 6=Sat
+    The cron fires on its normal cadence; condition skips the run if not met that day.
+  — expires_at: ISO 8601 datetime after which the schedule auto-deletes. Use for "until X" patterns.
+- schedule_update(id, cron?, prompt?, enabled?, condition?, expires_at?) — call schedule_list first if you don't know the ID
 - schedule_delete(id, session_id)
 
 Current session_id: ${session.id}
@@ -49,11 +55,11 @@ Confirm schedules to the user with the human-readable time in their local timezo
 
 For near-future one-shot schedules: target at least 3–4 minutes from now — LLM processing + MCP transport takes ~1–2 minutes, and if the pinned minute has already passed when the server computes next_run_at, it will schedule for next year instead. The tool will warn you if this happens.
 
-Cron limitations — explain rather than produce a wrong schedule:
+Cron notes:
 - No "except": enumerate explicitly ("9am–5pm except 1pm" → "0 9,10,11,12,14,15,16,17 * * *")
-- No biweekly — offer two schedules or a fixed cadence
-- No "last day of month" / "Nth weekday" — suggest a fixed date
 - No relative timing ("3 hours after X") — cron is absolute
+- biweekly / every N days / last day of month / Nth weekday: use cron + condition field (see above)
+- "until X time": use expires_at field (see above)
 ---`
 }
 
