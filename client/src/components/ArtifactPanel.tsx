@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listArtifacts, deleteArtifact, type Artifact, type ArtifactType } from '../lib/api'
+import { listArtifacts, deleteArtifact, refreshArtifact, type Artifact, type ArtifactType } from '../lib/api'
 
 interface Props {
   projectId: string
@@ -48,12 +48,29 @@ function TrashIcon() {
   )
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function getRefreshCommand(a: Artifact): string | undefined {
+  if (!a.metadata) return undefined
+  try { return (JSON.parse(a.metadata) as Record<string, unknown>).refresh_command as string | undefined }
+  catch { return undefined }
+}
+
+function relativeTime(ts: number): string {
+  const diff = Date.now() / 1000 - ts
+  if (diff < 60) return 'just now'
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+  return `${Math.floor(diff / 86400)}d ago`
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function ArtifactPanel({ projectId, onOpen, refreshTick }: Props) {
   const [artifacts, setArtifacts] = useState<Artifact[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     setLoading(true)
@@ -77,6 +94,20 @@ export function ArtifactPanel({ projectId, onOpen, refreshTick }: Props) {
     }
   }
 
+  async function handleRefresh(id: string) {
+    setRefreshingIds(prev => new Set(prev).add(id))
+    try {
+      await refreshArtifact(id)
+      // Re-fetch list to update updated_at
+      const updated = await listArtifacts(projectId)
+      setArtifacts(updated)
+    } catch (e) {
+      console.error('Refresh failed', e)
+    } finally {
+      setRefreshingIds(prev => { const s = new Set(prev); s.delete(id); return s })
+    }
+  }
+
   return (
     <div className="px-3 pb-3 flex flex-col gap-2">
       {loading ? (
@@ -96,12 +127,25 @@ export function ArtifactPanel({ projectId, onOpen, refreshTick }: Props) {
             >
               <div className="flex items-center gap-2">
                 <TypeBadge type={a.type} />
-                <span
-                  className="flex-1 text-[12px] font-medium text-[#ccc] truncate"
-                  title={a.name}
-                >
-                  {a.name}
-                </span>
+                <div className="flex-1 min-w-0 flex flex-col">
+                  <span
+                    className="text-[12px] font-medium text-[#ccc] truncate"
+                    title={a.name}
+                  >
+                    {a.name}
+                  </span>
+                  <span className="text-[10px] text-[#444]">{relativeTime(a.updated_at)}</span>
+                </div>
+                {getRefreshCommand(a) && (
+                  <button
+                    onClick={() => void handleRefresh(a.id)}
+                    disabled={refreshingIds.has(a.id)}
+                    title="Refresh artifact"
+                    className={`text-[#555] hover:text-[#aaa] flex-shrink-0 px-1 flex items-center disabled:opacity-50 ${refreshingIds.has(a.id) ? 'animate-spin' : ''}`}
+                  >
+                    ↻
+                  </button>
+                )}
                 <button
                   onClick={() => onOpen(a)}
                   title="Open artifact"

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, getSessionChain, updateSessionTimezone, toolDisplayName, toolDisplayDetail, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo, type Artifact, type ArtifactType } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, getSessionChain, updateSessionTimezone, listArtifacts, toolDisplayName, toolDisplayDetail, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo, type Artifact, type ArtifactType } from '../lib/api'
 import { CompactDivider } from './CompactDivider'
 import { SaveAsArtifactDialog } from './SaveAsArtifactDialog'
 
@@ -98,11 +98,13 @@ type Props = {
   onCompact?: (newSessionId: string) => void
   /** Incremented by App when the server emits a schedules_changed SSE event. */
   schedulesTick?: number
+  /** Incremented by App when an artifact SSE event fires, so MessageInput suggestions stay fresh. */
+  artifactRefreshTick?: number
   /** Called when a saved artifact should be opened in the float panel. */
   onOpenArtifact?: (artifact: Artifact) => void
 }
 
-export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact, schedulesTick = 0, onOpenArtifact }: Props) {
+export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact, schedulesTick = 0, artifactRefreshTick, onOpenArtifact }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -119,6 +121,8 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   const [debugOpen, setDebugOpen] = useState(false)
   const [chainInfoOpen, setChainInfoOpen] = useState(false)
   const [kernelRefreshTick, setKernelRefreshTick] = useState(0)
+  // Artifacts for @mention autocomplete in MessageInput
+  const [projectArtifacts, setProjectArtifacts] = useState<Artifact[]>([])
   // Save as artifact dialog state
   const [saveArtifactTarget, setSaveArtifactTarget] = useState<{
     content: string
@@ -194,6 +198,12 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
       if (tz) updateSessionTimezone(sessionId, tz).catch(() => {})
     } catch { /* ignore */ }
   }, [sessionId])
+
+  // Fetch artifacts for @mention autocomplete; re-fetch when projectId or artifactRefreshTick changes
+  useEffect(() => {
+    if (!projectId) { setProjectArtifacts([]); return }
+    listArtifacts(projectId).then(setProjectArtifacts).catch(() => {})
+  }, [projectId, artifactRefreshTick])
 
   async function handlePromptSave() {
     const value = promptDraft.trim() || null
@@ -910,6 +920,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         projectId={projectId}
         onSend={handleSend}
         focusTrigger={focusTrigger}
+        artifacts={projectArtifacts}
         onStop={() => {
           streamingFromSendRef.current = false
           // Tell the server to kill the Claude subprocess before aborting the SSE fetch.

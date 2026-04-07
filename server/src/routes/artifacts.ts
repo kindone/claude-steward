@@ -5,6 +5,7 @@ import path from 'node:path'
 import { exec } from 'node:child_process'
 import { artifactQueries, projectQueries } from '../db/index.js'
 import { broadcastEvent } from '../lib/connections.js'
+import { syncArtifactSchedule, cleanupArtifactSchedule } from '../lib/artifactSchedule.js'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -148,6 +149,10 @@ artifactRouter.patch('/', (req, res) => {
     metadata: metadata !== undefined ? JSON.stringify(metadata) : undefined,
   })
 
+  if (metadata !== undefined) {
+    syncArtifactSchedule(artifact.id)
+  }
+
   broadcastEvent('artifact_updated', { artifactId: artifact.id, projectId: artifact.project_id })
   res.json(updated)
 })
@@ -170,6 +175,7 @@ artifactRouter.delete('/', (req, res) => {
     }
   }
 
+  cleanupArtifactSchedule(artifact.id)
   artifactQueries.delete(artifact.id)
   broadcastEvent('artifact_deleted', { artifactId: artifact.id, projectId: artifact.project_id })
   res.status(204).end()

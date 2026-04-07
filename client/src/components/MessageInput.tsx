@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState, useCallback, type KeyboardEvent } from 'react'
-import { uploadFiles } from '../lib/api'
+import { uploadFiles, type Artifact } from '../lib/api'
 
 type Props = {
   sessionId: string
@@ -8,6 +8,7 @@ type Props = {
   onStop?: () => void
   disabled: boolean
   focusTrigger?: number
+  artifacts?: Artifact[]
 }
 
 function draftKey(sessionId: string) {
@@ -16,10 +17,12 @@ function draftKey(sessionId: string) {
 
 type DraftState = 'idle' | 'typing' | 'saved'
 
-export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, focusTrigger }: Props) {
+export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, focusTrigger, artifacts }: Props) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [draftState, setDraftState] = useState<DraftState>('idle')
+  const [mentionQuery, setMentionQuery] = useState<string | null>(null)
+  const [mentionIndex, setMentionIndex] = useState(0)
 
   // Re-focus textarea when streaming ends (focusTrigger increments) or on mount
   useEffect(() => {
@@ -87,9 +90,61 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
         }
       } catch { /* ignore */ }
     }, 400)
+
+    // Detect @mention token at cursor
+    const ta = textareaRef.current
+    if (ta) {
+      const before = ta.value.slice(0, ta.selectionStart)
+      const m = /(?:^|\s)@([\w-]*)$/.exec(before)
+      setMentionQuery(m ? m[1] : null)
+      setMentionIndex(0)
+    }
+  }
+
+  const suggestions = (artifacts ?? [])
+    .filter(a => a.name.toLowerCase().includes((mentionQuery ?? '').toLowerCase()))
+    .slice(0, 6)
+
+  function insertMention(artifact: Artifact) {
+    const ta = textareaRef.current
+    if (!ta) return
+    const before = ta.value.slice(0, ta.selectionStart)
+    const after = ta.value.slice(ta.selectionStart)
+    const m = /(?:^|\s)@([\w-]*)$/.exec(before)
+    if (!m) return
+    const start = ta.selectionStart - m[1].length - 1 // position of '@'
+    const newVal = ta.value.slice(0, start) + '@' + artifact.name + ' ' + after
+    ta.value = newVal
+    const newCursor = start + artifact.name.length + 2
+    ta.setSelectionRange(newCursor, newCursor)
+    setMentionQuery(null)
+    // trigger draft save
+    handleInput()
   }
 
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+    if (mentionQuery !== null && suggestions.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setMentionIndex(i => (i + 1) % suggestions.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setMentionIndex(i => (i - 1 + suggestions.length) % suggestions.length)
+        return
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault()
+        insertMention(suggestions[mentionIndex])
+        return
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        setMentionQuery(null)
+        return
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       submit()
@@ -158,8 +213,30 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
           className="hidden"
           onChange={(e) => { if (e.target.files?.length) addFiles(e.target.files) }}
         />
+        <div className="flex-1 min-w-0 relative">
+          {/* @mention autocomplete dropdown */}
+          {mentionQuery !== null && suggestions.length > 0 && (
+            <div className="absolute bottom-full left-0 mb-1 z-50 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl min-w-[200px] max-w-[320px] overflow-hidden">
+              {suggestions.map((a, i) => (
+                <button
+                  key={a.id}
+                  onMouseDown={(e) => { e.preventDefault(); insertMention(a) }}
+                  className={`w-full text-left flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors cursor-pointer border-none
+                    ${i === mentionIndex ? 'bg-[#2a2a2a] text-[#eee]' : 'text-[#aaa] hover:bg-[#222]'}`}
+                >
+                  <span className="flex-1 truncate font-medium">{a.name}</span>
+                  <span className={`text-[10px] px-1.5 py-px rounded border flex-shrink-0 ${
+                    a.type === 'chart' ? 'text-orange-400 bg-orange-500/10 border-orange-500/20' :
+                    a.type === 'report' ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' :
+                    a.type === 'data' ? 'text-green-400 bg-green-500/10 border-green-500/20' :
+                    'text-purple-400 bg-purple-500/10 border-purple-500/20'
+                  }`}>{a.type}</span>
+                </button>
+              ))}
+            </div>
+          )}
         <div
-          className={`flex-1 min-w-0 flex items-end gap-1 bg-[#1a1a1a] border rounded-[10px] transition-colors
+          className={`flex items-end gap-1 bg-[#1a1a1a] border rounded-[10px] transition-colors
             ${dragOver ? 'border-blue-500/60 bg-blue-500/5' : draftState === 'typing' ? 'border-amber-500/50' : draftState === 'saved' ? 'border-green-600/50' : 'border-[#2a2a2a] focus-within:border-blue-600'}`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
@@ -190,6 +267,7 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
             onInput={handleInput}
             onKeyDown={handleKeyDown}
           />
+        </div>
         </div>
         {disabled ? (
           <button

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Artifact } from '../lib/api'
+import { updateArtifact } from '../lib/api'
 import { ArtifactViewer } from './ArtifactViewer'
 
 interface Props {
@@ -18,10 +19,28 @@ export function ArtifactEditor({ artifact, content, onChange, onSave }: Props) {
   const [viewerContent, setViewerContent] = useState(content)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [refreshCmd, setRefreshCmd] = useState('')
+  const [refreshSched, setRefreshSched] = useState('')
+  const [metaSaving, setMetaSaving] = useState(false)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+
+  // Sync settings from metadata when artifact changes
+  useEffect(() => {
+    if (!artifact.metadata) {
+      setRefreshCmd('')
+      setRefreshSched('')
+      return
+    }
+    try {
+      const m = JSON.parse(artifact.metadata) as Record<string, unknown>
+      setRefreshCmd((m.refresh_command as string) ?? '')
+      setRefreshSched((m.refresh_schedule as string) ?? '')
+    } catch { /* ignore */ }
+  }, [artifact.metadata])
 
   // Sync local state if the content prop changes externally (e.g. SSE refresh)
   useEffect(() => {
@@ -56,6 +75,19 @@ export function ArtifactEditor({ artifact, content, onChange, onSave }: Props) {
       setSaveStatus('idle')
     }
   }, [saveStatus, onSave])
+
+  async function handleSaveMeta() {
+    setMetaSaving(true)
+    try {
+      let existingMeta: Record<string, unknown> = {}
+      if (artifact.metadata) { try { existingMeta = JSON.parse(artifact.metadata) as Record<string, unknown> } catch { /* ignore */ } }
+      const newMeta = { ...existingMeta, refresh_command: refreshCmd || undefined, refresh_schedule: refreshSched || undefined }
+      await updateArtifact(artifact.id, { metadata: JSON.stringify(newMeta) })
+    } finally {
+      setMetaSaving(false)
+      setSettingsOpen(false)
+    }
+  }
 
   const typeBadgeColor: Record<string, string> = {
     chart: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
@@ -100,6 +132,14 @@ export function ArtifactEditor({ artifact, content, onChange, onSave }: Props) {
           </button>
         )}
         <button
+          onClick={() => setSettingsOpen(o => !o)}
+          className={`text-[11px] px-2 py-1 rounded border cursor-pointer transition-colors flex-shrink-0
+            ${settingsOpen ? 'text-[#ccc] border-[#444] bg-[#222]' : 'text-[#555] border-[#2a2a2a] bg-[#1a1a1a] hover:text-[#aaa]'}`}
+          title="Artifact settings"
+        >
+          ⚙
+        </button>
+        <button
           onClick={handleSave}
           disabled={saveStatus === 'saving'}
           className={`text-[11px] px-2.5 py-1 rounded border cursor-pointer transition-colors flex-shrink-0 disabled:opacity-50
@@ -111,6 +151,24 @@ export function ArtifactEditor({ artifact, content, onChange, onSave }: Props) {
           {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : 'Save'}
         </button>
       </div>
+
+      {/* Settings panel */}
+      {settingsOpen && (
+        <div className="flex-shrink-0 border-b border-[#1f1f1f] p-3 bg-[#0d0d0d] flex flex-col gap-2">
+          <label className="text-[11px] text-[#666]">Refresh command</label>
+          <input value={refreshCmd} onChange={e => setRefreshCmd(e.target.value)}
+            placeholder="e.g. python fetch_data.py"
+            className="text-[12px] bg-[#111] border border-[#2a2a2a] rounded px-2 py-1 text-[#ccc] outline-none font-mono" />
+          <label className="text-[11px] text-[#666]">Refresh schedule (cron)</label>
+          <input value={refreshSched} onChange={e => setRefreshSched(e.target.value)}
+            placeholder="e.g. 0 17 * * 1-5"
+            className="text-[12px] bg-[#111] border border-[#2a2a2a] rounded px-2 py-1 text-[#ccc] outline-none font-mono" />
+          <button onClick={() => void handleSaveMeta()} disabled={metaSaving}
+            className="self-start text-[11px] px-2.5 py-1 rounded border border-[#2a2a2a] bg-[#1a1a1a] text-[#888] hover:text-[#ccc] cursor-pointer disabled:opacity-50">
+            {metaSaving ? 'Saving…' : 'Save settings'}
+          </button>
+        </div>
+      )}
 
       {/* Content area */}
       {isMobile ? (

@@ -620,6 +620,9 @@ const markScheduleRanStmt = db.prepare(
 )
 const deleteScheduleStmt = db.prepare(`DELETE FROM schedules WHERE id = ?`)
 const deleteSchedulesBySessionStmt = db.prepare(`DELETE FROM schedules WHERE session_id = ?`)
+const findScheduleByLabelStmt = db.prepare(
+  `SELECT * FROM schedules WHERE label = ? AND label != '' LIMIT 1`
+)
 
 export const scheduleQueries = {
   create: (id: string, sessionId: string, cron: string, prompt: string, nextRunAt: number | null, once = false, label = '', condition: string | null = null, expiresAt: number | null = null) =>
@@ -629,6 +632,8 @@ export const scheduleQueries = {
   findById: (id: string) => findScheduleByIdStmt.get(id) as Schedule | undefined,
   findBySessionAndLabel: (sessionId: string, label: string) =>
     findScheduleBySessionAndLabelStmt.get(sessionId, label) as Schedule | undefined,
+  findByLabel: (label: string) =>
+    findScheduleByLabelStmt.get(label) as Schedule | undefined,
   listDue: (now: number) => listDueSchedulesStmt.all(now, now) as Schedule[],
   update: (id: string, patch: { cron?: string; prompt?: string; enabled?: boolean; nextRunAt?: number | null; condition?: string | null; expiresAt?: number | null }) =>
     updateScheduleStmt.get(
@@ -653,6 +658,9 @@ const listArtifactsByProjectStmt = db.prepare(
 const findArtifactByIdStmt = db.prepare(
   `SELECT * FROM artifacts WHERE id = ?`
 )
+const findArtifactByProjectAndNameStmt = db.prepare(
+  `SELECT * FROM artifacts WHERE project_id = ? AND name = ? COLLATE NOCASE LIMIT 1`
+)
 const insertArtifactStmt = db.prepare(
   `INSERT INTO artifacts (id, project_id, name, type, path, metadata, created_from_session)
    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`
@@ -670,6 +678,8 @@ export const artifactQueries = {
     listArtifactsByProjectStmt.all(projectId) as unknown as Artifact[],
   findById: (id: string): Artifact | undefined =>
     findArtifactByIdStmt.get(id) as unknown as Artifact | undefined,
+  findByProjectAndName: (projectId: string, name: string): Artifact | undefined =>
+    findArtifactByProjectAndNameStmt.get(projectId, name) as unknown as Artifact | undefined,
   create: (artifact: Omit<Artifact, 'created_at' | 'updated_at'>): Artifact =>
     insertArtifactStmt.get(
       artifact.id,

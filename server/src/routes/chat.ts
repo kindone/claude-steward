@@ -10,6 +10,7 @@ import { broadcastEvent, hasActiveClients } from '../lib/connections.js'
 import { extractToolDetail } from '../claude/toolDetail.js'
 import { workerClient } from '../worker/client.js'
 import { buildEffectiveSystemPrompt } from '../lib/schedulePrompt.js'
+import { resolveArtifactMentions } from '../lib/artifactMentions.js'
 
 /**
  * Normalize a tool_result content value to a plain string.
@@ -82,6 +83,11 @@ router.post('/', (req, res) => {
   messageQueries.insert(uuidv4(), sessionId, 'user', message)
 
   const project = session.project_id ? projectQueries.findById(session.project_id) : undefined
+
+  // Resolve @artifact mentions — inject content for Claude but keep raw @tokens in the stored message.
+  const promptForClaude = project
+    ? resolveArtifactMentions(message, project)
+    : message
 
   // ── Shared completion handlers ─────────────────────────────────────────────
 
@@ -219,7 +225,7 @@ router.post('/', (req, res) => {
     workerClient.send({
       type: 'start',
       sessionId,
-      prompt: message,
+      prompt: promptForClaude,
       claudeSessionId: session.claude_session_id,
       projectPath: project?.path ?? process.cwd(),
       permissionMode: session.permission_mode,
@@ -245,7 +251,7 @@ router.post('/', (req, res) => {
   registerChat(sessionId, controller)
 
   spawnClaude({
-    message,
+    message: promptForClaude,
     claudeSessionId: session.claude_session_id,
     systemPrompt: buildEffectiveSystemPrompt(session),
     permissionMode: session.permission_mode,

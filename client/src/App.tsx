@@ -675,6 +675,7 @@ export default function App() {
               }
               onCompact={handleCompact}
               schedulesTick={schedulesTick}
+              artifactRefreshTick={artifactRefreshTick}
               onOpenArtifact={handleOpenArtifact}
             />
           ) : (
