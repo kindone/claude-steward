@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect, useCallback, useMemo } from 'react'
 import type { Cell as CellType, Language, OutputLine, CompileResult } from '../types'
 import { streamKernelRun, updateCell, deleteCell } from '../api'
 import { CodeMirrorEditor } from './CodeMirrorEditor'
@@ -99,12 +99,30 @@ const CROSSFADE_MS = 200
  */
 function useCrossfadePanel(html: string, enabled: boolean) {
   const [front, setFront] = useState<0 | 1>(0)
+  // htmls tracks the string content per layer (used by useRenderMermaid as a dep
+  // to detect content changes). We do NOT pass these to dangerouslySetInnerHTML —
+  // see useLayoutEffect below for why.
   const [htmls, setHtmls] = useState<[string, string]>([html, ''])
   const ref0 = useRef<HTMLDivElement>(null)
   const ref1 = useRef<HTMLDivElement>(null)
   // Always-current copy of `front` — avoids stale closure in the effect
   const frontRef = useRef<0 | 1>(0)
   const rafRef = useRef<number | null>(null)
+  // Incremented on every flip so useRenderMermaid can re-run for the new front layer.
+  const [flipVersion, setFlipVersion] = useState(0)
+
+  // Set innerHTML directly rather than via dangerouslySetInnerHTML.
+  //
+  // dangerouslySetInnerHTML creates a new {__html} object on every render (it's
+  // always an inline literal). React compares props by reference, so it sees a
+  // change every render and calls `el.innerHTML = html` — even when the string
+  // didn't change. That wipes any mermaid SVGs that were asynchronously written
+  // by mermaid.render(). Direct DOM writes in useLayoutEffect fire only when
+  // htmls actually changes, so React never touches the layer divs' content.
+  useLayoutEffect(() => {
+    if (ref0.current) ref0.current.innerHTML = htmls[0]
+    if (ref1.current) ref1.current.innerHTML = htmls[1]
+  }, [htmls]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     // Cancel any pending flip so rapid updates collapse into one crossfade
@@ -127,6 +145,7 @@ function useCrossfadePanel(html: string, enabled: boolean) {
       rafRef.current = null
       frontRef.current = back
       setFront(back)
+      setFlipVersion(v => v + 1)
     })
   }, [html, enabled]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -143,18 +162,22 @@ function useCrossfadePanel(html: string, enabled: boolean) {
 
   return {
     containerStyle: { display: 'grid' } as React.CSSProperties,
-    layer0: { ref: ref0, html: htmls[0], style: layerStyle(0) },
-    layer1: { ref: ref1, html: htmls[1], style: layerStyle(1) },
+    layer0: { ref: ref0, style: layerStyle(0) },
+    layer1: { ref: ref1, style: layerStyle(1) },
     frontRef: front === 0 ? ref0 : ref1,
     frontHtml: htmls[front],
+    flipVersion,
   }
 }
 
-// Shared mermaid rendering hook — runs after the given HTML is committed to containerRef
+// Shared mermaid rendering hook — runs after the given HTML is committed to containerRef.
+// flipVersion is incremented by useCrossfadePanel after each layer flip so this hook
+// re-runs targeting the new front layer (which holds fresh placeholders with no SVG yet).
 function useRenderMermaid(
   containerRef: React.RefObject<HTMLDivElement | null>,
   html: string,
   enabled: boolean,
+  flipVersion: number,
 ) {
   useEffect(() => {
     if (!enabled || !containerRef.current) return
@@ -178,7 +201,7 @@ function useRenderMermaid(
         }
       }
     })
-  }, [enabled, html]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [enabled, html, flipVersion]) // eslint-disable-line react-hooks/exhaustive-deps
 }
 
 export function Cell({ cell, onUpdate, onDelete, onMoveUp, onMoveDown, canMoveUp, canMoveDown, isRunningByAI }: Props) {
@@ -341,9 +364,10 @@ export function Cell({ cell, onUpdate, onDelete, onMoveUp, onMoveDown, canMoveUp
   const normalCf = useCrossfadePanel(normalHtml, isMarkdown && mdPreview && !isFullscreen)
   const fsCf    = useCrossfadePanel(fsHtml,     isMarkdown && isFullscreen)
 
-  // Mermaid rendering into whichever layer is currently front
-  useRenderMermaid(normalCf.frontRef, normalCf.frontHtml, isMarkdown && mdPreview && !isFullscreen)
-  useRenderMermaid(fsCf.frontRef,    fsCf.frontHtml,    isMarkdown && isFullscreen)
+  // Mermaid rendering into whichever layer is currently front.
+  // flipVersion ensures we re-run after each crossfade flip (new front layer has fresh placeholders).
+  useRenderMermaid(normalCf.frontRef, normalCf.frontHtml, isMarkdown && mdPreview && !isFullscreen, normalCf.flipVersion)
+  useRenderMermaid(fsCf.frontRef,    fsCf.frontHtml,    isMarkdown && isFullscreen,               fsCf.flipVersion)
 
   return (
     <>
@@ -445,7 +469,6 @@ export function Cell({ cell, onUpdate, onDelete, onMoveUp, onMoveDown, canMoveUp
                 ref={layer.ref}
                 className="p-3 text-sm text-[var(--color-text)] leading-relaxed prose-invert"
                 style={layer.style}
-                dangerouslySetInnerHTML={{ __html: layer.html }}
               />
             ))}
           </div>
@@ -568,7 +591,6 @@ export function Cell({ cell, onUpdate, onDelete, onMoveUp, onMoveDown, canMoveUp
                     ref={layer.ref}
                     className="p-4 text-sm text-[var(--color-text)] leading-relaxed prose-invert"
                     style={layer.style}
-                    dangerouslySetInnerHTML={{ __html: layer.html }}
                   />
                 ))}
               </div>
