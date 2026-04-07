@@ -13,6 +13,7 @@ type AppConnectionOpts = {
   onReload?: () => void
   onPushTarget?: (target: { sessionId: string; projectId: string | null }) => void
   onSchedulesChanged?: (sessionId: string | null) => void
+  onArtifactUpdated?: () => void
 }
 
 /**
@@ -28,12 +29,15 @@ export function useAppConnection(opts?: AppConnectionOpts): AppConnection {
   onPushTargetRef.current = opts?.onPushTarget
   const onSchedulesChangedRef = useRef(opts?.onSchedulesChanged)
   onSchedulesChangedRef.current = opts?.onSchedulesChanged
+  const onArtifactUpdatedRef = useRef(opts?.onArtifactUpdated)
+  onArtifactUpdatedRef.current = opts?.onArtifactUpdated
 
   useEffect(() => {
     const cancel = subscribeToAppEvents({
       onReload: () => onReloadRef.current?.(),
       onPushTarget: (t) => onPushTargetRef.current?.(t),
       onSchedulesChanged: (sid) => onSchedulesChangedRef.current?.(sid),
+      onArtifactUpdated: () => onArtifactUpdatedRef.current?.(),
       onConnect: () => {
         setState('connected')
         setLastSeenAt(Date.now())

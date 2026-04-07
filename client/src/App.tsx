@@ -4,7 +4,8 @@ import {
   listProjects, createProject, deleteProject, fetchMeta, updatePermissionMode, updateProject,
   listSessions, createSession, deleteSession, renameSession,
   getAuthStatus, logout,
-  type Project, type Session,
+  getArtifactContent, putArtifactContent,
+  type Project, type Session, type Artifact,
 } from './lib/api'
 import { SessionSidebar } from './components/SessionSidebar'
 import { ChatWindow } from './components/ChatWindow'
@@ -12,6 +13,7 @@ import { AppViewPanel } from './components/AppViewPanel'
 import AuthPage from './components/AuthPage'
 import { ErrorConsole } from './components/ErrorConsole'
 import { useAppConnection, type ConnState } from './hooks/useAppConnection'
+import { ArtifactFloat, type OpenArtifact } from './components/ArtifactFloat'
 
 type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
 
@@ -106,6 +108,16 @@ export default function App() {
   // Incremented whenever the MCP server notifies us that schedules changed,
   // so ChatWindow/SchedulePanel can re-fetch without polling.
   const [schedulesTick, setSchedulesTick] = useState(0)
+  // Incremented whenever the server notifies us that an artifact was updated,
+  // so ArtifactPanel can re-fetch without polling.
+  const [artifactRefreshTick, setArtifactRefreshTick] = useState(0)
+
+  // ── Artifact float panel ──────────────────────────────────────────────────────
+  const [openArtifacts, setOpenArtifacts] = useState<OpenArtifact[]>([])
+  const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null)
+  // Ref so SSE handler always sees the latest openArtifacts without re-registering
+  const openArtifactsRef = useRef<OpenArtifact[]>([])
+  useEffect(() => { openArtifactsRef.current = openArtifacts }, [openArtifacts])
 
   // Capture unhandled JS errors and promise rejections for visibility
   const pushError = useCallback((message: string, stack?: string) => {
@@ -260,6 +272,17 @@ export default function App() {
     onReload: authState === 'authenticated' ? handleReload : undefined,
     onPushTarget: handlePushTarget,
     onSchedulesChanged: () => setSchedulesTick((t) => t + 1),
+    onArtifactUpdated: () => {
+      setArtifactRefreshTick((t) => t + 1)
+      // Re-fetch content for any currently-open artifact
+      openArtifactsRef.current.forEach(({ artifact }) => {
+        getArtifactContent(artifact.id).then((content) => {
+          setOpenArtifacts((prev) =>
+            prev.map((a) => a.artifact.id === artifact.id ? { ...a, content } : a)
+          )
+        }).catch(console.error)
+      })
+    },
   })
 
   // Load projects and meta once authenticated; restore last-used project if it still exists.
@@ -401,6 +424,52 @@ export default function App() {
     setSessions((prev) => prev.map((s) => (s.id === sessionId ? updated : s)))
   }
 
+  const handleOpenArtifact = useCallback(async (artifact: Artifact) => {
+    // If already open, just activate (and restore if minimized)
+    if (openArtifactsRef.current.some((a) => a.artifact.id === artifact.id)) {
+      setActiveArtifactId(artifact.id)
+      setOpenArtifacts((prev) =>
+        prev.map((a) => a.artifact.id === artifact.id ? { ...a, minimized: false } : a)
+      )
+      return
+    }
+    // Load content then add to open list
+    const content = await getArtifactContent(artifact.id)
+    setOpenArtifacts((prev) => [...prev, { artifact, content, minimized: false }])
+    setActiveArtifactId(artifact.id)
+  }, [])
+
+  const handleCloseArtifact = useCallback((id: string) => {
+    setOpenArtifacts((prev) => prev.filter((a) => a.artifact.id !== id))
+    setActiveArtifactId((cur) => (cur === id ? null : cur))
+  }, [])
+
+  const handleMinimizeArtifact = useCallback((id: string) => {
+    setOpenArtifacts((prev) =>
+      prev.map((a) => a.artifact.id === id ? { ...a, minimized: true } : a)
+    )
+    setActiveArtifactId((cur) => (cur === id ? null : cur))
+  }, [])
+
+  const handleRestoreArtifact = useCallback((id: string) => {
+    setOpenArtifacts((prev) =>
+      prev.map((a) => a.artifact.id === id ? { ...a, minimized: false } : a)
+    )
+    setActiveArtifactId(id)
+  }, [])
+
+  const handleArtifactContentChange = useCallback((id: string, newContent: string) => {
+    setOpenArtifacts((prev) =>
+      prev.map((a) => a.artifact.id === id ? { ...a, content: newContent } : a)
+    )
+  }, [])
+
+  const handleSaveArtifact = useCallback((id: string) => {
+    const entry = openArtifactsRef.current.find((a) => a.artifact.id === id)
+    if (!entry) return
+    putArtifactContent(id, entry.content).catch(console.error)
+  }, [])
+
   async function handleCompact(_newSessionId: string) {
     if (!activeProjectId) return
     // Refresh sidebar — but filter out past chain segments (sessions whose id is
@@ -538,6 +607,8 @@ export default function App() {
           connState={connState}
           lastSeenAt={lastSeenAt}
           onOpenApp={(url, name) => setAppPanel({ url, name })}
+          onOpenArtifact={handleOpenArtifact}
+          artifactRefreshTick={artifactRefreshTick}
         />
       </div>
 
@@ -604,6 +675,7 @@ export default function App() {
               }
               onCompact={handleCompact}
               schedulesTick={schedulesTick}
+              onOpenArtifact={handleOpenArtifact}
             />
           ) : (
             <div className="flex flex-col items-center justify-center h-full gap-4 text-[#666]">
@@ -623,6 +695,18 @@ export default function App() {
             </div>
           )}
         </div>
+
+        {/* Artifact float panel — fixed right overlay, does not push content */}
+        <ArtifactFloat
+          openArtifacts={openArtifacts}
+          activeArtifactId={activeArtifactId}
+          onActivate={setActiveArtifactId}
+          onClose={handleCloseArtifact}
+          onMinimize={handleMinimizeArtifact}
+          onRestore={handleRestoreArtifact}
+          onContentChange={handleArtifactContentChange}
+          onSave={handleSaveArtifact}
+        />
 
         {/* App view panel — mobile: full-screen overlay; desktop: side column */}
         {appPanel && (

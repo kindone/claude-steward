@@ -25,7 +25,8 @@
     "marked": "^15.0.7",
     "mermaid": "^11.13.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "vega-embed": "^7.1.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.1",

@@ -15,6 +15,7 @@ import { KernelOutputPanel, type OutputPanelState } from './KernelOutputPanel'
 import { runCode, normalizeLanguage } from '../lib/kernelApi'
 import { SaveAsCellDialog } from './SaveAsCellDialog'
 import type { SaveCellResult } from '../lib/notebookApi'
+import type { ArtifactType } from '../lib/api'
 
 // Mermaid is initialized once at module level with a dark theme.
 mermaid.initialize({ startOnLoad: false, theme: 'dark' })
@@ -42,9 +43,10 @@ type Props = {
   projectId?: string | null
   createdAt?: number
   onSendToChat?: (text: string) => void
+  onSaveAsArtifact?: (content: string, defaultType: ArtifactType, defaultName: string, anchorEl: HTMLElement) => void
 }
 
-export function MessageBubble({ role, content, streaming = false, errorCode, source, toolUses, onCompact, projectId = null, createdAt, onSendToChat }: Props) {
+export function MessageBubble({ role, content, streaming = false, errorCode, source, toolUses, onCompact, projectId = null, createdAt, onSendToChat, onSaveAsArtifact }: Props) {
   const displayContent = content
   const isScheduled = source === 'scheduler'
   const contentRef = useRef<HTMLDivElement>(null)
@@ -70,6 +72,9 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
   /** Per-block save dialog: block index → { anchorEl, lang, code } | null */
   const [saveDialogs, setSaveDialogs] = useState<Map<number, { anchorEl: HTMLButtonElement; lang: string; code: string }>>(() => new Map())
   const handleSaveRef = useRef<((idx: number, lang: string, code: string, btn: HTMLButtonElement) => void) | undefined>(undefined)
+
+  // ── Save as Artifact state ────────────────────────────────────────────────────
+  const onSaveAsArtifactRef = useRef<typeof onSaveAsArtifact>(undefined)
 
   // Syntax-highlight code blocks after every render.
   //
@@ -163,6 +168,24 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
             const lang = pre.getAttribute('data-runnable-lang') ?? ''
             const code = pre.querySelector('code')?.textContent ?? ''
             handleSaveRef.current?.(idx, lang, code, btn as HTMLButtonElement)
+          })
+          pre.appendChild(btn)
+        }
+        if (!pre.querySelector('.artifact-save-btn') && onSaveAsArtifactRef.current) {
+          const btn = document.createElement('button')
+          btn.className = 'artifact-save-btn code-action-btn'
+          btn.title = 'Save as artifact'
+          btn.textContent = '📎'
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation()
+            const lang = pre.getAttribute('data-runnable-lang') ?? 'text'
+            const code = pre.querySelector('code')?.textContent ?? ''
+            const defaultType: ArtifactType =
+              lang === 'json' ? 'chart' :
+              ['md', 'markdown'].includes(lang) ? 'report' :
+              ['csv'].includes(lang) ? 'data' :
+              'code'
+            onSaveAsArtifactRef.current?.(code, defaultType, '', btn as HTMLButtonElement)
           })
           pre.appendChild(btn)
         }
@@ -308,6 +331,9 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
 
     abortProxy.fn = abort
   }
+
+  // Keep artifact save ref up-to-date so DOM listeners see the latest callback
+  onSaveAsArtifactRef.current = onSaveAsArtifact
 
   // Toggle the save dialog for a code block (click again to close)
   handleSaveRef.current = (idx: number, lang: string, code: string, btn: HTMLButtonElement) => {

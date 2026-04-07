@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, getSessionChain, updateSessionTimezone, toolDisplayName, toolDisplayDetail, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, getSessionChain, updateSessionTimezone, toolDisplayName, toolDisplayDetail, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo, type Artifact, type ArtifactType } from '../lib/api'
 import { CompactDivider } from './CompactDivider'
+import { SaveAsArtifactDialog } from './SaveAsArtifactDialog'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
@@ -97,9 +98,11 @@ type Props = {
   onCompact?: (newSessionId: string) => void
   /** Incremented by App when the server emits a schedules_changed SSE event. */
   schedulesTick?: number
+  /** Called when a saved artifact should be opened in the float panel. */
+  onOpenArtifact?: (artifact: Artifact) => void
 }
 
-export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact, schedulesTick = 0 }: Props) {
+export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact, schedulesTick = 0, onOpenArtifact }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingOlder, setLoadingOlder] = useState(false)
@@ -116,6 +119,13 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   const [debugOpen, setDebugOpen] = useState(false)
   const [chainInfoOpen, setChainInfoOpen] = useState(false)
   const [kernelRefreshTick, setKernelRefreshTick] = useState(0)
+  // Save as artifact dialog state
+  const [saveArtifactTarget, setSaveArtifactTarget] = useState<{
+    content: string
+    type: ArtifactType
+    name: string
+    anchor: HTMLElement
+  } | null>(null)
   // Past segments: frozen messages from compacted predecessors, shown above dividers.
   const [pastSegments, setPastSegments] = useState<(ChainSegment & { messages: Message[] })[]>([])
   // The tail session this ChatWindow is currently sending to (may differ from sessionId prop after compact).
@@ -795,6 +805,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
                     projectId={projectId}
                     createdAt={m.createdAt}
                     onSendToChat={(text) => { handleSend(`Output:\n\`\`\`\n${text}\n\`\`\``); setKernelRefreshTick(t => t + 1) }}
+                    onSaveAsArtifact={(content, type, name, anchor) => setSaveArtifactTarget({ content, type, name, anchor })}
                   />
                 </div>
               )
@@ -839,6 +850,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
                 projectId={projectId}
                 createdAt={m.createdAt}
                 onSendToChat={(text) => { handleSend(`Output:\n\`\`\`\n${text}\n\`\`\``); setKernelRefreshTick(t => t + 1) }}
+                onSaveAsArtifact={(content, type, name, anchor) => setSaveArtifactTarget({ content, type, name, anchor })}
               />
             </div>
           )
@@ -913,6 +925,23 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         }}
         disabled={streaming}
       />
+
+      {/* Save as Artifact dialog */}
+      {saveArtifactTarget && projectId && (
+        <SaveAsArtifactDialog
+          projectId={projectId}
+          sessionId={sessionId}
+          content={saveArtifactTarget.content}
+          defaultType={saveArtifactTarget.type}
+          defaultName={saveArtifactTarget.name}
+          anchorEl={saveArtifactTarget.anchor}
+          onClose={() => setSaveArtifactTarget(null)}
+          onSaved={(artifact) => {
+            setSaveArtifactTarget(null)
+            onOpenArtifact?.(artifact)
+          }}
+        />
+      )}
     </div>
   )
 }

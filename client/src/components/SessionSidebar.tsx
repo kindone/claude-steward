@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import type { Session, Project } from '../lib/api'
+import type { Session, Project, Artifact } from '../lib/api'
 import { ProjectPicker } from './ProjectPicker'
 import { FileTree } from './FileTree'
 import { TerminalPanel } from './TerminalPanel'
 import { AppsPanel } from './AppsPanel'
+import { ArtifactPanel } from './ArtifactPanel'
 import { usePushNotifications } from '../hooks/usePushNotifications'
 import type { ConnState } from '../hooks/useAppConnection'
 
@@ -29,6 +30,8 @@ type Props = {
   connState?: ConnState
   lastSeenAt?: number | null
   onOpenApp?: (url: string, name: string) => void
+  onOpenArtifact: (artifact: Artifact) => void
+  artifactRefreshTick?: number
 }
 
 export function SessionSidebar({
@@ -52,6 +55,8 @@ export function SessionSidebar({
   connState,
   lastSeenAt,
   onOpenApp,
+  onOpenArtifact,
+  artifactRefreshTick,
 }: Props) {
   const { state: pushState, subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
@@ -60,12 +65,12 @@ export function SessionSidebar({
   const editInputRef = useRef<HTMLInputElement>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
-  const [activeTab, setActiveTab] = useState<'sessions' | 'files' | 'terminal' | 'apps'>(() => {
-    try { return (localStorage.getItem('steward:sidebarTab') as 'sessions' | 'files' | 'terminal' | 'apps') ?? 'sessions' }
+  const [activeTab, setActiveTab] = useState<'sessions' | 'files' | 'terminal' | 'apps' | 'artifacts'>(() => {
+    try { return (localStorage.getItem('steward:sidebarTab') as 'sessions' | 'files' | 'terminal' | 'apps' | 'artifacts') ?? 'sessions' }
     catch { return 'sessions' }
   })
 
-  const switchTab = useCallback((tab: 'sessions' | 'files' | 'terminal' | 'apps') => {
+  const switchTab = useCallback((tab: 'sessions' | 'files' | 'terminal' | 'apps' | 'artifacts') => {
     setActiveTab(tab)
     try { localStorage.setItem('steward:sidebarTab', tab) } catch { /* ignore */ }
   }, [])
@@ -163,7 +168,7 @@ export function SessionSidebar({
 
       {/* Tab bar */}
       <div className="flex items-stretch border-b border-[#1f1f1f] flex-shrink-0">
-        {(['sessions', 'files', 'apps', 'terminal'] as const).map((tab) => (
+        {(['sessions', 'files', 'apps', 'artifacts', 'terminal'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => switchTab(tab)}
@@ -174,14 +179,14 @@ export function SessionSidebar({
           >
             {tab === 'sessions' ? (
               <span className="flex items-center justify-center gap-1">
-                Sessions
+                Chats
                 {sessions.length > 0 && (
                   <span className="bg-[#2a2a2a] text-[#666] text-[10px] font-semibold px-1.5 py-px rounded-full">
                     {sessions.length}
                   </span>
                 )}
               </span>
-            ) : tab === 'terminal' ? 'Term' : tab === 'apps' ? 'Apps' : 'Files'}
+            ) : tab === 'terminal' ? 'Term' : tab === 'apps' ? 'Apps' : tab === 'artifacts' ? 'Art' : 'Files'}
           </button>
         ))}
         {/* Push notification bell — tab bar keeps it always visible on all screen sizes */}
@@ -318,6 +323,18 @@ export function SessionSidebar({
         activeProjectId
           ? <FileTree projectId={activeProjectId} alwaysExpanded />
           : <p className="px-3 py-4 text-[12px] text-[#444] italic">No project selected</p>
+      )}
+
+      {/* Artifacts tab */}
+      {activeTab === 'artifacts' && activeProjectId && (
+        <ArtifactPanel
+          projectId={activeProjectId}
+          onOpen={onOpenArtifact}
+          refreshTick={artifactRefreshTick}
+        />
+      )}
+      {activeTab === 'artifacts' && !activeProjectId && (
+        <p className="px-3 py-4 text-[12px] text-[#444] italic">No project selected</p>
       )}
 
       {/* Terminal tab — always mounted once first shown so xterm.js instance survives tab switches */}

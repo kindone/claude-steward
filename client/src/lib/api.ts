@@ -408,6 +408,99 @@ export async function runScheduleNow(id: string): Promise<void> {
   })
 }
 
+// ── Artifacts ─────────────────────────────────────────────────────────────────
+
+export type ArtifactType = 'chart' | 'report' | 'data' | 'code'
+
+export interface Artifact {
+  id: string
+  project_id: string
+  name: string
+  type: ArtifactType
+  path: string
+  metadata: string | null
+  created_from_session: string | null
+  created_at: number
+  updated_at: number
+}
+
+export async function listArtifacts(projectId: string): Promise<Artifact[]> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/artifacts`, credentialsOpt)
+  if (!res.ok) throw new Error('Failed to list artifacts')
+  return res.json() as Promise<Artifact[]>
+}
+
+export async function createArtifact(projectId: string, body: {
+  name: string
+  type: ArtifactType
+  content: string
+  metadata?: string
+  created_from_session?: string
+}): Promise<Artifact> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/artifacts`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(b.error ?? 'Failed to create artifact')
+  }
+  return res.json() as Promise<Artifact>
+}
+
+export async function getArtifact(id: string): Promise<Artifact> {
+  const res = await fetch(`/api/artifacts/${encodeURIComponent(id)}`, credentialsOpt)
+  if (!res.ok) throw new Error('Failed to get artifact')
+  return res.json() as Promise<Artifact>
+}
+
+export async function updateArtifact(id: string, patch: { name?: string; metadata?: string }): Promise<Artifact> {
+  const res = await fetch(`/api/artifacts/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify(patch),
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(b.error ?? 'Failed to update artifact')
+  }
+  return res.json() as Promise<Artifact>
+}
+
+export async function deleteArtifact(id: string): Promise<void> {
+  await fetch(`/api/artifacts/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    ...credentialsOpt,
+  })
+}
+
+export async function getArtifactContent(id: string): Promise<string> {
+  const res = await fetch(`/api/artifacts/${encodeURIComponent(id)}/content`, credentialsOpt)
+  if (!res.ok) throw new Error('Failed to get artifact content')
+  const data = await res.json() as { content: string }
+  return data.content
+}
+
+export async function putArtifactContent(id: string, content: string): Promise<void> {
+  const res = await fetch(`/api/artifacts/${encodeURIComponent(id)}/content`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'text/plain' },
+    body: content,
+    ...credentialsOpt,
+  })
+  if (!res.ok) throw new Error('Failed to update artifact content')
+}
+
+export async function refreshArtifact(id: string): Promise<void> {
+  await fetch(`/api/artifacts/${encodeURIComponent(id)}/refresh`, {
+    method: 'POST',
+    ...credentialsOpt,
+  })
+}
+
 // ── Exec ──────────────────────────────────────────────────────────────────────
 
 export type ExecHandlers = {
@@ -605,6 +698,8 @@ export type AppEventHandlers = {
   onPushTarget?: (target: { sessionId: string; projectId: string | null }) => void
   /** Fired when an MCP schedule tool mutates schedules — sessionId may be null for global. */
   onSchedulesChanged?: (sessionId: string | null) => void
+  /** Fired when an artifact is created or updated — triggers ArtifactPanel refresh. */
+  onArtifactUpdated?: () => void
   /** Fired when the SSE connection is established (initial + every reconnect). */
   onConnect?: () => void
   /** Fired when the SSE connection drops unexpectedly (before the reconnect delay). */
@@ -746,6 +841,9 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
                 const { sessionId } = JSON.parse(raw) as { sessionId?: string | null }
                 handlers.onSchedulesChanged?.(sessionId ?? null)
               } catch { /* ignore */ }
+            }
+            if (pendingEvent === 'artifact_updated' || pendingEvent === 'artifact_created' || pendingEvent === 'artifact_deleted') {
+              handlers.onArtifactUpdated?.()
             }
             pendingEvent = ''
           }

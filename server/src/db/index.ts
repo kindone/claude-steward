@@ -167,6 +167,26 @@ try {
   db.exec(`ALTER TABLE schedules ADD COLUMN expires_at INTEGER`)
 } catch { /* already exists */ }
 
+// ── Artifact tables ──────────────────────────────────────────────────────────
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS artifacts (
+    id                   TEXT PRIMARY KEY,
+    project_id           TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name                 TEXT NOT NULL,
+    type                 TEXT NOT NULL,
+    path                 TEXT NOT NULL,
+    metadata             TEXT,
+    created_from_session TEXT REFERENCES sessions(id),
+    created_at           INTEGER NOT NULL DEFAULT (unixepoch()),
+    updated_at           INTEGER NOT NULL DEFAULT (unixepoch())
+  )
+`)
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_artifacts_project_id ON artifacts(project_id)
+`)
+
 // ── Mini-app tables ───────────────────────────────────────────────────────────
 
 db.exec(`
@@ -253,6 +273,20 @@ export type Message = {
   tool_calls: string | null  // JSON array of ToolCall objects, null if none
   source: string | null      // null = user-initiated, 'scheduler' = agent-initiated scheduled message
   created_at: number
+}
+
+export type ArtifactType = 'chart' | 'report' | 'data' | 'code'
+
+export interface Artifact {
+  id: string
+  project_id: string
+  name: string
+  type: ArtifactType
+  path: string
+  metadata: string | null
+  created_from_session: string | null
+  created_at: number
+  updated_at: number
 }
 
 // ── Project queries ───────────────────────────────────────────────────────────
@@ -609,6 +643,48 @@ export const scheduleQueries = {
     markScheduleRanStmt.run(ranAt, nextRunAt, id),
   delete: (id: string) => deleteScheduleStmt.run(id),
   deleteBySession: (sessionId: string) => deleteSchedulesBySessionStmt.run(sessionId),
+}
+
+// ── Artifact queries ──────────────────────────────────────────────────────────
+
+const listArtifactsByProjectStmt = db.prepare(
+  `SELECT * FROM artifacts WHERE project_id = ? ORDER BY created_at ASC`
+)
+const findArtifactByIdStmt = db.prepare(
+  `SELECT * FROM artifacts WHERE id = ?`
+)
+const insertArtifactStmt = db.prepare(
+  `INSERT INTO artifacts (id, project_id, name, type, path, metadata, created_from_session)
+   VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`
+)
+const updateArtifactStmt = db.prepare(
+  `UPDATE artifacts SET name = COALESCE(?, name), metadata = COALESCE(?, metadata),
+   updated_at = unixepoch() WHERE id = ? RETURNING *`
+)
+const deleteArtifactStmt = db.prepare(
+  `DELETE FROM artifacts WHERE id = ?`
+)
+
+export const artifactQueries = {
+  listByProject: (projectId: string): Artifact[] =>
+    listArtifactsByProjectStmt.all(projectId) as unknown as Artifact[],
+  findById: (id: string): Artifact | undefined =>
+    findArtifactByIdStmt.get(id) as unknown as Artifact | undefined,
+  create: (artifact: Omit<Artifact, 'created_at' | 'updated_at'>): Artifact =>
+    insertArtifactStmt.get(
+      artifact.id,
+      artifact.project_id,
+      artifact.name,
+      artifact.type,
+      artifact.path,
+      artifact.metadata ?? null,
+      artifact.created_from_session ?? null
+    ) as unknown as Artifact,
+  update: (id: string, patch: { name?: string; metadata?: string }): Artifact | undefined =>
+    updateArtifactStmt.get(patch.name ?? null, patch.metadata ?? null, id) as unknown as Artifact | undefined,
+  delete: (id: string): void => {
+    deleteArtifactStmt.run(id)
+  },
 }
 
 // ── App config types + queries ────────────────────────────────────────────────
