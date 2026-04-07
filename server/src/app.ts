@@ -15,6 +15,8 @@ import schedulesRouter from './routes/schedules.js'
 import evalRouter from './routes/eval.js'
 import appsRouter from './routes/apps.js'
 import mcpNotifyRouter from './routes/mcp.js'
+import kernelsRouter from './routes/kernels.js'
+import notebooksRouter from './routes/notebooks.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Monorepo root — two levels up from server/src/
@@ -62,6 +64,8 @@ export function createApp() {
   app.use('/api/push', pushRouter)
   app.use('/api/schedules', schedulesRouter)
   app.use('/api', appsRouter)
+  app.use('/api/projects/:projectId/kernels', kernelsRouter)
+  app.use('/api/projects/:projectId/notebooks', notebooksRouter)
 
   if (NODE_ENV === 'production') {
     const publicDir = path.join(__dirname, '../public')

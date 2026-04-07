@@ -74,7 +74,13 @@ export function buildMarkedOptions(projectId: string | null): { renderer: Instan
       const encoded = encodeURIComponent(token.text)
       return `<div class="mermaid-placeholder" data-graph="${encoded}"></div>`
     }
-    return parentCode(token)
+    // Add data-runnable-lang to <pre> so MessageBubble can inject Run buttons.
+    // The code content is read from the <code> element's textContent at run time.
+    const html = parentCode(token)
+    if (token.lang) {
+      return html.replace('<pre>', `<pre data-runnable-lang="${escapeAttr(token.lang)}">`)
+    }
+    return html
   }
 
   // Image URL rewriting for relative paths

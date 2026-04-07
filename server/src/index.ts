@@ -10,6 +10,7 @@ import { startScheduler } from './lib/scheduler.js'
 import { writeMcpConfig } from './mcp/config.js'
 import { appsClient } from './apps/client.js'
 import { appSlotQueries } from './db/index.js'
+import { initProjectKernelManager } from './kernels/manager.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // .env lives in the monorepo root (two levels up from server/src/ or server/dist/)
@@ -83,6 +84,9 @@ appsClient.onCrashed = (configId, _exitCode) => {
   }
 }
 appsClient.connect()
+
+// Initialise the project-scoped kernel manager (code execution in chat).
+initProjectKernelManager()
 
 // Write the MCP config file so Claude CLI subprocesses can load schedule tools.
 // Must run before the worker connects (which may immediately spawn Claude).

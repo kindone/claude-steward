@@ -21,6 +21,7 @@ const MODEL_OPTIONS: { value: string | null; label: string }[] = [
 import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
 import { SchedulePanel } from './SchedulePanel'
+import { KernelSelector } from './KernelSelector'
 
 type Message = {
   id: string
@@ -114,6 +115,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   const [scheduleTick, setScheduleTick] = useState(0)
   const [debugOpen, setDebugOpen] = useState(false)
   const [chainInfoOpen, setChainInfoOpen] = useState(false)
+  const [kernelRefreshTick, setKernelRefreshTick] = useState(0)
   // Past segments: frozen messages from compacted predecessors, shown above dividers.
   const [pastSegments, setPastSegments] = useState<(ChainSegment & { messages: Message[] })[]>([])
   // The tail session this ChatWindow is currently sending to (may differ from sessionId prop after compact).
@@ -575,6 +577,11 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
           </span>
 
           <span className="flex items-center gap-1 sm:gap-2">
+            {/* Kernel selector — shown when project has live kernels */}
+            {projectId && (
+              <KernelSelector projectId={projectId} refreshTick={kernelRefreshTick} />
+            )}
+
             {/* Schedule button */}
             <button
               className={`bg-transparent border border-[#222] hover:border-[#444] rounded cursor-pointer text-xs px-2.5 py-1.5 transition-colors ${scheduleOpen ? 'text-blue-400 border-blue-500/40' : 'text-[#444] hover:text-[#888]'}`}
@@ -787,6 +794,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
                     toolUses={m.toolUses}
                     projectId={projectId}
                     createdAt={m.createdAt}
+                    onSendToChat={(text) => { handleSend(`Output:\n\`\`\`\n${text}\n\`\`\``); setKernelRefreshTick(t => t + 1) }}
                   />
                 </div>
               )
@@ -830,6 +838,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
                 onCompact={m.errorCode === 'context_limit' ? handleCompact : undefined}
                 projectId={projectId}
                 createdAt={m.createdAt}
+                onSendToChat={(text) => { handleSend(`Output:\n\`\`\`\n${text}\n\`\`\``); setKernelRefreshTick(t => t + 1) }}
               />
             </div>
           )

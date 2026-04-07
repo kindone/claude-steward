@@ -1,4 +1,5 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
@@ -10,6 +11,10 @@ import { toolDisplayName, toolDisplayDetail } from '../lib/api'
 import { splitContent, buildMarkedOptions, preprocessKaTeX } from '../lib/markdownRenderer'
 import { HtmlPreview } from './HtmlPreview'
 import { ImageLightbox, type LightboxContent } from './ImageLightbox'
+import { KernelOutputPanel, type OutputPanelState } from './KernelOutputPanel'
+import { runCode, normalizeLanguage } from '../lib/kernelApi'
+import { SaveAsCellDialog } from './SaveAsCellDialog'
+import type { SaveCellResult } from '../lib/notebookApi'
 
 // Mermaid is initialized once at module level with a dark theme.
 mermaid.initialize({ startOnLoad: false, theme: 'dark' })
@@ -22,7 +27,7 @@ function renderMarkdown(content: string, projectId: string | null): string {
   const { renderer } = buildMarkedOptions(projectId)
   const html = marked.parse(withKatex, { renderer }) as string
   return DOMPurify.sanitize(html, {
-    ADD_ATTR: ['data-graph', 'style'],
+    ADD_ATTR: ['data-graph', 'data-runnable-lang', 'style'],
   })
 }
 
@@ -36,9 +41,10 @@ type Props = {
   onCompact?: () => void
   projectId?: string | null
   createdAt?: number
+  onSendToChat?: (text: string) => void
 }
 
-export function MessageBubble({ role, content, streaming = false, errorCode, source, toolUses, onCompact, projectId = null, createdAt }: Props) {
+export function MessageBubble({ role, content, streaming = false, errorCode, source, toolUses, onCompact, projectId = null, createdAt, onSendToChat }: Props) {
   const displayContent = content
   const isScheduled = source === 'scheduler'
   const contentRef = useRef<HTMLDivElement>(null)
@@ -49,6 +55,21 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
   const [galleryExpanded, setGalleryExpanded] = useState(false)
   /** Per-message SVG cache: graph source → rendered SVG string. */
   const mermaidCache = useRef<Map<string, string>>(new Map())
+
+  // ── Kernel code execution state ─────────────────────────────────────────────
+  /** Per-block run state: block index → output panel state */
+  const [runStates, setRunStates] = useState<Map<number, OutputPanelState>>(() => new Map())
+  /** Ref to DOM mount divs injected after <pre> blocks (portal targets) */
+  const outputMountsRef = useRef<Map<number, HTMLDivElement>>(new Map())
+  /** Version counter incremented when new mount divs are added, triggering portal renders */
+  const [mountVersion, setMountVersion] = useState(0)
+  /** Stable ref to the run handler, so DOM event listeners don't close over stale state */
+  const handleRunRef = useRef<((idx: number, lang: string, code: string) => void) | undefined>(undefined)
+
+  // ── Save as Cell state ───────────────────────────────────────────────────────
+  /** Per-block save dialog: block index → { anchorEl, lang, code } | null */
+  const [saveDialogs, setSaveDialogs] = useState<Map<number, { anchorEl: HTMLButtonElement; lang: string; code: string }>>(() => new Map())
+  const handleSaveRef = useRef<((idx: number, lang: string, code: string, btn: HTMLButtonElement) => void) | undefined>(undefined)
 
   // Syntax-highlight code blocks after every render.
   //
@@ -112,6 +133,47 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
     const grid = contentRef.current?.querySelector<HTMLElement>('.img-gallery-grid')
     if (grid) {
       grid.classList.toggle('is-collapsed', !galleryExpanded)
+    }
+
+    // Run buttons: inject ▶ Run button and output portal mount into each runnable
+    // code block once streaming ends. Idempotent — skips blocks that already have a button.
+    if (!streaming && projectId) {
+      const pres = contentRef.current.querySelectorAll<HTMLElement>('pre[data-runnable-lang]')
+      let mountsChanged = false
+      pres.forEach((pre, idx) => {
+        if (!pre.querySelector('.kernel-run-btn')) {
+          const btn = document.createElement('button')
+          btn.className = 'kernel-run-btn'
+          btn.textContent = '▶ Run'
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation()
+            const lang = pre.getAttribute('data-runnable-lang') ?? ''
+            const code = pre.querySelector('code')?.textContent ?? ''
+            handleRunRef.current?.(idx, lang, code)
+          })
+          pre.appendChild(btn)
+        }
+        if (!pre.querySelector('.kernel-save-btn')) {
+          const btn = document.createElement('button')
+          btn.className = 'kernel-save-btn'
+          btn.textContent = '💾'
+          btn.title = 'Save as cell'
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation()
+            const lang = pre.getAttribute('data-runnable-lang') ?? ''
+            const code = pre.querySelector('code')?.textContent ?? ''
+            handleSaveRef.current?.(idx, lang, code, btn as HTMLButtonElement)
+          })
+          pre.appendChild(btn)
+        }
+        if (!outputMountsRef.current.has(idx)) {
+          const mount = document.createElement('div')
+          pre.after(mount)
+          outputMountsRef.current.set(idx, mount)
+          mountsChanged = true
+        }
+      })
+      if (mountsChanged) setMountVersion(v => v + 1)
     }
   }) // intentionally no deps — must run after every render
 
@@ -192,6 +254,85 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       setLightbox({ type: 'svg', markup: svg.outerHTML })
     }
   }
+
+  // Keep handleRunRef.current up-to-date so DOM event listeners see the latest projectId
+  handleRunRef.current = (idx: number, lang: string, code: string) => {
+    const kernelLang = normalizeLanguage(lang)
+    if (!kernelLang || !projectId) return
+    const kernelName = 'default'
+
+    // Abort any existing run for this block
+    setRunStates(prev => {
+      prev.get(idx)?.abort?.()
+      return prev
+    })
+
+    // Create a stable abort proxy — the real abort fn is assigned after runCode() returns
+    const abortProxy = { fn: undefined as (() => void) | undefined }
+
+    setRunStates(prev => new Map(prev).set(idx, {
+      status: 'running',
+      lines: [],
+      exitCode: null,
+      durationMs: null,
+      abort: () => abortProxy.fn?.(),
+    }))
+
+    const abort = runCode(projectId, kernelName, kernelLang, code, (event) => {
+      if (event.type === 'output') {
+        setRunStates(prev => {
+          const cur = prev.get(idx)
+          if (!cur) return prev
+          return new Map(prev).set(idx, { ...cur, lines: [...cur.lines, event.text] })
+        })
+      } else if (event.type === 'compile') {
+        setRunStates(prev => {
+          const cur = prev.get(idx)
+          if (!cur) return prev
+          return new Map(prev).set(idx, { ...cur, compileOk: event.ok, compileOutput: event.output })
+        })
+      } else if (event.type === 'done') {
+        setRunStates(prev => {
+          const cur = prev.get(idx)
+          if (!cur) return prev
+          return new Map(prev).set(idx, {
+            ...cur,
+            status: event.exitCode === 0 ? 'done' : 'error',
+            exitCode: event.exitCode,
+            durationMs: event.durationMs,
+            abort: undefined,
+          })
+        })
+      }
+    })
+
+    abortProxy.fn = abort
+  }
+
+  // Toggle the save dialog for a code block (click again to close)
+  handleSaveRef.current = (idx: number, lang: string, code: string, btn: HTMLButtonElement) => {
+    setSaveDialogs(prev => {
+      const next = new Map(prev)
+      if (next.has(idx)) { next.delete(idx) } // toggle off
+      else { next.set(idx, { anchorEl: btn, lang, code }) }
+      return next
+    })
+  }
+
+  // Memoize rendered HTML objects so React sees stable references and skips
+  // innerHTML resets when unrelated state (runStates, mountVersion, etc.) changes.
+  // Without this, every kernel output line triggers a re-render that wipes the
+  // injected portal mount divs, making output panels render into detached nodes.
+  const renderedSegments = useMemo(() =>
+    splitContent(displayContent).map((seg, i) => ({
+      seg,
+      dangerousHtml: seg.type === 'markdown'
+        ? { __html: renderMarkdown(seg.content, projectId) }
+        : null,
+      key: i,
+    })),
+    [displayContent, projectId]
+  )
 
   async function handleCopy() {
     await navigator.clipboard.writeText(displayContent)
@@ -282,17 +423,44 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
               className={`prose text-sm leading-[1.65] break-words w-full${streaming ? ' streaming-cursor' : ''}`}
               onClick={handleContentClick}
             >
-              {splitContent(displayContent).map((seg, i) =>
+              {renderedSegments.map(({ seg, dangerousHtml, key }) =>
                 seg.type === 'html-preview' ? (
-                  <HtmlPreview key={i} html={seg.content} />
+                  <HtmlPreview key={key} html={seg.content} />
                 ) : (
                   <div
-                    key={i}
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(seg.content, projectId) }}
+                    key={key}
+                    dangerouslySetInnerHTML={dangerousHtml!}
                   />
                 )
               )}
             </div>
+            {/* Kernel output panels rendered via portals into mount divs injected by useLayoutEffect.
+                mountVersion dependency ensures we re-render when new mount divs are created. */}
+            {mountVersion >= 0 && Array.from(outputMountsRef.current.entries()).map(([idx, mount]) => {
+              const state = runStates.get(idx)
+              if (!state) return null
+              return createPortal(
+                <KernelOutputPanel
+                  key={idx}
+                  state={state}
+                  onSendToChat={(text) => onSendToChat?.(text)}
+                  onDismiss={() => setRunStates(prev => { const next = new Map(prev); next.delete(idx); return next })}
+                />,
+                mount
+              )
+            })}
+            {/* Save as Cell dialogs — portals rendered directly to document.body */}
+            {projectId && Array.from(saveDialogs.entries()).map(([idx, { anchorEl, lang, code }]) => (
+              <SaveAsCellDialog
+                key={idx}
+                projectId={projectId}
+                language={lang}
+                code={code}
+                anchorEl={anchorEl}
+                onClose={() => setSaveDialogs(prev => { const n = new Map(prev); n.delete(idx); return n })}
+                onSaved={(_result: SaveCellResult) => { /* success handled inside dialog (auto-close) */ }}
+              />
+            ))}
             {!streaming && displayContent && (
               <button
                 className={`absolute top-1 right-1 bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]
