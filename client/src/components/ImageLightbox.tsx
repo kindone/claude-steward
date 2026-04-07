@@ -143,9 +143,9 @@ export function ImageLightbox({ content, onClose }: Props) {
       {/* Close button */}
       <button
         className="absolute top-4 right-4 z-10 w-9 h-9 flex items-center justify-center
-                   bg-[#1a1a1a] border border-[#333] rounded-full text-[#888]
-                   hover:text-white hover:border-[#666] cursor-pointer text-lg leading-none
-                   transition-colors"
+                   bg-[#1a1a1a]/50 border border-[#333]/50 rounded-full text-[#888]
+                   hover:bg-[#1a1a1a]/80 hover:text-white hover:border-[#666]/80
+                   cursor-pointer text-lg leading-none transition-all"
         onClick={(e) => { e.stopPropagation(); onClose() }}
         aria-label="Close lightbox"
       >
@@ -155,8 +155,8 @@ export function ImageLightbox({ content, onClose }: Props) {
       {/* Reset zoom button */}
       <button
         className="absolute top-4 right-16 z-10 h-9 px-3 flex items-center
-                   bg-[#1a1a1a] border border-[#333] rounded-full text-[#666]
-                   hover:text-[#aaa] cursor-pointer text-xs transition-colors"
+                   bg-[#1a1a1a]/50 border border-[#333]/50 rounded-full text-[#666]
+                   hover:bg-[#1a1a1a]/80 hover:text-[#aaa] cursor-pointer text-xs transition-all"
         onClick={handleResetView}
         title="Reset zoom"
       >
@@ -167,8 +167,9 @@ export function ImageLightbox({ content, onClose }: Props) {
       {isGallery && galleryIdx > 0 && (
         <button
           className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center
-                     bg-[#1a1a1a] border border-[#333] rounded-full text-[#888]
-                     hover:text-white hover:border-[#666] cursor-pointer text-lg transition-colors"
+                     bg-[#1a1a1a]/50 border border-[#333]/50 rounded-full text-[#888]
+                     hover:bg-[#1a1a1a]/80 hover:text-white hover:border-[#666]/80
+                     cursor-pointer text-lg transition-all"
           onClick={(e) => { e.stopPropagation(); goTo(galleryIdx - 1) }}
           aria-label="Previous image"
         >
@@ -178,8 +179,9 @@ export function ImageLightbox({ content, onClose }: Props) {
       {isGallery && galleryIdx < totalImages - 1 && (
         <button
           className="absolute right-16 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center
-                     bg-[#1a1a1a] border border-[#333] rounded-full text-[#888]
-                     hover:text-white hover:border-[#666] cursor-pointer text-lg transition-colors"
+                     bg-[#1a1a1a]/50 border border-[#333]/50 rounded-full text-[#888]
+                     hover:bg-[#1a1a1a]/80 hover:text-white hover:border-[#666]/80
+                     cursor-pointer text-lg transition-all"
           onClick={(e) => { e.stopPropagation(); goTo(galleryIdx + 1) }}
           aria-label="Next image"
         >
