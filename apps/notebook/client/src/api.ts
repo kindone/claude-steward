@@ -1,17 +1,53 @@
-import type { Cell, Language, CellType, KernelStatus } from './types'
+import type { Cell, Language, CellType, KernelStatus, Notebook } from './types'
 
 const BASE = '/api'
 
-// ── Cells ─────────────────────────────────────────────────────────────────────
+// ── Notebooks ─────────────────────────────────────────────────────────────────
 
-export async function listCells(): Promise<Cell[]> {
-  const r = await fetch(`${BASE}/cells`)
+export async function listNotebooks(): Promise<Notebook[]> {
+  const r = await fetch(`${BASE}/notebooks`)
   if (!r.ok) throw new Error(await r.text())
   return r.json()
 }
 
-export async function createCell(opts: { type?: CellType; language?: Language; position?: number; source?: string }): Promise<Cell> {
-  const r = await fetch(`${BASE}/cells`, {
+export async function createNotebook(title: string): Promise<Notebook> {
+  const r = await fetch(`${BASE}/notebooks`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  })
+  if (!r.ok) throw new Error(await r.text())
+  return r.json()
+}
+
+export async function renameNotebook(id: string, title: string): Promise<Notebook> {
+  const r = await fetch(`${BASE}/notebooks/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  })
+  if (!r.ok) throw new Error(await r.text())
+  return r.json()
+}
+
+export async function deleteNotebook(id: string): Promise<void> {
+  const r = await fetch(`${BASE}/notebooks/${id}`, { method: 'DELETE' })
+  if (!r.ok) throw new Error(await r.text())
+}
+
+// ── Cells ─────────────────────────────────────────────────────────────────────
+
+export async function listCells(notebookId: string): Promise<Cell[]> {
+  const r = await fetch(`${BASE}/notebooks/${notebookId}/cells`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json()
+}
+
+export async function createCell(
+  notebookId: string,
+  opts: { type?: CellType; language?: Language; position?: number; source?: string },
+): Promise<Cell> {
+  const r = await fetch(`${BASE}/notebooks/${notebookId}/cells`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(opts),
@@ -47,14 +83,19 @@ export async function moveCell(id: string, position: number): Promise<Cell> {
 
 // ── Kernel ────────────────────────────────────────────────────────────────────
 
-export async function kernelStatus(): Promise<KernelStatus[]> {
-  const r = await fetch(`${BASE}/kernel/status`)
+export async function kernelStatus(notebookId: string): Promise<KernelStatus[]> {
+  const r = await fetch(`${BASE}/notebooks/${notebookId}/kernel/status`)
   if (!r.ok) throw new Error(await r.text())
   return r.json()
 }
 
-export async function restartKernel(lang: Language): Promise<void> {
-  const r = await fetch(`${BASE}/kernel/restart/${lang}`, { method: 'POST' })
+export async function restartKernel(notebookId: string, lang: Language): Promise<void> {
+  const r = await fetch(`${BASE}/notebooks/${notebookId}/kernel/restart/${lang}`, { method: 'POST' })
+  if (!r.ok) throw new Error(await r.text())
+}
+
+export async function killNotebookKernels(notebookId: string): Promise<void> {
+  const r = await fetch(`${BASE}/notebooks/${notebookId}/kernel/kill`, { method: 'POST' })
   if (!r.ok) throw new Error(await r.text())
 }
 
@@ -102,13 +143,14 @@ export function streamKernelRun(
 // ── Chat ──────────────────────────────────────────────────────────────────────
 
 export function streamChat(
+  notebookId: string,
   message: string,
   onChunk: (chunk: unknown) => void,
   onDone: (sessionId: string) => void,
   onError: (err: { message: string; code: string }) => void,
   signal?: AbortSignal,
 ): void {
-  fetch(`${BASE}/chat`, {
+  fetch(`${BASE}/notebooks/${notebookId}/chat`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message }),
@@ -138,7 +180,6 @@ export function streamChat(
               else if (event === 'done') onDone(data.session_id ?? '')
               else if (event === 'error') onError(data)
               else if (event === 'cell:updated') {
-                // Cell update from file watcher — dispatch as custom event
                 window.dispatchEvent(new CustomEvent('notebook:cell-updated', { detail: data }))
               }
             } catch { /* ignore malformed */ }
@@ -151,6 +192,6 @@ export function streamChat(
     })
 }
 
-export async function clearSession(): Promise<void> {
-  await fetch(`${BASE}/chat/session`, { method: 'DELETE' })
+export async function clearSession(notebookId: string): Promise<void> {
+  await fetch(`${BASE}/notebooks/${notebookId}/chat/session`, { method: 'DELETE' })
 }

@@ -16,8 +16,12 @@ const WRITE_SUPPRESS_MS = 500
 // Debounce timers per cell
 const debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-export function startWatcher(cellsDir: string, onCellChanged: CellUpdateCallback): void {
-  chokidar.watch(cellsDir, {
+/**
+ * Watch all notebook cell directories under DATA_DIR/notebooks/
+ * Path pattern: notebooks/{notebookId}/cells/{cellId}.{ext}
+ */
+export function startWatcher(notebooksDir: string, onCellChanged: CellUpdateCallback): void {
+  chokidar.watch(notebooksDir, {
     persistent: true,
     ignoreInitial: true,
     awaitWriteFinish: { stabilityThreshold: 100, pollInterval: 50 },
@@ -47,5 +51,5 @@ export function startWatcher(cellsDir: string, onCellChanged: CellUpdateCallback
     }, 150))
   })
 
-  console.log(`[notebook] watching ${cellsDir}`)
+  console.log(`[notebook] watching ${notebooksDir}`)
 }

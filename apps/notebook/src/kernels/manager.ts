@@ -4,16 +4,24 @@ import { NodeKernel } from './node.js'
 import { BashKernel } from './bash.js'
 import { CppKernel } from './cpp.js'
 
+const LANGUAGES: Language[] = ['python', 'node', 'bash', 'cpp']
+
 export class KernelManager {
-  private kernels = new Map<Language, IKernel>()
+  // Key: `${notebookId}:${language}` for per-notebook isolation
+  private kernels = new Map<string, IKernel>()
 
   constructor(private readonly dataDir: string) {}
 
-  private get(lang: Language): IKernel {
-    let kernel = this.kernels.get(lang)
+  private key(notebookId: string, lang: Language): string {
+    return `${notebookId}:${lang}`
+  }
+
+  private getOrCreate(notebookId: string, lang: Language): IKernel {
+    const k = this.key(notebookId, lang)
+    let kernel = this.kernels.get(k)
     if (!kernel) {
       kernel = this.create(lang)
-      this.kernels.set(lang, kernel)
+      this.kernels.set(k, kernel)
     }
     return kernel
   }
@@ -27,42 +35,47 @@ export class KernelManager {
     }
   }
 
-  run(lang: Language, opts: RunOptions): Promise<void> {
-    return this.get(lang).run(opts)
+  run(notebookId: string, lang: Language, opts: RunOptions): Promise<void> {
+    return this.getOrCreate(notebookId, lang).run(opts)
   }
 
-  async restart(lang: Language): Promise<void> {
-    const kernel = this.kernels.get(lang)
+  async restart(notebookId: string, lang: Language): Promise<void> {
+    const k = this.key(notebookId, lang)
+    const kernel = this.kernels.get(k)
     if (kernel) {
       kernel.kill()
-      this.kernels.delete(lang)
+      this.kernels.delete(k)
     }
-    // Re-create lazily on next run
-    console.log(`[kernel-manager] restarted ${lang} kernel`)
+    console.log(`[kernel-manager] restarted ${lang} kernel for notebook ${notebookId}`)
   }
 
-  async resetState(lang: Language): Promise<void> {
-    const kernel = this.kernels.get(lang)
+  async resetState(notebookId: string, lang: Language): Promise<void> {
+    const kernel = this.kernels.get(this.key(notebookId, lang))
     if (kernel) await kernel.reset()
   }
 
-  status(): KernelStatus[] {
-    const langs: Language[] = ['python', 'node', 'bash', 'cpp']
-    return langs.map(lang => {
-      const kernel = this.kernels.get(lang)
-      return {
-        language: lang,
-        alive: kernel?.alive ?? false,
-        pid: kernel?.pid ?? null,
-      }
+  status(notebookId: string): KernelStatus[] {
+    return LANGUAGES.map(lang => {
+      const kernel = this.kernels.get(this.key(notebookId, lang))
+      return { language: lang, alive: kernel?.alive ?? false, pid: kernel?.pid ?? null }
     })
   }
 
-  shutdown(): void {
-    for (const [lang, kernel] of this.kernels) {
-      console.log(`[kernel-manager] killing ${lang} kernel`)
-      kernel.kill()
+  /** Kill all kernels belonging to a notebook (called on tab close). */
+  killNotebook(notebookId: string): void {
+    for (const lang of LANGUAGES) {
+      const k = this.key(notebookId, lang)
+      const kernel = this.kernels.get(k)
+      if (kernel) {
+        kernel.kill()
+        this.kernels.delete(k)
+      }
     }
+    console.log(`[kernel-manager] killed kernels for notebook ${notebookId}`)
+  }
+
+  shutdown(): void {
+    for (const [, kernel] of this.kernels) kernel.kill()
     this.kernels.clear()
   }
 }

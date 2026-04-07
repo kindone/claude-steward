@@ -16,24 +16,28 @@ const LANG_COLORS: Record<Language, string> = {
   cpp: 'text-orange-400',
 }
 
-export function KernelStatusBar() {
+interface Props {
+  notebookId: string
+}
+
+export function KernelStatusBar({ notebookId }: Props) {
   const [statuses, setStatuses] = useState<KernelStatus[]>([])
   const [restarting, setRestarting] = useState<Language | null>(null)
 
   const refresh = () => {
-    kernelStatus().then(setStatuses).catch(() => {})
+    kernelStatus(notebookId).then(setStatuses).catch(() => {})
   }
 
   useEffect(() => {
     refresh()
     const t = setInterval(refresh, 5000)
     return () => clearInterval(t)
-  }, [])
+  }, [notebookId])
 
   const handleRestart = async (lang: Language) => {
     setRestarting(lang)
     try {
-      await restartKernel(lang)
+      await restartKernel(notebookId, lang)
       await new Promise(r => setTimeout(r, 300))
       refresh()
     } finally {

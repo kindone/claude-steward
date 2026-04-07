@@ -4,8 +4,17 @@ import crypto from 'node:crypto'
 export type Language = 'python' | 'node' | 'bash' | 'cpp'
 export type CellType = 'code' | 'markdown'
 
+export interface Notebook {
+  id: string
+  title: string
+  claude_session_id: string | null
+  created_at: number
+  updated_at: number
+}
+
 export interface Cell {
   id: string
+  notebook_id: string
   type: CellType
   language: Language
   position: number
@@ -14,21 +23,27 @@ export interface Cell {
   updated_at: number
 }
 
-export interface NotebookMeta {
-  key: string
-  value: string
-}
-
 let _db: DatabaseSync | null = null
 
-export function initDb(dbPath: string): void {
+export function initDb(dbPath: string): { defaultNotebookId?: string } {
   _db = new DatabaseSync(dbPath)
   _db.exec('PRAGMA journal_mode = WAL')
   _db.exec('PRAGMA foreign_keys = ON')
 
   _db.exec(`
+    CREATE TABLE IF NOT EXISTS notebooks (
+      id                TEXT PRIMARY KEY,
+      title             TEXT NOT NULL DEFAULT 'Untitled',
+      claude_session_id TEXT,
+      created_at        INTEGER NOT NULL DEFAULT (unixepoch()),
+      updated_at        INTEGER NOT NULL DEFAULT (unixepoch())
+    )
+  `)
+
+  _db.exec(`
     CREATE TABLE IF NOT EXISTS cells (
       id          TEXT PRIMARY KEY,
+      notebook_id TEXT REFERENCES notebooks(id) ON DELETE CASCADE,
       type        TEXT NOT NULL DEFAULT 'code',
       language    TEXT NOT NULL DEFAULT 'python',
       position    INTEGER NOT NULL,
@@ -38,12 +53,31 @@ export function initDb(dbPath: string): void {
     )
   `)
 
+  // Legacy table — kept so old data isn't lost on first upgrade
   _db.exec(`
     CREATE TABLE IF NOT EXISTS notebook_meta (
       key   TEXT PRIMARY KEY,
       value TEXT NOT NULL
     )
   `)
+
+  // Migration: add notebook_id column if upgrading from single-notebook schema
+  const cellCols = (_db.prepare('PRAGMA table_info(cells)').all() as { name: string }[]).map(r => r.name)
+  if (!cellCols.includes('notebook_id')) {
+    _db.exec('ALTER TABLE cells ADD COLUMN notebook_id TEXT REFERENCES notebooks(id) ON DELETE CASCADE')
+  }
+
+  // Migration: assign orphaned cells to a default notebook
+  const orphanCount = (_db.prepare('SELECT COUNT(*) AS n FROM cells WHERE notebook_id IS NULL').get() as { n: number }).n
+  if (orphanCount > 0) {
+    const defaultId = crypto.randomUUID()
+    _db.prepare('INSERT INTO notebooks (id, title) VALUES (?, ?)').run(defaultId, 'Default')
+    _db.prepare('UPDATE cells SET notebook_id = ? WHERE notebook_id IS NULL').run(defaultId)
+    console.log(`[db] migrated ${orphanCount} cell(s) → notebook ${defaultId}`)
+    return { defaultNotebookId: defaultId }
+  }
+
+  return {}
 }
 
 function db(): DatabaseSync {
@@ -51,37 +85,83 @@ function db(): DatabaseSync {
   return _db
 }
 
+// ── Notebook queries ──────────────────────────────────────────────────────────
+
+export function listNotebooks(): Notebook[] {
+  return db().prepare('SELECT * FROM notebooks ORDER BY created_at ASC').all() as unknown as Notebook[]
+}
+
+export function getNotebook(id: string): Notebook | null {
+  return (db().prepare('SELECT * FROM notebooks WHERE id = ?').get(id) as unknown as Notebook) ?? null
+}
+
+export function createNotebook(title: string): Notebook {
+  const id = crypto.randomUUID()
+  db().prepare('INSERT INTO notebooks (id, title) VALUES (?, ?)').run(id, title)
+  return getNotebook(id)!
+}
+
+export function updateNotebook(id: string, updates: { title?: string; claude_session_id?: string | null }): Notebook | null {
+  const nb = getNotebook(id)
+  if (!nb) return null
+
+  const title = updates.title ?? nb.title
+  const sessionId = 'claude_session_id' in updates ? (updates.claude_session_id ?? null) : nb.claude_session_id
+
+  db().prepare(`
+    UPDATE notebooks SET title = ?, claude_session_id = ?, updated_at = unixepoch()
+    WHERE id = ?
+  `).run(title, sessionId, id)
+
+  return getNotebook(id)!
+}
+
+export function deleteNotebook(id: string): boolean {
+  const nb = getNotebook(id)
+  if (!nb) return false
+  // ON DELETE CASCADE removes all cells
+  db().prepare('DELETE FROM notebooks WHERE id = ?').run(id)
+  return true
+}
+
 // ── Cell queries ──────────────────────────────────────────────────────────────
 
-export function listCells(): Cell[] {
-  return db().prepare('SELECT * FROM cells ORDER BY position ASC').all() as unknown as Cell[]
+export function listCells(notebookId: string): Cell[] {
+  return db().prepare(
+    'SELECT * FROM cells WHERE notebook_id = ? ORDER BY position ASC'
+  ).all(notebookId) as unknown as Cell[]
 }
 
 export function getCell(id: string): Cell | null {
   return (db().prepare('SELECT * FROM cells WHERE id = ?').get(id) as unknown as Cell) ?? null
 }
 
-export function createCell(opts: { type?: CellType; language?: Language; position?: number; source?: string }): Cell {
+export function createCell(
+  notebookId: string,
+  opts: { type?: CellType; language?: Language; position?: number; source?: string },
+): Cell {
   const id = crypto.randomUUID()
   const type = opts.type ?? 'code'
   const language = opts.language ?? 'python'
   const source = opts.source ?? ''
 
-  // Default position: after the last cell
   const position = opts.position ?? (() => {
-    const row = db().prepare('SELECT COALESCE(MAX(position), 0) + 1 AS next FROM cells').get() as { next: number }
+    const row = db().prepare(
+      'SELECT COALESCE(MAX(position), 0) + 1 AS next FROM cells WHERE notebook_id = ?'
+    ).get(notebookId) as { next: number }
     return row.next
   })()
 
-  // Shift cells down to make room if inserting at a specific position
   if (opts.position !== undefined) {
-    db().prepare('UPDATE cells SET position = position + 1 WHERE position >= ?').run(position)
+    db().prepare(
+      'UPDATE cells SET position = position + 1 WHERE notebook_id = ? AND position >= ?'
+    ).run(notebookId, position)
   }
 
   db().prepare(`
-    INSERT INTO cells (id, type, language, position, source)
-    VALUES (?, ?, ?, ?, ?)
-  `).run(id, type, language, position, source)
+    INSERT INTO cells (id, notebook_id, type, language, position, source)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(id, notebookId, type, language, position, source)
 
   return getCell(id)!
 }
@@ -111,17 +191,16 @@ export function moveCell(id: string, newPosition: number): Cell | null {
   if (!cell) return null
 
   const oldPosition = cell.position
-
   if (oldPosition === newPosition) return cell
 
   if (oldPosition < newPosition) {
-    // Moving down: shift cells between old+1 and new up by 1
-    db().prepare('UPDATE cells SET position = position - 1 WHERE position > ? AND position <= ?')
-      .run(oldPosition, newPosition)
+    db().prepare(
+      'UPDATE cells SET position = position - 1 WHERE notebook_id = ? AND position > ? AND position <= ?'
+    ).run(cell.notebook_id, oldPosition, newPosition)
   } else {
-    // Moving up: shift cells between new and old-1 down by 1
-    db().prepare('UPDATE cells SET position = position + 1 WHERE position >= ? AND position < ?')
-      .run(newPosition, oldPosition)
+    db().prepare(
+      'UPDATE cells SET position = position + 1 WHERE notebook_id = ? AND position >= ? AND position < ?'
+    ).run(cell.notebook_id, newPosition, oldPosition)
   }
 
   db().prepare('UPDATE cells SET position = ?, updated_at = unixepoch() WHERE id = ?')
@@ -135,23 +214,9 @@ export function deleteCell(id: string): boolean {
   if (!cell) return false
 
   db().prepare('DELETE FROM cells WHERE id = ?').run(id)
-  // Close the gap
-  db().prepare('UPDATE cells SET position = position - 1 WHERE position > ?').run(cell.position)
+  db().prepare(
+    'UPDATE cells SET position = position - 1 WHERE notebook_id = ? AND position > ?'
+  ).run(cell.notebook_id, cell.position)
 
   return true
-}
-
-// ── Meta queries ──────────────────────────────────────────────────────────────
-
-export function getMeta(key: string): string | null {
-  const row = db().prepare('SELECT value FROM notebook_meta WHERE key = ?').get(key) as { value: string } | undefined
-  return row?.value ?? null
-}
-
-export function setMeta(key: string, value: string): void {
-  db().prepare('INSERT OR REPLACE INTO notebook_meta (key, value) VALUES (?, ?)').run(key, value)
-}
-
-export function deleteMeta(key: string): void {
-  db().prepare('DELETE FROM notebook_meta WHERE key = ?').run(key)
 }

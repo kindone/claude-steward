@@ -3,11 +3,12 @@ import type { ChatMessage, ToolCall } from '../types'
 import { streamChat, clearSession } from '../api'
 
 interface Props {
+  notebookId: string
   onCellRunByAI?: (cellId: string | null) => void
   onCellUpdatedByAI?: (cellId: string) => void
 }
 
-export function ChatPanel({ onCellRunByAI, onCellUpdatedByAI }: Props) {
+export function ChatPanel({ notebookId, onCellRunByAI, onCellUpdatedByAI }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isSending, setIsSending] = useState(false)
@@ -44,6 +45,7 @@ export function ChatPanel({ onCellRunByAI, onCellUpdatedByAI }: Props) {
     const toolCalls: ToolCall[] = []
 
     streamChat(
+      notebookId,
       text,
       (chunk: unknown) => {
         const c = chunk as Record<string, unknown>
@@ -122,7 +124,7 @@ export function ChatPanel({ onCellRunByAI, onCellUpdatedByAI }: Props) {
   }
 
   const handleClear = async () => {
-    await clearSession()
+    await clearSession(notebookId)
     setMessages([])
   }
 

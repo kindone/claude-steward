@@ -16,24 +16,18 @@ const EXT: Record<Language, string> = {
   cpp: 'cpp',
 }
 
-function cellFilePath(dataDir: string, cellId: string, language: Language): string {
-  return path.join(dataDir, 'cells', `${cellId}.${EXT[language]}`)
+function cellFilePath(dataDir: string, notebookId: string, cellId: string, language: Language): string {
+  return path.join(dataDir, 'notebooks', notebookId, 'cells', `${cellId}.${EXT[language]}`)
 }
 
-// GET /api/cells
-cellsRouter.get('/cells', (req, res) => {
-  res.json(listCells())
+// GET /api/notebooks/:notebookId/cells
+cellsRouter.get('/notebooks/:notebookId/cells', (req, res) => {
+  res.json(listCells(req.params.notebookId))
 })
 
-// GET /api/cells/:id
-cellsRouter.get('/cells/:id', (req, res) => {
-  const cell = getCell(req.params.id)
-  if (!cell) { res.status(404).json({ error: 'Cell not found' }); return }
-  res.json(cell)
-})
-
-// POST /api/cells
-cellsRouter.post('/cells', (req, res) => {
+// POST /api/notebooks/:notebookId/cells
+cellsRouter.post('/notebooks/:notebookId/cells', (req, res) => {
+  const { notebookId } = req.params
   const { type = 'code', language = 'python', position, source = '' } = req.body as {
     type?: CellType
     language?: Language
@@ -41,11 +35,11 @@ cellsRouter.post('/cells', (req, res) => {
     source?: string
   }
 
-  const cell = createCell({ type, language, position, source })
+  const cell = createCell(notebookId, { type, language, position, source })
   const dataDir = req.app.locals.dataDir as string
 
-  // Write the cell file
-  const filePath = cellFilePath(dataDir, cell.id, cell.language)
+  const filePath = cellFilePath(dataDir, notebookId, cell.id, cell.language)
+  fs.mkdirSync(path.dirname(filePath), { recursive: true })
   markServerWrite(cell.id)
   fs.writeFileSync(filePath, source)
 
@@ -65,11 +59,12 @@ cellsRouter.patch('/cells/:id', (req, res) => {
   if (!existing) { res.status(404).json({ error: 'Cell not found' }); return }
 
   const dataDir = req.app.locals.dataDir as string
+  const notebookId = existing.notebook_id
 
   // Handle language change — rename the file
   if (language && language !== existing.language) {
-    const oldPath = cellFilePath(dataDir, existing.id, existing.language)
-    const newPath = cellFilePath(dataDir, existing.id, language)
+    const oldPath = cellFilePath(dataDir, notebookId, existing.id, existing.language)
+    const newPath = cellFilePath(dataDir, notebookId, existing.id, language)
     if (fs.existsSync(oldPath)) {
       markServerWrite(existing.id)
       fs.renameSync(oldPath, newPath)
@@ -79,14 +74,14 @@ cellsRouter.patch('/cells/:id', (req, res) => {
   // Update source on disk
   if (source !== undefined) {
     const lang = language ?? existing.language
-    const filePath = cellFilePath(dataDir, existing.id, lang)
+    const filePath = cellFilePath(dataDir, notebookId, existing.id, lang)
     markServerWrite(existing.id)
     fs.writeFileSync(filePath, source)
     updateCellSource(existing.id, source)
   }
 
   // Update other fields in DB
-  const updated = updateCell(existing.id, { source, language, type })
+  updateCell(existing.id, { source, language, type })
 
   // Handle position change
   if (position !== undefined && position !== existing.position) {
@@ -102,7 +97,7 @@ cellsRouter.delete('/cells/:id', (req, res) => {
   if (!cell) { res.status(404).json({ error: 'Cell not found' }); return }
 
   const dataDir = req.app.locals.dataDir as string
-  const filePath = cellFilePath(dataDir, cell.id, cell.language)
+  const filePath = cellFilePath(dataDir, cell.notebook_id, cell.id, cell.language)
 
   if (fs.existsSync(filePath)) {
     fs.unlinkSync(filePath)

@@ -5,6 +5,8 @@ import { sendSseEvent } from '../sse.js'
 
 export const kernelRouter = Router()
 
+const VALID_LANGS: Language[] = ['python', 'node', 'bash', 'cpp']
+
 function sseHeaders(res: import('express').Response): void {
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -24,7 +26,7 @@ kernelRouter.post('/kernel/run/:cellId', async (req, res) => {
   res.on('close', () => ac.abort())
 
   try {
-    await getKernelManager().run(cell.language as Language, {
+    await getKernelManager().run(cell.notebook_id, cell.language as Language, {
       cellId: cell.id,
       source: cell.source,
       signal: ac.signal,
@@ -41,25 +43,26 @@ kernelRouter.post('/kernel/run/:cellId', async (req, res) => {
   }
 })
 
-// GET /api/kernel/status
-kernelRouter.get('/kernel/status', (_req, res) => {
-  res.json(getKernelManager().status())
+// GET /api/notebooks/:notebookId/kernel/status
+kernelRouter.get('/notebooks/:notebookId/kernel/status', (req, res) => {
+  res.json(getKernelManager().status(req.params.notebookId))
 })
 
-// POST /api/kernel/restart/:lang
-kernelRouter.post('/kernel/restart/:lang', async (req, res) => {
+// POST /api/notebooks/:notebookId/kernel/restart/:lang
+kernelRouter.post('/notebooks/:notebookId/kernel/restart/:lang', async (req, res) => {
   const lang = req.params.lang as Language
-  const valid: Language[] = ['python', 'node', 'bash', 'cpp']
-  if (!valid.includes(lang)) { res.status(400).json({ error: 'Invalid language' }); return }
+  if (!VALID_LANGS.includes(lang)) { res.status(400).json({ error: 'Invalid language' }); return }
 
-  await getKernelManager().restart(lang)
+  await getKernelManager().restart(req.params.notebookId, lang)
   res.json({ ok: true, language: lang })
 })
 
-// POST /api/kernel/reset/:lang  (clear state without killing)
-kernelRouter.post('/kernel/reset/:lang', async (req, res) => {
+// POST /api/notebooks/:notebookId/kernel/reset/:lang
+kernelRouter.post('/notebooks/:notebookId/kernel/reset/:lang', async (req, res) => {
   const lang = req.params.lang as Language
-  await getKernelManager().resetState(lang)
+  if (!VALID_LANGS.includes(lang)) { res.status(400).json({ error: 'Invalid language' }); return }
+
+  await getKernelManager().resetState(req.params.notebookId, lang)
   res.json({ ok: true, language: lang })
 })
 

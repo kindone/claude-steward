@@ -4,6 +4,7 @@ import fs from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { initDb } from './db.js'
 import { cellsRouter } from './routes/cells.js'
+import { notebooksRouter } from './routes/notebooks.js'
 import { kernelRouter, shutdownKernels } from './routes/kernel.js'
 import { chatRouter } from './routes/chat.js'
 import { startWatcher } from './watcher.js'
@@ -25,9 +26,9 @@ const DATA_DIR = dataDirArg !== -1
   ? path.resolve(process.argv[dataDirArg + 1])
   : process.cwd()
 
-// ── Ensure directory structure ────────────────────────────────────────────────
+// ── Ensure base directory structure ──────────────────────────────────────────
 
-for (const dir of ['cells', 'workspace', '.notebook', 'kernels/tmp']) {
+for (const dir of ['notebooks', 'workspace', '.notebook', 'kernels/tmp']) {
   fs.mkdirSync(path.join(DATA_DIR, dir), { recursive: true })
 }
 
@@ -45,9 +46,30 @@ for (const script of ['run_cell.sh', 'run_all.sh']) {
   }
 }
 
-// ── Init DB + Kernels ─────────────────────────────────────────────────────────
+// ── Init DB ───────────────────────────────────────────────────────────────────
 
-initDb(path.join(DATA_DIR, 'notebook.db'))
+const { defaultNotebookId } = initDb(path.join(DATA_DIR, 'notebook.db'))
+
+// ── Filesystem migration (single → multi-notebook) ────────────────────────────
+// If DB migration created a default notebook, move old flat cells/ → notebooks/{id}/cells/
+
+if (defaultNotebookId) {
+  const oldCellsDir = path.join(DATA_DIR, 'cells')
+  const newCellsDir = path.join(DATA_DIR, 'notebooks', defaultNotebookId, 'cells')
+
+  if (fs.existsSync(oldCellsDir)) {
+    fs.mkdirSync(newCellsDir, { recursive: true })
+    const files = fs.readdirSync(oldCellsDir)
+    for (const f of files) {
+      fs.renameSync(path.join(oldCellsDir, f), path.join(newCellsDir, f))
+    }
+    try { fs.rmdirSync(oldCellsDir) } catch { /* non-empty, leave it */ }
+    console.log(`[server] migrated ${files.length} file(s): cells/ → notebooks/${defaultNotebookId}/cells/`)
+  }
+}
+
+// ── Init Kernels ──────────────────────────────────────────────────────────────
+
 initKernelManager(DATA_DIR)
 
 // ── Express app ───────────────────────────────────────────────────────────────
@@ -59,6 +81,7 @@ app.use(express.json())
 app.locals.dataDir = DATA_DIR
 
 // Routes
+app.use('/api', notebooksRouter)
 app.use('/api', cellsRouter)
 app.use('/api', kernelRouter)
 app.use('/api', chatRouter)
@@ -92,7 +115,7 @@ if (fs.existsSync(publicDir)) {
 
 // ── Start file watcher ────────────────────────────────────────────────────────
 
-startWatcher(path.join(DATA_DIR, 'cells'), (cellId, source) => {
+startWatcher(path.join(DATA_DIR, 'notebooks'), (cellId, source) => {
   broadcastCellUpdate(cellId, source)
 })
 
