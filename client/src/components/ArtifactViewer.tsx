@@ -3,6 +3,8 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
 import type { Artifact } from '../lib/api'
+import { buildMarkedOptions } from '../lib/markdownRenderer'
+import { renderPikchr } from '../lib/pikchrRenderer'
 
 interface Props {
   artifact: Artifact
@@ -86,12 +88,45 @@ function ChartView({ content }: { content: string }) {
 // ── Report renderer ───────────────────────────────────────────────────────────
 
 function ReportView({ content }: { content: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  const pikchrCache = useRef<Map<string, string>>(new Map())
+
   const html = DOMPurify.sanitize(
-    marked.parse(content, { breaks: true }) as string,
-    { ADD_ATTR: ['style'] }
+    marked.parse(content, { renderer: buildMarkedOptions(null).renderer, breaks: true }) as string,
+    { ADD_ATTR: ['style', 'data-src'] }
   )
+
+  // Hydrate pikchr placeholders after render (same pattern as MessageBubble)
+  useEffect(() => {
+    if (!containerRef.current) return
+    const placeholders = containerRef.current.querySelectorAll<HTMLDivElement>(
+      '.pikchr-placeholder:not(.pikchr-rendered)'
+    )
+    placeholders.forEach((el) => {
+      const src = decodeURIComponent(el.getAttribute('data-src') ?? '')
+      if (!src) return
+      const cached = pikchrCache.current.get(src)
+      if (cached) {
+        el.innerHTML = cached
+        el.classList.add('pikchr-rendered')
+        return
+      }
+      renderPikchr(src).then((svg) => {
+        pikchrCache.current.set(src, svg)
+        if (el.isConnected && !el.classList.contains('pikchr-rendered')) {
+          el.innerHTML = svg
+          el.classList.add('pikchr-rendered')
+        }
+      }).catch((err: unknown) => {
+        el.classList.add('pikchr-error')
+        el.textContent = `Pikchr error: ${String(err)}`
+      })
+    })
+  })
+
   return (
     <div
+      ref={containerRef}
       className="prose prose-invert prose-sm max-w-none px-1"
       dangerouslySetInnerHTML={{ __html: html }}
     />
@@ -243,6 +278,50 @@ function CodeView({ content, artifact }: { content: string; artifact: Artifact }
   )
 }
 
+// ── Pikchr renderer ──────────────────────────────────────────────────────────
+
+function PikchrView({ content }: { content: string }) {
+  const [svg, setSvg] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setSvg(null)
+    setError(null)
+    renderPikchr(content).then((result) => {
+      if (result.trimStart().startsWith('<svg')) {
+        setSvg(result)
+      } else {
+        setError(result)
+      }
+    }).catch((err: unknown) => {
+      setError(String(err))
+    })
+  }, [content])
+
+  if (error) {
+    return (
+      <div className="pikchr-error">
+        <pre>{error}</pre>
+      </div>
+    )
+  }
+
+  if (!svg) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#333] border-t-[#666]" />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      className="pikchr-placeholder pikchr-rendered overflow-x-auto"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function ArtifactViewer({ artifact, content, className }: Props) {
@@ -260,6 +339,7 @@ export function ArtifactViewer({ artifact, content, className }: Props) {
       {artifact.type === 'report' && <ReportView content={content} />}
       {artifact.type === 'data' && <DataView content={content} />}
       {artifact.type === 'code' && <CodeView content={content} artifact={artifact} />}
+      {artifact.type === 'pikchr' && <PikchrView content={content} />}
     </div>
   )
 }

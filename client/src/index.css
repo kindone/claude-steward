@@ -91,6 +91,62 @@ body {
   cursor: zoom-in;
 }
 
+/* Pikchr diagram container */
+.pikchr-placeholder {
+  position: relative;
+  margin: 12px 0;
+  overflow-x: auto;
+}
+
+.pikchr-save-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  padding: 2px 6px;
+  background: rgba(26, 26, 26, 0.8);
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #aaa;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s, background 0.15s;
+  line-height: 1.6;
+}
+
+.pikchr-placeholder:hover .pikchr-save-btn {
+  opacity: 1;
+}
+
+.pikchr-save-btn:hover {
+  background: rgba(40, 40, 40, 0.95);
+  color: #fff;
+}
+
+.pikchr-placeholder svg {
+  max-width: 100%;
+  height: auto;
+  background: white;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.pikchr-error {
+  color: #f87171;
+  font-size: 0.85em;
+  border-left: 3px solid #f87171;
+  padding: 6px 10px;
+  margin: 8px 0;
+  background: rgba(248, 113, 113, 0.08);
+  border-radius: 0 4px 4px 0;
+}
+
+.pikchr-error pre {
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: monospace;
+}
+
 /* Image gallery grid — built dynamically when a message contains 3+ images */
 .img-gallery-grid {
   display: flex;

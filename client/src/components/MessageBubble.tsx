@@ -4,10 +4,11 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
 import mermaid from 'mermaid'
+import { renderPikchr } from '../lib/pikchrRenderer'
 import 'highlight.js/styles/github-dark.css'
 import 'katex/dist/katex.min.css'
 import type { ClaudeErrorCode, ToolCall } from '../lib/api'
-import { toolDisplayName, toolDisplayDetail } from '../lib/api'
+import { toolDisplayName, toolDisplayDetail, deriveArtifactName } from '../lib/api'
 import { splitContent, buildMarkedOptions, preprocessKaTeX } from '../lib/markdownRenderer'
 import { HtmlPreview } from './HtmlPreview'
 import { ImageLightbox, type LightboxContent } from './ImageLightbox'
@@ -28,7 +29,7 @@ function renderMarkdown(content: string, projectId: string | null): string {
   const { renderer } = buildMarkedOptions(projectId)
   const html = marked.parse(withKatex, { renderer }) as string
   return DOMPurify.sanitize(html, {
-    ADD_ATTR: ['data-graph', 'data-runnable-lang', 'style'],
+    ADD_ATTR: ['data-graph', 'data-src', 'data-runnable-lang', 'style'],
   })
 }
 
@@ -57,6 +58,8 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
   const [galleryExpanded, setGalleryExpanded] = useState(false)
   /** Per-message SVG cache: graph source → rendered SVG string. */
   const mermaidCache = useRef<Map<string, string>>(new Map())
+  /** Per-message pikchr SVG cache: source → rendered SVG string. */
+  const pikchrCache = useRef<Map<string, string>>(new Map())
 
   // ── Kernel code execution state ─────────────────────────────────────────────
   /** Per-block run state: block index → output panel state */
@@ -250,6 +253,58 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
     })
   }) // intentionally no deps — must run after every render
 
+  // Pikchr rendering — mirrors the mermaid pattern above.
+  // Uses the same cache+guard approach: synchronous cache restore handles DOM
+  // resets; async first-render waits until streaming is done.
+  useEffect(() => {
+    if (!contentRef.current || role !== 'assistant' || errorCode) return
+    const placeholders = contentRef.current.querySelectorAll<HTMLDivElement>(
+      '.pikchr-placeholder:not(.pikchr-rendered)'
+    )
+    if (placeholders.length === 0) return
+
+    // Inject a 📎 save-as-artifact button into a rendered pikchr div.
+    // No native click listener — handleContentClick dispatches the save via
+    // React's synthetic event system (avoids stopPropagation/synthetic ordering issues).
+    const injectSaveBtn = (el: HTMLDivElement) => {
+      if (el.querySelector('.pikchr-save-btn')) return
+      const btn = document.createElement('button')
+      btn.className = 'pikchr-save-btn'
+      btn.title = 'Save as artifact'
+      btn.textContent = '📎'
+      el.appendChild(btn)
+    }
+
+    placeholders.forEach((el) => {
+      const src = decodeURIComponent(el.getAttribute('data-src') ?? '')
+      if (!src) return
+
+      // Fast path: restore from cache
+      const cached = pikchrCache.current.get(src)
+      if (cached) {
+        el.innerHTML = cached
+        el.classList.add('pikchr-rendered')
+        injectSaveBtn(el)
+        return
+      }
+
+      // Slow path: wait until streaming is done before the async WASM call
+      if (streaming) return
+
+      renderPikchr(src).then((svg) => {
+        pikchrCache.current.set(src, svg)
+        if (el.isConnected && !el.classList.contains('pikchr-rendered')) {
+          el.innerHTML = svg
+          el.classList.add('pikchr-rendered')
+          injectSaveBtn(el)
+        }
+      }).catch((err: unknown) => {
+        el.classList.add('pikchr-error')
+        el.textContent = `Pikchr error: ${String(err)}`
+      })
+    })
+  }) // intentionally no deps — must run after every render
+
   function handleContentClick(e: React.MouseEvent<HTMLDivElement>) {
     const target = e.target as Element
 
@@ -275,6 +330,17 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       }
       return
     }
+    // pikchr save button — must be checked before svg to avoid lightbox opening
+    if (target.closest('.pikchr-save-btn')) {
+      const placeholder = target.closest('.pikchr-placeholder') as HTMLDivElement | null
+      const src = decodeURIComponent(placeholder?.getAttribute('data-src') ?? '')
+      if (src) {
+        const name = deriveArtifactName(src, 'pikchr', 'pikchr')
+        onSaveAsArtifactRef.current?.(src, 'pikchr', name, target as HTMLElement)
+      }
+      return
+    }
+
     // svg click — target may be an inner <path>/<g>/etc., walk up to <svg> root
     const svg = target.closest('svg')
     if (svg) {

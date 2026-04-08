@@ -74,6 +74,11 @@ export function buildMarkedOptions(projectId: string | null): { renderer: Instan
       const encoded = encodeURIComponent(token.text)
       return `<div class="mermaid-placeholder" data-graph="${encoded}"></div>`
     }
+    if (token.lang === 'pikchr') {
+      // Encode the diagram source; MessageBubble hydrates these via pikchrRenderer.ts.
+      const encoded = encodeURIComponent(token.text)
+      return `<div class="pikchr-placeholder" data-src="${encoded}"></div>`
+    }
     // Add data-runnable-lang to <pre> so MessageBubble can inject Run buttons.
     // The code content is read from the <code> element's textContent at run time.
     const html = parentCode(token)

@@ -410,7 +410,7 @@ export async function runScheduleNow(id: string): Promise<void> {
 
 // ── Artifacts ─────────────────────────────────────────────────────────────────
 
-export type ArtifactType = 'chart' | 'report' | 'data' | 'code'
+export type ArtifactType = 'chart' | 'report' | 'data' | 'code' | 'pikchr'
 
 export interface Artifact {
   id: string
@@ -492,6 +492,12 @@ export function deriveArtifactName(content: string, lang: string, type: Artifact
   if (type === 'code') {
     const m = trimmed.match(/(?:^|\n)\s*(?:def|function|class|fn|func)\s+([\w_]+)/m)
     if (m) return m[1].toLowerCase().replace(/_/g, '-')
+  }
+
+  // Pikchr: first line comment or first named object
+  if (type === 'pikchr') {
+    const m = trimmed.match(/^#\s*(.+)/m) ?? trimmed.match(/"([^"]{3,40})"/)
+    if (m) return m[1].trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 48)
   }
 
   // Fallback: lang or type + short base36 timestamp
