@@ -202,7 +202,10 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
           lowerError.includes('too many tokens') ||
           lowerError.includes('maximum') ||
           lowerError.includes('token limit')
-        const isSessionError = !isContextLimit && (
+        const isOverload =
+          lowerError.includes('overload') ||
+          lowerError.includes('529')
+        const isSessionError = !isContextLimit && !isOverload && (
           Boolean(claudeSessionId) ||
           lowerError.includes('session') ||
           lowerError.includes('conversation')
@@ -248,8 +251,10 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
       return
     }
     if (code !== 0 && !res.writableEnded) {
-      const isResumeAttempt = Boolean(claudeSessionId)
       const detail = stderrOutput.trim() || undefined
+      const lowerDetail = (detail ?? '').toLowerCase()
+      const isOverload = lowerDetail.includes('overload') || lowerDetail.includes('529')
+      const isResumeAttempt = !isOverload && Boolean(claudeSessionId)
       const claudeErr: ClaudeError = isResumeAttempt
         ? {
             message: 'The previous Claude session could not be resumed. Your next message will start a fresh conversation.',

@@ -127,7 +127,8 @@ router.post('/', (req, res) => {
 
   const onError = (message: string, code: string, persistMsg: boolean) => {
     unregisterChat(sessionId)
-    if (session.claude_session_id) {
+    // Only clear claude_session_id for genuine session expiry — not for transient errors like overloads.
+    if (session.claude_session_id && code === 'session_expired') {
       sessionQueries.clearClaudeSessionId(sessionId)
       session.claude_session_id = null
     }

@@ -207,9 +207,10 @@ export class JobManager {
         if (chunk.is_error) {
           const errorText = (chunk.errors as string[] | undefined)?.join('; ') || (chunk.result as string) || `Claude error: ${chunk.subtype}`
           const lower = errorText.toLowerCase()
+          const isOverload = lower.includes('overload') || lower.includes('529')
           const errorCode = lower.includes('context') || lower.includes('too long') || lower.includes('token limit')
             ? 'context_limit'
-            : Boolean(claudeSessionId) || lower.includes('session') || lower.includes('conversation')
+            : !isOverload && (Boolean(claudeSessionId) || lower.includes('session') || lower.includes('conversation'))
             ? 'session_expired'
             : 'process_error'
           finish('interrupted', errorCode)
@@ -235,7 +236,8 @@ export class JobManager {
       }
       if (code !== 0 && !resolved) {
         const detail = stderrOutput.trim() || `Claude exited with code ${code}`
-        const errorCode = Boolean(claudeSessionId) ? 'session_expired' : 'process_error'
+        const isOverload = detail.toLowerCase().includes('overload') || detail.includes('529')
+        const errorCode = !isOverload && Boolean(claudeSessionId) ? 'session_expired' : 'process_error'
         finish('interrupted', errorCode)
         this.onEvent({ type: 'error', sessionId, errorCode, message: detail, content: accumulatedText })
         return
