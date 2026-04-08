@@ -22,6 +22,10 @@ server/public/
 client/src/**/*.js
 client/src/**/*.js.map
 
+# Runtime artifact and notebook files (user data, not code)
+artifacts/
+notebooks/
+
 # Test artifacts
 test-results/
 playwright-report/
