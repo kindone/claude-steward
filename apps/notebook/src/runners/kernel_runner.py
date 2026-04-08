@@ -16,7 +16,7 @@ import signal as _signal
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, line_buffering=True)
 sys.stderr = sys.stdout  # merge stderr into stdout
 
-_globals: dict = {}
+_globals: dict = {'__name__': '__main__'}  # ensure `if __name__ == "__main__":` blocks execute
 _current_cell_id: str | None = None
 _executing: bool = False  # True only while exec() is running
 

@@ -3,17 +3,20 @@ import type { Artifact } from '../lib/api'
 import { updateArtifact } from '../lib/api'
 import { ArtifactViewer } from './ArtifactViewer'
 import { ArtifactCodeMirror } from './ArtifactCodeMirror'
+import { KernelOutputPanel, type OutputPanelState } from './KernelOutputPanel'
+import { runCode, normalizeLanguage } from '../lib/kernelApi'
 
 interface Props {
   artifact: Artifact
   content: string
+  projectId: string | null
   onChange: (newContent: string) => void
   onSave: () => void
 }
 
 type SaveStatus = 'idle' | 'saving' | 'saved'
 
-export function ArtifactEditor({ artifact, content, onChange, onSave }: Props) {
+export function ArtifactEditor({ artifact, content, projectId, onChange, onSave }: Props) {
   // Local editing value — starts from content prop but is independent after that
   const [localContent, setLocalContent] = useState(content)
   // For chart: debounced viewer content
@@ -24,6 +27,9 @@ export function ArtifactEditor({ artifact, content, onChange, onSave }: Props) {
   const [refreshCmd, setRefreshCmd] = useState('')
   const [refreshSched, setRefreshSched] = useState('')
   const [metaSaving, setMetaSaving] = useState(false)
+  // Kernel run state for code artifacts
+  const [runState, setRunState] = useState<OutputPanelState | null>(null)
+  const runAbortRef = useRef<(() => void) | undefined>(undefined)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -90,16 +96,6 @@ export function ArtifactEditor({ artifact, content, onChange, onSave }: Props) {
     }
   }
 
-  const typeBadgeColor: Record<string, string> = {
-    chart: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
-    report: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
-    data: 'text-green-400 bg-green-400/10 border-green-400/20',
-    code: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
-  }
-  const badgeClass = typeBadgeColor[artifact.type] ?? 'text-[#888] bg-[#222] border-[#333]'
-
-  const viewerArtifact = { ...artifact }
-
   const editorLanguage = (() => {
     if (artifact.type === 'report') return 'markdown'
     if (artifact.type === 'chart') return 'json'
@@ -115,6 +111,45 @@ export function ArtifactEditor({ artifact, content, onChange, onSave }: Props) {
     }
     return ''
   })()
+
+  const kernelLang = normalizeLanguage(editorLanguage)
+  const canRun = artifact.type === 'code' && kernelLang !== null && projectId !== null
+
+  function handleRun() {
+    if (!canRun || !projectId || !kernelLang) return
+
+    // Abort any existing run
+    runAbortRef.current?.()
+
+    setRunState({ status: 'running', lines: [], exitCode: null, durationMs: null })
+
+    const abort = runCode(projectId, 'default', kernelLang, localContent, (event) => {
+      if (event.type === 'output') {
+        setRunState(prev => prev ? { ...prev, lines: [...prev.lines, event.text] } : prev)
+      } else if (event.type === 'done') {
+        setRunState(prev => prev ? {
+          ...prev,
+          status: event.exitCode === 0 ? 'done' : 'error',
+          exitCode: event.exitCode,
+          durationMs: event.durationMs,
+          abort: undefined,
+        } : prev)
+      }
+    })
+
+    runAbortRef.current = abort
+    setRunState(prev => prev ? { ...prev, abort: () => abort() } : prev)
+  }
+
+  const typeBadgeColor: Record<string, string> = {
+    chart: 'text-purple-400 bg-purple-400/10 border-purple-400/20',
+    report: 'text-blue-400 bg-blue-400/10 border-blue-400/20',
+    data: 'text-green-400 bg-green-400/10 border-green-400/20',
+    code: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
+  }
+  const badgeClass = typeBadgeColor[artifact.type] ?? 'text-[#888] bg-[#222] border-[#333]'
+
+  const viewerArtifact = { ...artifact }
 
   const editorEl = (
     <ArtifactCodeMirror
@@ -139,13 +174,24 @@ export function ArtifactEditor({ artifact, content, onChange, onSave }: Props) {
         <span className={`text-[10px] px-1.5 py-0.5 rounded border ${badgeClass} flex-shrink-0`}>
           {artifact.type}
         </span>
-        {/* Mobile tab toggle */}
-        {isMobile && (
+        {/* Mobile tab toggle — only for types with a preview pane */}
+        {isMobile && artifact.type !== 'code' && (
           <button
             onClick={() => setMobileTab(t => t === 'editor' ? 'preview' : 'editor')}
             className="text-[11px] text-[#666] hover:text-[#aaa] border border-[#2a2a2a] rounded px-2 py-0.5 cursor-pointer flex-shrink-0"
           >
             {mobileTab === 'editor' ? 'Preview' : 'Edit'}
+          </button>
+        )}
+        {/* Run button — code artifacts only */}
+        {canRun && (
+          <button
+            onClick={handleRun}
+            disabled={runState?.status === 'running'}
+            className="text-[11px] px-2.5 py-1 rounded border cursor-pointer transition-colors flex-shrink-0 disabled:opacity-50 text-emerald-400 border-emerald-500/30 bg-emerald-500/10 hover:bg-emerald-500/20"
+            title="Run code"
+          >
+            {runState?.status === 'running' ? '⏳ Running…' : '▶ Run'}
           </button>
         )}
         <button
@@ -188,7 +234,22 @@ export function ArtifactEditor({ artifact, content, onChange, onSave }: Props) {
       )}
 
       {/* Content area */}
-      {isMobile ? (
+      {artifact.type === 'code' ? (
+        // Code artifacts: full-width editor + optional output panel below
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden flex">
+            {editorEl}
+          </div>
+          {runState && (
+            <div className="flex-shrink-0 border-t border-[#1f1f1f] max-h-[40%] overflow-auto">
+              <KernelOutputPanel
+                state={runState}
+                onDismiss={() => setRunState(null)}
+              />
+            </div>
+          )}
+        </div>
+      ) : isMobile ? (
         <div className="flex-1 overflow-hidden">
           {mobileTab === 'editor' ? editorEl : previewEl}
         </div>

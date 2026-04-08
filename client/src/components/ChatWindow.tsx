@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, getSessionChain, updateSessionTimezone, listArtifacts, toolDisplayName, toolDisplayDetail, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo, type Artifact, type ArtifactType } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, getSessionChain, updateSessionTimezone, listArtifacts, createArtifact, deriveArtifactName, toolDisplayName, toolDisplayDetail, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo, type Artifact, type ArtifactType } from '../lib/api'
 import { CompactDivider } from './CompactDivider'
-import { SaveAsArtifactDialog } from './SaveAsArtifactDialog'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
@@ -123,13 +122,6 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   const [kernelRefreshTick, setKernelRefreshTick] = useState(0)
   // Artifacts for @mention autocomplete in MessageInput
   const [projectArtifacts, setProjectArtifacts] = useState<Artifact[]>([])
-  // Save as artifact dialog state
-  const [saveArtifactTarget, setSaveArtifactTarget] = useState<{
-    content: string
-    type: ArtifactType
-    name: string
-    anchor: HTMLElement
-  } | null>(null)
   // Past segments: frozen messages from compacted predecessors, shown above dividers.
   const [pastSegments, setPastSegments] = useState<(ChainSegment & { messages: Message[] })[]>([])
   // The tail session this ChatWindow is currently sending to (may differ from sessionId prop after compact).
@@ -469,6 +461,30 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
     }
   }, [sessionId, hasMore, loadingOlder, messages])
 
+  const handleSaveAsArtifact = useCallback(async (
+    content: string,
+    defaultType: ArtifactType,
+    defaultName: string,
+    _anchorEl: HTMLElement,
+    language?: string
+  ) => {
+    if (!projectId) return
+    const name = defaultName || deriveArtifactName(content, '', defaultType)
+    const metadata = defaultType === 'code' && language ? { language } : undefined
+    try {
+      const artifact = await createArtifact(projectId, {
+        name,
+        type: defaultType,
+        content,
+        metadata,
+        created_from_session: sessionId,
+      })
+      onOpenArtifact?.(artifact)
+    } catch (e) {
+      console.error('Failed to save artifact', e)
+    }
+  }, [projectId, sessionId, onOpenArtifact])
+
   function generateId(): string {
     if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -638,14 +654,15 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
               {MODES.map((m) => (
                 <button
                   key={m.value}
-                  className={`bg-transparent border-r border-[#222] last:border-r-0 cursor-pointer text-xs px-3 py-2 transition-colors
+                  className={`bg-transparent border-r border-[#222] last:border-r-0 cursor-pointer text-xs px-2 sm:px-3 py-2 transition-colors
                     ${permissionMode === m.value
                       ? 'bg-[#1e3a5f] text-blue-400'
                       : 'text-[#444] hover:bg-[#1a1a1a] hover:text-[#888]'}`}
                   onClick={() => handleModeChange(m.value)}
                   title={m.title}
                 >
-                  {m.label}
+                  <span className="sm:hidden">{m.label.charAt(0)}</span>
+                  <span className="hidden sm:inline">{m.label}</span>
                 </button>
               ))}
             </span>
@@ -815,7 +832,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
                     projectId={projectId}
                     createdAt={m.createdAt}
                     onSendToChat={(text) => { handleSend(`Output:\n\`\`\`\n${text}\n\`\`\``); setKernelRefreshTick(t => t + 1) }}
-                    onSaveAsArtifact={(content, type, name, anchor) => setSaveArtifactTarget({ content, type, name, anchor })}
+                    onSaveAsArtifact={handleSaveAsArtifact}
                   />
                 </div>
               )
@@ -860,7 +877,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
                 projectId={projectId}
                 createdAt={m.createdAt}
                 onSendToChat={(text) => { handleSend(`Output:\n\`\`\`\n${text}\n\`\`\``); setKernelRefreshTick(t => t + 1) }}
-                onSaveAsArtifact={(content, type, name, anchor) => setSaveArtifactTarget({ content, type, name, anchor })}
+                onSaveAsArtifact={handleSaveAsArtifact}
               />
             </div>
           )
@@ -937,22 +954,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         disabled={streaming}
       />
 
-      {/* Save as Artifact dialog */}
-      {saveArtifactTarget && projectId && (
-        <SaveAsArtifactDialog
-          projectId={projectId}
-          sessionId={sessionId}
-          content={saveArtifactTarget.content}
-          defaultType={saveArtifactTarget.type}
-          defaultName={saveArtifactTarget.name}
-          anchorEl={saveArtifactTarget.anchor}
-          onClose={() => setSaveArtifactTarget(null)}
-          onSaved={(artifact) => {
-            setSaveArtifactTarget(null)
-            onOpenArtifact?.(artifact)
-          }}
-        />
-      )}
+
     </div>
   )
 }

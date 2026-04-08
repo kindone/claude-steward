@@ -326,15 +326,13 @@ export function SessionSidebar({
       )}
 
       {/* Artifacts tab */}
-      {activeTab === 'artifacts' && activeProjectId && (
-        <ArtifactPanel
-          projectId={activeProjectId}
-          onOpen={onOpenArtifact}
-          refreshTick={artifactRefreshTick}
-        />
-      )}
-      {activeTab === 'artifacts' && !activeProjectId && (
-        <p className="px-3 py-4 text-[12px] text-[#444] italic">No project selected</p>
+      {activeTab === 'artifacts' && (
+        <div className="flex-1 overflow-y-auto">
+          {activeProjectId
+            ? <ArtifactPanel projectId={activeProjectId} onOpen={onOpenArtifact} refreshTick={artifactRefreshTick} />
+            : <p className="px-3 py-4 text-[12px] text-[#444] italic">No project selected</p>
+          }
+        </div>
       )}
 
       {/* Terminal tab — always mounted once first shown so xterm.js instance survives tab switches */}

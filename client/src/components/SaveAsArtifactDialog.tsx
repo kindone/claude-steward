@@ -91,7 +91,7 @@ export function SaveAsArtifactDialog({
         name: safeName,
         type,
         content,
-        metadata: Object.keys(metadata).length > 0 ? JSON.stringify(metadata) : undefined,
+        metadata: Object.keys(metadata).length > 0 ? metadata : undefined,
         created_from_session: sessionId,
       })
 

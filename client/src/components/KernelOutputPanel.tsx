@@ -14,7 +14,7 @@ export interface OutputPanelState {
 
 interface Props {
   state: OutputPanelState
-  onSendToChat: (text: string) => void
+  onSendToChat?: (text: string) => void
   onDismiss: () => void
 }
 
@@ -82,7 +82,7 @@ export function KernelOutputPanel({ state, onSendToChat, onDismiss }: Props) {
         )}
 
         {/* Send to Claude */}
-        {status !== 'running' && outputText && (
+        {status !== 'running' && outputText && onSendToChat && (
           <button
             onClick={() => onSendToChat(outputText)}
             className="text-[11px] text-[#666] hover:text-[#aaa] transition-colors cursor-pointer"

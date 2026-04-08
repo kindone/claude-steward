@@ -32,8 +32,6 @@ export function KernelSelector({ projectId, refreshTick = 0 }: Props) {
 
   const alive = kernels.filter(k => k.alive)
 
-  if (alive.length === 0 && !open) return null
-
   async function handleKill(k: KernelInfo) {
     try {
       await killKernel(k.projectId, k.name, k.language)
@@ -67,10 +65,10 @@ export function KernelSelector({ projectId, refreshTick = 0 }: Props) {
       <button
         onClick={() => setOpen(o => !o)}
         className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-[#666] hover:text-[#aaa] hover:bg-[#1a1a1a] transition-colors cursor-pointer"
-        title="Active kernels"
+        title="Kernels"
       >
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-500" />
-        <span>{alive.length} kernel{alive.length !== 1 ? 's' : ''}</span>
+        <span className={`inline-block w-1.5 h-1.5 rounded-full ${alive.length > 0 ? 'bg-green-500' : 'bg-[#444]'}`} />
+        <span className="hidden sm:inline">{alive.length > 0 ? `${alive.length} kernel${alive.length !== 1 ? 's' : ''}` : 'kernels'}</span>
       </button>
 
       {open && (

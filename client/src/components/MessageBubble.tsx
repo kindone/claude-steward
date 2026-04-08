@@ -43,7 +43,7 @@ type Props = {
   projectId?: string | null
   createdAt?: number
   onSendToChat?: (text: string) => void
-  onSaveAsArtifact?: (content: string, defaultType: ArtifactType, defaultName: string, anchorEl: HTMLElement) => void
+  onSaveAsArtifact?: (content: string, defaultType: ArtifactType, defaultName: string, anchorEl: HTMLElement, language?: string) => void
 }
 
 export function MessageBubble({ role, content, streaming = false, errorCode, source, toolUses, onCompact, projectId = null, createdAt, onSendToChat, onSaveAsArtifact }: Props) {
@@ -142,17 +142,21 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
 
     // Run buttons: inject ▶ Run button and output portal mount into each runnable
     // code block once streaming ends. Idempotent — skips blocks that already have a button.
+    const EXECUTABLE_LANGS = new Set([
+      'python', 'py', 'javascript', 'js', 'typescript', 'ts',
+      'bash', 'sh', 'shell', 'cpp', 'c++', 'c',
+    ])
     if (!streaming && projectId) {
       const pres = contentRef.current.querySelectorAll<HTMLElement>('pre[data-runnable-lang]')
       let mountsChanged = false
       pres.forEach((pre, idx) => {
-        if (!pre.querySelector('.kernel-run-btn')) {
+        const lang = (pre.getAttribute('data-runnable-lang') ?? '').toLowerCase()
+        if (!pre.querySelector('.kernel-run-btn') && EXECUTABLE_LANGS.has(lang)) {
           const btn = document.createElement('button')
           btn.className = 'kernel-run-btn'
           btn.textContent = '▶ Run'
           btn.addEventListener('click', (e) => {
             e.stopPropagation()
-            const lang = pre.getAttribute('data-runnable-lang') ?? ''
             const code = pre.querySelector('code')?.textContent ?? ''
             handleRunRef.current?.(idx, lang, code)
           })
@@ -185,7 +189,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
               ['md', 'markdown'].includes(lang) ? 'report' :
               ['csv'].includes(lang) ? 'data' :
               'code'
-            onSaveAsArtifactRef.current?.(code, defaultType, '', btn as HTMLButtonElement)
+            onSaveAsArtifactRef.current?.(code, defaultType, '', btn as HTMLButtonElement, lang)
           })
           pre.appendChild(btn)
         }

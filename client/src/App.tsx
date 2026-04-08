@@ -701,6 +701,7 @@ export default function App() {
         <ArtifactFloat
           openArtifacts={openArtifacts}
           activeArtifactId={activeArtifactId}
+          projectId={activeProjectId}
           onActivate={setActiveArtifactId}
           onClose={handleCloseArtifact}
           onMinimize={handleMinimizeArtifact}

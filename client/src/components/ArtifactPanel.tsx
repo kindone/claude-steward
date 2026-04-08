@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { listArtifacts, deleteArtifact, refreshArtifact, type Artifact, type ArtifactType } from '../lib/api'
+import { listArtifacts, deleteArtifact, refreshArtifact, updateArtifact, type Artifact, type ArtifactType } from '../lib/api'
 
 interface Props {
   projectId: string
@@ -71,6 +71,8 @@ export function ArtifactPanel({ projectId, onOpen, refreshTick }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [refreshingIds, setRefreshingIds] = useState<Set<string>>(new Set())
+  const [renamingId, setRenamingId] = useState<string | null>(null)
+  const [renameValue, setRenameValue] = useState('')
 
   useEffect(() => {
     setLoading(true)
@@ -108,6 +110,18 @@ export function ArtifactPanel({ projectId, onOpen, refreshTick }: Props) {
     }
   }
 
+  async function handleRename(id: string) {
+    const newName = renameValue.trim()
+    setRenamingId(null)
+    if (!newName || newName === artifacts.find(a => a.id === id)?.name) return
+    try {
+      await updateArtifact(id, { name: newName })
+      setArtifacts(prev => prev.map(a => a.id === id ? { ...a, name: newName } : a))
+    } catch (e) {
+      console.error('Rename failed', e)
+    }
+  }
+
   return (
     <div className="px-3 pb-3 flex flex-col gap-2">
       {loading ? (
@@ -128,12 +142,28 @@ export function ArtifactPanel({ projectId, onOpen, refreshTick }: Props) {
               <div className="flex items-center gap-2">
                 <TypeBadge type={a.type} />
                 <div className="flex-1 min-w-0 flex flex-col">
-                  <span
-                    className="text-[12px] font-medium text-[#ccc] truncate"
-                    title={a.name}
-                  >
-                    {a.name}
-                  </span>
+                  {renamingId === a.id ? (
+                    <input
+                      autoFocus
+                      value={renameValue}
+                      onChange={e => setRenameValue(e.target.value)}
+                      onBlur={() => void handleRename(a.id)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') void handleRename(a.id)
+                        if (e.key === 'Escape') setRenamingId(null)
+                      }}
+                      className="flex-1 bg-[#1a1a1a] border border-[#3a3a3a] rounded px-1 text-[12px] text-[#ccc] outline-none min-w-0"
+                      onClick={e => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span
+                      className="text-[12px] font-medium text-[#ccc] truncate cursor-text"
+                      title={`${a.name} — click to rename`}
+                      onClick={() => { setRenamingId(a.id); setRenameValue(a.name) }}
+                    >
+                      {a.name}
+                    </span>
+                  )}
                   <span className="text-[10px] text-[#444]">{relativeTime(a.updated_at)}</span>
                 </div>
                 {getRefreshCommand(a) && (

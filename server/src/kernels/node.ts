@@ -95,9 +95,9 @@ export class NodeKernel implements IKernel {
   }
 
   async reset(): Promise<void> {
-    if (!this.child) return
-    this.child.stdin!.write('RESET\n')
-    await new Promise(r => setTimeout(r, 100))
+    // Kill and let ensureAlive() respawn on next run — this clears both
+    // ctx properties and script-level lexical bindings (const/let).
+    this.kill()
   }
 
   kill(): void {

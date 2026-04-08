@@ -434,7 +434,7 @@ export async function createArtifact(projectId: string, body: {
   name: string
   type: ArtifactType
   content: string
-  metadata?: string
+  metadata?: Record<string, unknown>
   created_from_session?: string
 }): Promise<Artifact> {
   const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/artifacts`, {
@@ -468,6 +468,36 @@ export async function updateArtifact(id: string, patch: { name?: string; metadat
     throw new Error(b.error ?? 'Failed to update artifact')
   }
   return res.json() as Promise<Artifact>
+}
+
+export function deriveArtifactName(content: string, lang: string, type: ArtifactType): string {
+  const trimmed = content.trim()
+
+  // Markdown/report: use first heading
+  if (type === 'report') {
+    const m = trimmed.match(/^#{1,3}\s+(.+)/m)
+    if (m) return m[1].trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 48)
+  }
+
+  // JSON/chart: use description or title field
+  if (type === 'chart' || (type === 'data' && (trimmed.startsWith('{') || trimmed.startsWith('[')))) {
+    try {
+      const p = JSON.parse(trimmed) as Record<string, unknown>
+      const label = (p['description'] ?? p['title'] ?? p['name']) as string | undefined
+      if (label) return label.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 48)
+    } catch { /* ignore */ }
+  }
+
+  // Code: first function/class/def name
+  if (type === 'code') {
+    const m = trimmed.match(/(?:^|\n)\s*(?:def|function|class|fn|func)\s+([\w_]+)/m)
+    if (m) return m[1].toLowerCase().replace(/_/g, '-')
+  }
+
+  // Fallback: lang or type + short base36 timestamp
+  const prefix = lang || type
+  const suffix = Math.floor(Date.now() / 1000).toString(36)
+  return `${prefix}-${suffix}`
 }
 
 export async function deleteArtifact(id: string): Promise<void> {

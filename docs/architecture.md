@@ -160,8 +160,6 @@ Uses **Passkeys (WebAuthn)**. The full flow:
 3. On success the server issues a `sid` cookie (`HttpOnly; Secure; SameSite=Strict; Max-Age=30d`)
 4. All subsequent `/api/*` requests include `credentials: 'include'`; the server validates the cookie in `requireAuth`
 
-The server also accepts `Authorization: Bearer <API_KEY>` as a fallback for the `requireAuth` middleware.
-
 Auth-related routes (`/api/auth/*`) are mounted **before** the `requireAuth` middleware and are fully public.
 
 Credential storage: `passkey_credentials` table (credential ID + COSE public key + sign counter). Session storage: `auth_sessions` table (random 32-byte token + expiry). Challenges are kept in-memory with a 5-minute TTL (single-user, so one slot per operation type).
@@ -178,7 +176,7 @@ All config lives in `.env` at the monorepo root.
 
 | Variable | Default | Description |
 |---|---|---|
-| `API_KEY` | — | Bearer token; still accepted as auth fallback during passkey rollout. Remove once all devices have passkeys registered. |
+| `API_KEY` | — | Bootstrap key used only during device registration (`X-Bootstrap-Key` header on `/api/auth/register/start`). Not used for general API auth. |
 | `PORT` | `3001` | Main server port |
 | `SAFE_PORT` | `3003` | Safe-mode server port |
 | `DATABASE_PATH` | `server/steward.db` | Optional SQLite path override |

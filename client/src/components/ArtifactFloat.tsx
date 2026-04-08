@@ -11,6 +11,7 @@ export interface OpenArtifact {
 interface Props {
   openArtifacts: OpenArtifact[]
   activeArtifactId: string | null
+  projectId: string | null
   onActivate: (id: string) => void
   onClose: (id: string) => void
   onMinimize: (id: string) => void
@@ -40,6 +41,7 @@ function readStoredWidth(): number {
 export function ArtifactFloat({
   openArtifacts,
   activeArtifactId,
+  projectId,
   onActivate,
   onClose,
   onMinimize,
@@ -294,6 +296,7 @@ export function ArtifactFloat({
             <ArtifactEditor
               artifact={activeEntry.artifact}
               content={activeEntry.content}
+              projectId={projectId}
               onChange={(newContent) => onContentChange(activeEntry.artifact.id, newContent)}
               onSave={() => onSave(activeEntry.artifact.id)}
             />
