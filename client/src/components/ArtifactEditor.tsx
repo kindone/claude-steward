@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Artifact } from '../lib/api'
 import { updateArtifact } from '../lib/api'
 import { ArtifactViewer } from './ArtifactViewer'
+import { ArtifactCodeMirror } from './ArtifactCodeMirror'
 
 interface Props {
   artifact: Artifact
@@ -99,12 +100,28 @@ export function ArtifactEditor({ artifact, content, onChange, onSave }: Props) {
 
   const viewerArtifact = { ...artifact }
 
+  const editorLanguage = (() => {
+    if (artifact.type === 'report') return 'markdown'
+    if (artifact.type === 'chart') return 'json'
+    if (artifact.type === 'data') {
+      const t = localContent.trim()
+      return (t.startsWith('{') || t.startsWith('[')) ? 'json' : ''
+    }
+    if (artifact.type === 'code') {
+      try {
+        const m = JSON.parse(artifact.metadata ?? '{}') as { language?: string }
+        return m.language ?? ''
+      } catch { return '' }
+    }
+    return ''
+  })()
+
   const editorEl = (
-    <textarea
-      className="w-full h-full resize-none bg-[#0d0d0d] text-[#ccc] font-mono text-[12px] leading-[1.6] p-3 focus:outline-none border-none"
+    <ArtifactCodeMirror
       value={localContent}
-      onChange={(e) => handleChange(e.target.value)}
-      spellCheck={false}
+      onChange={handleChange}
+      language={editorLanguage}
+      className="w-full h-full"
     />
   )
 
