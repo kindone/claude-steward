@@ -27,21 +27,51 @@ function ChartView({ content }: { content: string }) {
     setLoading(true)
     setError(null)
 
-    import('vega-embed').then(({ default: vegaEmbed }) => {
+    Promise.all([
+      import('vega-embed'),
+      import('vega-lite'),
+    ]).then(([{ default: vegaEmbed }, vegaLite]) => {
       if (cancelled || !containerRef.current) return
-      let spec: unknown
+      let vlSpec: Record<string, unknown>
       try {
-        spec = JSON.parse(content)
+        vlSpec = JSON.parse(content) as Record<string, unknown>
       } catch {
         setError('Invalid JSON: could not parse chart spec')
         setLoading(false)
         return
       }
-      // Ensure the full chart (including axes) fits the container width,
-      // not just the plot area. Override only if the spec doesn't set autosize.
-      const s = spec as Record<string, unknown>
-      const mergedSpec = { ...s, autosize: s['autosize'] ?? { type: 'fit', contains: 'padding' } }
-      vegaEmbed(containerRef.current, mergedSpec as Parameters<typeof vegaEmbed>[1], {
+
+      // Vega-Lite 6 bug: `bind: 'scales'` on a layer spec emits pan/zoom
+      // signals (grid_tuple, hover_tuple, etc.) once per layer instead of
+      // once per view, producing "Duplicate signal name" runtime errors.
+      // Fix: compile VL → Vega ourselves, deduplicate top-level signals by
+      // keeping the first occurrence of each name, then render as Vega.
+      let vegaSpec: Record<string, unknown>
+      try {
+        const compiled = vegaLite.compile(vlSpec as unknown as Parameters<typeof vegaLite.compile>[0])
+        vegaSpec = compiled.spec as Record<string, unknown>
+        if (Array.isArray(vegaSpec.signals)) {
+          const seen = new Set<string>()
+          vegaSpec.signals = (vegaSpec.signals as Array<{ name?: string }>).filter(s => {
+            if (!s.name) return true
+            if (seen.has(s.name)) return false
+            seen.add(s.name)
+            return true
+          })
+        }
+      } catch (compileErr) {
+        // If VL compilation fails fall back to passing the raw spec to vega-embed
+        vegaSpec = { ...vlSpec, autosize: vlSpec['autosize'] ?? { type: 'fit', contains: 'padding' } }
+      }
+
+      if (!('$schema' in vegaSpec && String(vegaSpec.$schema).includes('vega-lite'))) {
+        // Already Vega or fallback path — inject autosize
+        vegaSpec = { ...vegaSpec, autosize: vegaSpec['autosize'] ?? { type: 'fit', contains: 'padding' } }
+      } else {
+        vegaSpec = { ...vegaSpec, autosize: vegaSpec['autosize'] ?? { type: 'fit', contains: 'padding' } }
+      }
+
+      vegaEmbed(containerRef.current, vegaSpec as Parameters<typeof vegaEmbed>[1], {
         actions: false,
         renderer: 'svg',
       }).then((result) => {
