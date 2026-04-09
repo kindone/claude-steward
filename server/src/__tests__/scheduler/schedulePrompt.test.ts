@@ -16,6 +16,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { buildScheduleFragment, buildEffectiveSystemPrompt } from '../../lib/schedulePrompt.js'
+import { buildArtifactFragment } from '../../lib/artifactPrompt.js'
 import type { Session } from '../../db/index.js'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -145,8 +146,9 @@ describe('buildEffectiveSystemPrompt', () => {
     // Should equal the fragment (both are computed fresh, so compare structure)
     expect(result).toContain('cron')
     expect(result).toContain('UTC')
-    // Should NOT contain anything from a null system prompt
-    expect(result).toBe(fragment)
+    // Should equal schedule fragment + artifact fragment (no user system_prompt prepended)
+    const artifactFragment = buildArtifactFragment(session.project_id)
+    expect(result).toBe(fragment + artifactFragment)
   })
 
   it('prepends session system_prompt before fragment when set', () => {

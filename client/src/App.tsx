@@ -464,10 +464,10 @@ export default function App() {
     )
   }, [])
 
-  const handleSaveArtifact = useCallback((id: string) => {
+  const handleSaveArtifact = useCallback((id: string): Promise<void> => {
     const entry = openArtifactsRef.current.find((a) => a.artifact.id === id)
-    if (!entry) return
-    putArtifactContent(id, entry.content).catch(console.error)
+    if (!entry) return Promise.reject(new Error('Artifact not found in open list'))
+    return putArtifactContent(id, entry.content)
   }, [])
 
   async function handleCompact(_newSessionId: string) {

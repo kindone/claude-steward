@@ -410,7 +410,7 @@ export async function runScheduleNow(id: string): Promise<void> {
 
 // ── Artifacts ─────────────────────────────────────────────────────────────────
 
-export type ArtifactType = 'chart' | 'report' | 'data' | 'code' | 'pikchr'
+export type ArtifactType = 'chart' | 'report' | 'data' | 'code' | 'pikchr' | 'html'
 
 export interface Artifact {
   id: string
@@ -523,8 +523,8 @@ export async function getArtifactContent(id: string): Promise<string> {
 export async function putArtifactContent(id: string, content: string): Promise<void> {
   const res = await fetch(`/api/artifacts/${encodeURIComponent(id)}/content`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'text/plain' },
-    body: content,
+    headers: { ...JSON_HEADERS },
+    body: JSON.stringify({ content }),
     ...credentialsOpt,
   })
   if (!res.ok) throw new Error('Failed to update artifact content')

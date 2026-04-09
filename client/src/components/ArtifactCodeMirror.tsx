@@ -10,6 +10,7 @@ import { javascript } from '@codemirror/lang-javascript'
 import { cpp } from '@codemirror/lang-cpp'
 import { markdown } from '@codemirror/lang-markdown'
 import { json } from '@codemirror/lang-json'
+import { html } from '@codemirror/lang-html'
 import { StreamLanguage } from '@codemirror/language'
 import { shell } from '@codemirror/legacy-modes/mode/shell'
 import type { Extension } from '@codemirror/state'
@@ -41,6 +42,8 @@ function langExtension(language: string): Extension {
       return markdown()
     case 'json':
       return json()
+    case 'html':
+      return html()
     case 'bash':
     case 'shell':
     case 'sh':

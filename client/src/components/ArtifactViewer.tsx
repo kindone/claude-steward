@@ -352,6 +352,71 @@ function PikchrView({ content }: { content: string }) {
   )
 }
 
+// ── HTML renderer ─────────────────────────────────────────────────────────────
+
+function HtmlView({ content }: { content: string }) {
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [height, setHeight] = useState(500)
+  const [expanded, setExpanded] = useState(false)
+
+  // Listen for resize messages from the iframe so it can report its own height
+  useEffect(() => {
+    function onMessage(ev: MessageEvent) {
+      if (ev.data && typeof ev.data === 'object' && ev.data.__stewardResize) {
+        setHeight(Math.min(Math.max(ev.data.height as number, 100), 2000))
+      }
+    }
+    window.addEventListener('message', onMessage)
+    return () => window.removeEventListener('message', onMessage)
+  }, [])
+
+  // Inject a tiny auto-resize helper into the srcdoc so the iframe can report
+  // its content height back to the parent via postMessage.
+  const autoResizeScript = `<script>
+(function(){
+  function report(){
+    var h=document.documentElement.scrollHeight||document.body.scrollHeight;
+    parent.postMessage({__stewardResize:true,height:h},'*');
+  }
+  window.addEventListener('load',report);
+  new MutationObserver(report).observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true});
+})();
+<\/script>`
+
+  // Inject the helper right before </body> or </html>, or append if neither found.
+  function injectHelper(html: string): string {
+    const lower = html.toLowerCase()
+    const bodyClose = lower.lastIndexOf('</body>')
+    const htmlClose = lower.lastIndexOf('</html>')
+    const insertAt = bodyClose !== -1 ? bodyClose : htmlClose !== -1 ? htmlClose : html.length
+    return html.slice(0, insertAt) + autoResizeScript + html.slice(insertAt)
+  }
+
+  const srcdoc = injectHelper(content)
+  const displayHeight = expanded ? Math.max(height, 500) : Math.min(height, 500)
+
+  return (
+    <div className="flex flex-col gap-2">
+      <iframe
+        ref={iframeRef}
+        srcDoc={srcdoc}
+        sandbox="allow-scripts allow-downloads"
+        className="w-full rounded-md border border-[#2a2a2a] bg-white"
+        style={{ height: displayHeight, transition: 'height 0.15s ease' }}
+        title="HTML artifact"
+      />
+      {height > 500 && (
+        <button
+          onClick={() => setExpanded(e => !e)}
+          className="self-center text-[11px] text-[#555] hover:text-[#aaa] py-0.5 px-2 rounded border border-[#2a2a2a] hover:border-[#444]"
+        >
+          {expanded ? '↑ collapse' : `↓ expand (${height}px)`}
+        </button>
+      )}
+    </div>
+  )
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function ArtifactViewer({ artifact, content, className }: Props) {
@@ -370,6 +435,7 @@ export function ArtifactViewer({ artifact, content, className }: Props) {
       {artifact.type === 'data' && <DataView content={content} />}
       {artifact.type === 'code' && <CodeView content={content} artifact={artifact} />}
       {artifact.type === 'pikchr' && <PikchrView content={content} />}
+      {artifact.type === 'html'   && <HtmlView content={content} />}
     </div>
   )
 }

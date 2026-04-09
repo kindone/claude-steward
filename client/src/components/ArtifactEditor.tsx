@@ -11,10 +11,10 @@ interface Props {
   content: string
   projectId: string | null
   onChange: (newContent: string) => void
-  onSave: () => void
+  onSave: () => Promise<void>
 }
 
-type SaveStatus = 'idle' | 'saving' | 'saved'
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
 export function ArtifactEditor({ artifact, content, projectId, onChange, onSave }: Props) {
   // Local editing value — starts from content prop but is independent after that
@@ -74,12 +74,15 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
     if (saveStatus === 'saving') return
     setSaveStatus('saving')
     try {
-      onSave()
+      await onSave()
       setSaveStatus('saved')
       if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
       savedTimerRef.current = setTimeout(() => setSaveStatus('idle'), 2000)
-    } catch {
-      setSaveStatus('idle')
+    } catch (err) {
+      console.error('[artifact] save failed:', err)
+      setSaveStatus('error')
+      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+      savedTimerRef.current = setTimeout(() => setSaveStatus('idle'), 3000)
     }
   }, [saveStatus, onSave])
 
@@ -99,6 +102,7 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
   const editorLanguage = (() => {
     if (artifact.type === 'report') return 'markdown'
     if (artifact.type === 'chart') return 'json'
+    if (artifact.type === 'html') return 'html'
     if (artifact.type === 'data') {
       const t = localContent.trim()
       return (t.startsWith('{') || t.startsWith('[')) ? 'json' : ''
@@ -208,10 +212,12 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
           className={`text-[11px] px-2.5 py-1 rounded border cursor-pointer transition-colors flex-shrink-0 disabled:opacity-50
             ${saveStatus === 'saved'
               ? 'text-green-400 border-green-400/30 bg-green-400/10'
+              : saveStatus === 'error'
+              ? 'text-red-400 border-red-400/30 bg-red-400/10'
               : 'text-[#888] border-[#2a2a2a] bg-[#1a1a1a] hover:text-[#ccc] hover:border-[#444]'
             }`}
         >
-          {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : 'Save'}
+          {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? 'Error ✗' : 'Save'}
         </button>
       </div>
 

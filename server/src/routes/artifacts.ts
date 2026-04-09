@@ -33,6 +33,7 @@ function artifactExtension(type: string, metadata: Record<string, unknown> | nul
       return LANG_EXT[lang.toLowerCase()] ?? '.txt'
     }
     case 'pikchr': return '.pikchr'
+    case 'html':   return '.html'
     default: return '.bin'
   }
 }
@@ -77,7 +78,7 @@ projectArtifactsRouter.post('/', (req, res) => {
     res.status(400).json({ error: 'name is required' })
     return
   }
-  const validTypes = ['chart', 'report', 'data', 'code', 'pikchr']
+  const validTypes = ['chart', 'report', 'data', 'code', 'pikchr', 'html']
   if (!type || !validTypes.includes(type)) {
     res.status(400).json({ error: `type must be one of: ${validTypes.join(', ')}` })
     return
@@ -106,7 +107,7 @@ projectArtifactsRouter.post('/', (req, res) => {
     id,
     project_id: (req.params as ProjectArtifactParams).projectId,
     name: name.trim(),
-    type: type as 'chart' | 'report' | 'data' | 'code' | 'pikchr',
+    type: type as 'chart' | 'report' | 'data' | 'code' | 'pikchr' | 'html',
     path: relPath,
     metadata: metadata ? JSON.stringify(metadata) : null,
     created_from_session: created_from_session ?? null,
@@ -219,8 +220,16 @@ artifactRouter.put('/content', (req, res) => {
     return
   }
 
-  const { content } = req.body as { content?: string }
+  // body may be undefined if JSON body-parser didn't run (wrong Content-Type, etc.)
+  const body = req.body as { content?: string } | undefined
+  if (!body) {
+    console.error('[artifacts] PUT /content: req.body is undefined — Content-Type was:', req.headers['content-type'])
+    res.status(400).json({ error: 'Request body missing — send Content-Type: application/json' })
+    return
+  }
+  const { content } = body
   if (typeof content !== 'string') {
+    console.error('[artifacts] PUT /content: content field missing or non-string, body keys:', Object.keys(body))
     res.status(400).json({ error: 'content is required' })
     return
   }
@@ -229,7 +238,8 @@ artifactRouter.put('/content', (req, res) => {
   try {
     fs.mkdirSync(path.dirname(absPath), { recursive: true })
     fs.writeFileSync(absPath, content, 'utf8')
-  } catch {
+  } catch (err) {
+    console.error('[artifacts] PUT /content: file write failed:', absPath, err)
     res.status(500).json({ error: 'Failed to write artifact content' })
     return
   }

@@ -15,6 +15,7 @@ const TYPE_COLORS: Record<ArtifactType, string> = {
   data: 'text-green-400 bg-green-500/10 border-green-500/20',
   code: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
   pikchr: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/20',
+  html:   'text-yellow-400 bg-yellow-500/10 border-yellow-500/20',
 }
 
 function TypeBadge({ type }: { type: ArtifactType }) {

@@ -275,7 +275,7 @@ export type Message = {
   created_at: number
 }
 
-export type ArtifactType = 'chart' | 'report' | 'data' | 'code' | 'pikchr'
+export type ArtifactType = 'chart' | 'report' | 'data' | 'code' | 'pikchr' | 'html'
 
 export interface Artifact {
   id: string

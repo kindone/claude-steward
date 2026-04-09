@@ -17,7 +17,7 @@ interface Props {
   onMinimize: (id: string) => void
   onRestore: (id: string) => void
   onContentChange: (id: string, newContent: string) => void
-  onSave: (id: string) => void
+  onSave: (id: string) => Promise<void>
 }
 
 const PANEL_WIDTH_KEY = 'steward:artifactPanelWidth'
