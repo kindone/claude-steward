@@ -231,52 +231,40 @@ body {
   display: none;
 }
 
-/* ── Kernel run button ──────────────────────────────────────────────────────── */
+/* ── Code block action buttons ──────────────────────────────────────────────── */
 
-/* Positioned in the top-right corner of each <pre> block */
+/* Container anchored to the top-right of each <pre>. All action buttons live
+   inside it as a flex row so there are no hardcoded right-offset calculations. */
 pre {
   position: relative;
 }
 
-.kernel-run-btn {
+.code-action-group {
   position: absolute;
   top: 6px;
   right: 8px;
-  padding: 2px 8px;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
-  border-radius: 4px;
-  color: #555;
-  font-size: 11px;
-  font-family: inherit;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+  align-items: center;
   opacity: 0;
-  line-height: 1.6;
+  transition: opacity 0.15s;
 }
 
-pre:hover .kernel-run-btn {
+pre:hover .code-action-group {
   opacity: 1;
 }
 
-.kernel-run-btn:hover {
-  color: #ccc;
-  border-color: #444;
-  background: #222;
-}
-
-/* Always visible on touch devices */
 @media (hover: none) {
-  .kernel-run-btn {
+  .code-action-group {
     opacity: 1;
   }
 }
 
-/* Save-as-cell button — sits to the right of the Run button */
-.kernel-save-btn {
-  position: absolute;
-  top: 6px;
-  right: 54px;  /* sits left of the Run button (which is at right:8) */
+/* Shared style for all buttons inside the group */
+.kernel-run-btn,
+.kernel-save-btn,
+.artifact-save-btn {
   padding: 2px 6px;
   background: #1a1a1a;
   border: 1px solid #2a2a2a;
@@ -285,23 +273,17 @@ pre:hover .kernel-run-btn {
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background 0.15s;
-  opacity: 0;
   line-height: 1.6;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  white-space: nowrap;
 }
 
-pre:hover .kernel-save-btn {
-  opacity: 1;
-}
+.kernel-run-btn { padding: 2px 8px; }
 
-.kernel-save-btn:hover {
+.kernel-run-btn:hover,
+.kernel-save-btn:hover,
+.artifact-save-btn:hover {
   color: #ccc;
   border-color: #444;
   background: #222;
-}
-
-@media (hover: none) {
-  .kernel-save-btn {
-    opacity: 1;
-  }
 }

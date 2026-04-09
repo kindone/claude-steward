@@ -48,9 +48,12 @@ export function writeMcpConfig(): void {
   fs.mkdirSync(dataDir, { recursive: true })
 
   const isProd = process.env.NODE_ENV === 'production'
-  const serverEntry = isProd
+  const scheduleEntry = isProd
     ? path.join(__dirname, '../mcp/schedule-server.js')    // dist/mcp/schedule-server.js
     : path.join(__dirname, 'schedule-server.ts')            // src/mcp/schedule-server.ts
+  const artifactEntry = isProd
+    ? path.join(__dirname, '../mcp/artifact-server.js')    // dist/mcp/artifact-server.js
+    : path.join(__dirname, 'artifact-server.ts')            // src/mcp/artifact-server.ts
 
   // Use the absolute path to the current Node.js binary so MCP servers inherit
   // the same version the steward server runs on (NVM-managed v22+, required for
@@ -58,29 +61,22 @@ export function writeMcpConfig(): void {
   // node (often v18) which doesn't have node:sqlite and crashes on import.
   const nodeBin = process.execPath
 
+  const sharedEnv = {
+    DATABASE_PATH:     dbPath,
+    MCP_NOTIFY_URL:    notifyUrl,
+    MCP_NOTIFY_SECRET: notifySecret,
+  }
+
+  function makeServer(entry: string) {
+    return isProd
+      ? { type: 'stdio', command: nodeBin, args: [entry],                       env: sharedEnv }
+      : { type: 'stdio', command: nodeBin, args: ['--import', 'tsx', entry],    env: sharedEnv }
+  }
+
   const mcpConfig = {
     mcpServers: {
-      'steward-schedules': isProd
-        ? {
-            type: 'stdio',
-            command: nodeBin,
-            args: [serverEntry],
-            env: {
-              DATABASE_PATH:     dbPath,
-              MCP_NOTIFY_URL:    notifyUrl,
-              MCP_NOTIFY_SECRET: notifySecret,
-            },
-          }
-        : {
-            type: 'stdio',
-            command: nodeBin,
-            args: ['--import', 'tsx', serverEntry],
-            env: {
-              DATABASE_PATH:     dbPath,
-              MCP_NOTIFY_URL:    notifyUrl,
-              MCP_NOTIFY_SECRET: notifySecret,
-            },
-          },
+      'steward-schedules': makeServer(scheduleEntry),
+      'steward-artifacts': makeServer(artifactEntry),
     },
   }
 
@@ -90,19 +86,19 @@ export function writeMcpConfig(): void {
   process.env.MCP_CONFIG_PATH    = MCP_CONFIG_PATH
   process.env.MCP_NOTIFY_SECRET  = notifySecret
 
-  // Keep .claude/settings.json in sync so the Claude Code session always has the
-  // current secret and server entry point. Silently skip if the file doesn't exist.
-  syncClaudeSettings(mcpConfig.mcpServers['steward-schedules'])
+  // Keep ~/.claude.json in sync so the Claude Code session always has the
+  // current secret and server entry points. Silently skip if the file doesn't exist.
+  syncClaudeSettings(mcpConfig.mcpServers)
 
   console.log(`[mcp] config written → ${MCP_CONFIG_PATH} (notify: ${notifyUrl})`)
 }
 
 /**
- * Update the steward-schedules entry in ~/.claude.json — the file Claude Code
+ * Update steward MCP server entries in ~/.claude.json — the file Claude Code
  * uses to store MCP server registrations (written by `claude mcp add`).
- * This keeps the secret and node binary path in sync across server restarts.
+ * This keeps secrets and node binary paths in sync across server restarts.
  */
-function syncClaudeSettings(serverConfig: object): void {
+function syncClaudeSettings(servers: Record<string, object>): void {
   const claudeJson = path.join(
     process.env.HOME ?? process.env.USERPROFILE ?? '~',
     '.claude.json',
@@ -112,7 +108,9 @@ function syncClaudeSettings(serverConfig: object): void {
     const raw = fs.readFileSync(claudeJson, 'utf8')
     const data = JSON.parse(raw)
     data.mcpServers ??= {}
-    data.mcpServers['steward-schedules'] = serverConfig
+    for (const [name, config] of Object.entries(servers)) {
+      data.mcpServers[name] = config
+    }
     fs.writeFileSync(claudeJson, JSON.stringify(data, null, 2) + '\n')
   } catch (err) {
     // Non-fatal — a stale secret just means SSE notify won't fire until next restart.

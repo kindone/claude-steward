@@ -23,8 +23,15 @@ router.post('/', (req, res) => {
     return
   }
 
-  const { sessionId } = req.body as { sessionId?: string }
-  broadcastEvent('schedules_changed', { sessionId: sessionId ?? null })
+  const body = req.body as { sessionId?: string; event?: string; payload?: unknown }
+
+  if (body.event) {
+    // Generic event broadcast (used by artifact-server and future MCP servers)
+    broadcastEvent(body.event, body.payload ?? {})
+  } else {
+    // Legacy: schedule server sends { sessionId }
+    broadcastEvent('schedules_changed', { sessionId: body.sessionId ?? null })
+  }
 
   res.status(204).end()
 })

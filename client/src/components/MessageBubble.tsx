@@ -143,8 +143,10 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       grid.classList.toggle('is-collapsed', !galleryExpanded)
     }
 
-    // Run buttons: inject ▶ Run button and output portal mount into each runnable
-    // code block once streaming ends. Idempotent — skips blocks that already have a button.
+    // Code action buttons: inject a .code-action-group container (flex row) into
+    // the top-right of each <pre> block, then append buttons inside it.
+    // Order inside group (left → right): 📎 artifact-save, 💾 cell-save, ▶ Run
+    // Idempotent — skips blocks that already have a group.
     const EXECUTABLE_LANGS = new Set([
       'python', 'py', 'javascript', 'js', 'typescript', 'ts',
       'bash', 'sh', 'shell', 'cpp', 'c++', 'c',
@@ -154,38 +156,23 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       let mountsChanged = false
       pres.forEach((pre, idx) => {
         const lang = (pre.getAttribute('data-runnable-lang') ?? '').toLowerCase()
-        if (!pre.querySelector('.kernel-run-btn') && EXECUTABLE_LANGS.has(lang)) {
-          const btn = document.createElement('button')
-          btn.className = 'kernel-run-btn'
-          btn.textContent = '▶ Run'
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation()
-            const code = pre.querySelector('code')?.textContent ?? ''
-            handleRunRef.current?.(idx, lang, code)
-          })
-          pre.appendChild(btn)
+
+        // Ensure the shared button group container exists
+        let group = pre.querySelector<HTMLDivElement>('.code-action-group')
+        if (!group) {
+          group = document.createElement('div')
+          group.className = 'code-action-group'
+          pre.appendChild(group)
         }
-        if (!pre.querySelector('.kernel-save-btn')) {
+
+        // 📎 Artifact-save — leftmost, always shown when callback is available
+        if (!group.querySelector('.artifact-save-btn') && onSaveAsArtifactRef.current) {
           const btn = document.createElement('button')
-          btn.className = 'kernel-save-btn'
-          btn.textContent = '💾'
-          btn.title = 'Save as cell'
-          btn.addEventListener('click', (e) => {
-            e.stopPropagation()
-            const lang = pre.getAttribute('data-runnable-lang') ?? ''
-            const code = pre.querySelector('code')?.textContent ?? ''
-            handleSaveRef.current?.(idx, lang, code, btn as HTMLButtonElement)
-          })
-          pre.appendChild(btn)
-        }
-        if (!pre.querySelector('.artifact-save-btn') && onSaveAsArtifactRef.current) {
-          const btn = document.createElement('button')
-          btn.className = 'artifact-save-btn code-action-btn'
+          btn.className = 'artifact-save-btn'
           btn.title = 'Save as artifact'
           btn.textContent = '📎'
           btn.addEventListener('click', (e) => {
             e.stopPropagation()
-            const lang = pre.getAttribute('data-runnable-lang') ?? 'text'
             const code = pre.querySelector('code')?.textContent ?? ''
             const defaultType: ArtifactType =
               lang === 'json' ? 'chart' :
@@ -194,8 +181,36 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
               'code'
             onSaveAsArtifactRef.current?.(code, defaultType, '', btn as HTMLButtonElement, lang)
           })
-          pre.appendChild(btn)
+          group.appendChild(btn)
         }
+
+        // 💾 Cell-save — middle, only for executable langs
+        if (!group.querySelector('.kernel-save-btn') && EXECUTABLE_LANGS.has(lang)) {
+          const btn = document.createElement('button')
+          btn.className = 'kernel-save-btn'
+          btn.textContent = '💾'
+          btn.title = 'Save as cell'
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation()
+            const code = pre.querySelector('code')?.textContent ?? ''
+            handleSaveRef.current?.(idx, lang, code, btn as HTMLButtonElement)
+          })
+          group.appendChild(btn)
+        }
+
+        // ▶ Run — rightmost, only for executable langs
+        if (!group.querySelector('.kernel-run-btn') && EXECUTABLE_LANGS.has(lang)) {
+          const btn = document.createElement('button')
+          btn.className = 'kernel-run-btn'
+          btn.textContent = '▶ Run'
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation()
+            const code = pre.querySelector('code')?.textContent ?? ''
+            handleRunRef.current?.(idx, lang, code)
+          })
+          group.appendChild(btn)
+        }
+
         if (!outputMountsRef.current.has(idx)) {
           const mount = document.createElement('div')
           pre.after(mount)
