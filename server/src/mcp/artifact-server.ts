@@ -26,7 +26,7 @@ import { mcpArtifactDb, type ArtifactType } from './artifact-db.js'
 
 // ── Notification helper ────────────────────────────────────────────────────────
 
-async function notifyArtifactCreated(projectId: string, artifactId: string): Promise<void> {
+async function notifyServer(event: string, payload: Record<string, unknown>): Promise<void> {
   const url = process.env.MCP_NOTIFY_URL
   const secret = process.env.MCP_NOTIFY_SECRET
   if (!url || !secret) return
@@ -34,7 +34,7 @@ async function notifyArtifactCreated(projectId: string, artifactId: string): Pro
     await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-MCP-Secret': secret },
-      body: JSON.stringify({ event: 'artifact_created', payload: { projectId, artifactId } }),
+      body: JSON.stringify({ event, payload }),
     })
   } catch {
     // Non-critical: Art panel will refresh on next open if notify fails
@@ -107,6 +107,32 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['session_id', 'name', 'type', 'content'],
       },
     },
+    {
+      name: 'artifact_update',
+      description:
+        'Update the content of an existing artifact in-place. ' +
+        'The Art panel will live-refresh automatically via SSE — no need to re-open. ' +
+        'Use artifact_list to get the artifact id if you don\'t already have it. ' +
+        'Only content is updated; name, type, and metadata are unchanged.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          session_id: {
+            type: 'string',
+            description: 'The steward session ID (from the system prompt).',
+          },
+          artifact_id: {
+            type: 'string',
+            description: 'The artifact UUID to update (from artifact_list or a prior artifact_create).',
+          },
+          content: {
+            type: 'string',
+            description: 'New full content to write. For charts: Vega-Lite JSON. For reports: Markdown. For code: source code.',
+          },
+        },
+        required: ['session_id', 'artifact_id', 'content'],
+      },
+    },
   ],
 }))
 
@@ -170,12 +196,35 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           metadata,
         )
 
-        await notifyArtifactCreated(project.id, artifact.id)
+        await notifyServer('artifact_created', { projectId: project.id, artifactId: artifact.id })
 
         return {
           content: [{
             type: 'text',
             text: `Artifact created: "${artifact.name}" (${artifact.type})\nID: ${artifact.id}\nPath: ${artifact.path}\nThe artifact is now visible in the Art panel.`,
+          }],
+        }
+      }
+
+      case 'artifact_update': {
+        const sessionId  = String(args.session_id  ?? '').trim()
+        const artifactId = String(args.artifact_id ?? '').trim()
+        const content    = String(args.content     ?? '')
+
+        if (!sessionId)  throw new Error('session_id is required')
+        if (!artifactId) throw new Error('artifact_id is required')
+
+        // Verify the session exists (auth check)
+        const project = mcpArtifactDb.findProjectFromSession(sessionId)
+        if (!project) throw new Error(`No project found for session "${sessionId}". Is this a valid steward session?`)
+
+        const artifact = mcpArtifactDb.update(artifactId, content)
+        await notifyServer('artifact_updated', { projectId: artifact.project_id, artifactId: artifact.id })
+
+        return {
+          content: [{
+            type: 'text',
+            text: `Artifact updated: "${artifact.name}" (${artifact.type})\nID: ${artifact.id}\nThe Art panel will refresh automatically.`,
           }],
         }
       }

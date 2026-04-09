@@ -28,7 +28,10 @@
       "mcp__steward-schedules__schedule_list",
       "mcp__steward-schedules__schedule_create",
       "mcp__steward-schedules__schedule_update",
-      "mcp__steward-schedules__schedule_delete"
+      "mcp__steward-schedules__schedule_delete",
+      "mcp__steward-artifacts__artifact_list",
+      "mcp__steward-artifacts__artifact_create",
+      "mcp__steward-artifacts__artifact_update"
     ],
     "deny": [
       "Bash(git push*)",

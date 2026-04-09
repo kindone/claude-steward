@@ -30,7 +30,10 @@
     "status": "node scripts/status.js",
     "stock-chart": "npx tsx scripts/stock-chart.ts",
     "compare-chart": "npx tsx scripts/compare-chart.ts",
-    "overview-chart": "npx tsx scripts/overview-chart.ts"
+    "overview-chart": "npx tsx scripts/overview-chart.ts",
+    "stock-chart-vl": "npx tsx scripts/stock-chart-vl.ts",
+    "compare-chart-vl": "npx tsx scripts/compare-chart-vl.ts",
+    "overview-chart-vl": "npx tsx scripts/overview-chart-vl.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

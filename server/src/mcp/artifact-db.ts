@@ -39,6 +39,17 @@ const insertArtifactStmt = db.prepare(
    VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *`
 )
 
+const findArtifactByIdStmt = db.prepare(
+  `SELECT a.id, a.project_id, a.name, a.type, a.path, a.metadata, a.created_at, a.updated_at,
+          p.path as project_path
+   FROM artifacts a JOIN projects p ON a.project_id = p.id
+   WHERE a.id = ? LIMIT 1`
+)
+
+const updateArtifactTimestampStmt = db.prepare(
+  `UPDATE artifacts SET updated_at = unixepoch() WHERE id = ?`
+)
+
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export type ArtifactType = 'chart' | 'report' | 'data' | 'code' | 'pikchr'
@@ -132,5 +143,20 @@ export const mcpArtifactDb = {
       metadata ? JSON.stringify(metadata) : null,
       sessionId,
     ) as unknown as ArtifactRow
+  },
+
+  /**
+   * Overwrite the artifact file content and bump updated_at.
+   * Returns the artifact row (with updated timestamp).
+   */
+  update: (artifactId: string, content: string): ArtifactRow & { project_path: string } => {
+    const row = findArtifactByIdStmt.get(artifactId) as (ArtifactRow & { project_path: string }) | undefined
+    if (!row) throw new Error(`Artifact "${artifactId}" not found`)
+
+    const absPath = path.join(row.project_path, row.path)
+    fs.writeFileSync(absPath, content, 'utf8')
+    updateArtifactTimestampStmt.run(artifactId)
+
+    return { ...row, updated_at: Math.floor(Date.now() / 1000) }
   },
 }
