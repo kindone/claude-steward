@@ -355,9 +355,9 @@ function PikchrView({ content }: { content: string }) {
 // ── HTML renderer ─────────────────────────────────────────────────────────────
 
 function HtmlView({ content }: { content: string }) {
-  const iframeRef = useRef<HTMLIFrameElement>(null)
   const [height, setHeight] = useState(500)
   const [expanded, setExpanded] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
 
   // Listen for resize messages from the iframe so it can report its own height
   useEffect(() => {
@@ -397,8 +397,17 @@ function HtmlView({ content }: { content: string }) {
 
   return (
     <div className="flex flex-col gap-2">
+      <div className="flex items-center justify-end gap-2">
+        <button
+          onClick={() => setReloadKey(k => k + 1)}
+          className="text-[11px] text-[#555] hover:text-[#aaa] py-0.5 px-2 rounded border border-[#2a2a2a] hover:border-[#444]"
+          title="Force reload preview"
+        >
+          ↺ reload
+        </button>
+      </div>
       <iframe
-        ref={iframeRef}
+        key={reloadKey}
         srcDoc={srcdoc}
         sandbox="allow-scripts allow-downloads"
         className="w-full rounded-md border border-[#2a2a2a] bg-white"
