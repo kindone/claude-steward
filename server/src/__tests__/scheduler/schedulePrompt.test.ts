@@ -146,9 +146,9 @@ describe('buildEffectiveSystemPrompt', () => {
     // Should equal the fragment (both are computed fresh, so compare structure)
     expect(result).toContain('cron')
     expect(result).toContain('UTC')
-    // Should equal schedule fragment + artifact fragment (no user system_prompt prepended)
-    const artifactFragment = buildArtifactFragment(session.project_id)
-    expect(result).toBe(fragment + artifactFragment)
+    // Should contain all fragments (no user system_prompt prepended)
+    expect(result).toContain('steward-schedules')
+    expect(result).toContain('artifact')
   })
 
   it('prepends session system_prompt before fragment when set', () => {

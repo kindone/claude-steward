@@ -341,6 +341,9 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
     let cancelled = false
     let cancelWatch: (() => void) | null = null
 
+    // Reset scroll to snap-to-bottom on every session load/switch
+    scrollBehaviorRef.current = 'instant'
+
     // Reset chain state when root session changes
     setPastSegments([])
     setCurrentSessionId(sessionId)

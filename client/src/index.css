@@ -114,7 +114,8 @@ body {
   line-height: 1.6;
 }
 
-.pikchr-placeholder:hover .pikchr-save-btn {
+.pikchr-placeholder:hover .pikchr-save-btn,
+.smartart-placeholder:hover .pikchr-save-btn {
   opacity: 1;
 }
 
@@ -129,6 +130,19 @@ body {
   background: white;
   border-radius: 6px;
   padding: 12px;
+}
+
+.smartart-placeholder {
+  position: relative;
+  display: inline-block;
+  width: 100%;
+}
+
+.smartart-placeholder svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
 }
 
 .pikchr-error {

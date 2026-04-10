@@ -410,7 +410,7 @@ export async function runScheduleNow(id: string): Promise<void> {
 
 // ── Artifacts ─────────────────────────────────────────────────────────────────
 
-export type ArtifactType = 'chart' | 'report' | 'data' | 'code' | 'pikchr' | 'html'
+export type ArtifactType = 'chart' | 'report' | 'data' | 'code' | 'pikchr' | 'html' | 'smartart'
 
 export interface Artifact {
   id: string

@@ -5,6 +5,7 @@ import hljs from 'highlight.js'
 import type { Artifact } from '../lib/api'
 import { buildMarkedOptions } from '../lib/markdownRenderer'
 import { renderPikchr } from '../lib/pikchrRenderer'
+import { SmartArtView } from './SmartArtView'
 
 interface Props {
   artifact: Artifact
@@ -443,8 +444,9 @@ export function ArtifactViewer({ artifact, content, className }: Props) {
       {artifact.type === 'report' && <ReportView content={content} />}
       {artifact.type === 'data' && <DataView content={content} />}
       {artifact.type === 'code' && <CodeView content={content} artifact={artifact} />}
-      {artifact.type === 'pikchr' && <PikchrView content={content} />}
-      {artifact.type === 'html'   && <HtmlView content={content} />}
+      {artifact.type === 'pikchr'   && <PikchrView content={content} />}
+      {artifact.type === 'html'     && <HtmlView content={content} />}
+      {artifact.type === 'smartart' && <SmartArtView content={content} />}
     </div>
   )
 }

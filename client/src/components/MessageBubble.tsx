@@ -5,6 +5,7 @@ import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
 import mermaid from 'mermaid'
 import { renderPikchr } from '../lib/pikchrRenderer'
+import { renderSmartArt } from '../lib/smartart/renderer'
 import 'highlight.js/styles/github-dark.css'
 import 'katex/dist/katex.min.css'
 import type { ClaudeErrorCode, ToolCall } from '../lib/api'
@@ -29,7 +30,8 @@ function renderMarkdown(content: string, projectId: string | null): string {
   const { renderer } = buildMarkedOptions(projectId)
   const html = marked.parse(withKatex, { renderer }) as string
   return DOMPurify.sanitize(html, {
-    ADD_ATTR: ['data-graph', 'data-src', 'data-runnable-lang', 'style'],
+    ADD_ATTR: ['data-graph', 'data-src', 'data-type', 'data-runnable-lang', 'style'],
+    ADD_TAGS: ['div'],
   })
 }
 
@@ -60,6 +62,8 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
   const mermaidCache = useRef<Map<string, string>>(new Map())
   /** Per-message pikchr SVG cache: source → rendered SVG string. */
   const pikchrCache = useRef<Map<string, string>>(new Map())
+  /** Per-message smartart SVG cache: source → rendered SVG string. */
+  const smartartCache = useRef<Map<string, string>>(new Map())
 
   // ── Kernel code execution state ─────────────────────────────────────────────
   /** Per-block run state: block index → output panel state */
@@ -320,6 +324,55 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
     })
   }) // intentionally no deps — must run after every render
 
+  // SmartArt rendering — synchronous (no WASM), mirrors the pikchr pattern.
+  // Renders immediately (no need to wait for streaming to finish) since it's
+  // pure JS. Still uses cache to survive innerHTML resets from re-renders.
+  useEffect(() => {
+    if (!contentRef.current || role !== 'assistant' || errorCode) return
+    const placeholders = contentRef.current.querySelectorAll<HTMLDivElement>(
+      '.smartart-placeholder:not(.smartart-rendered)'
+    )
+    if (placeholders.length === 0) return
+
+    const injectSmartartSaveBtn = (el: HTMLDivElement) => {
+      if (el.querySelector('.smartart-save-btn')) return
+      const btn = document.createElement('button')
+      btn.className = 'smartart-save-btn pikchr-save-btn'
+      btn.title = 'Save as artifact'
+      btn.textContent = '📎'
+      el.appendChild(btn)
+    }
+
+    placeholders.forEach((el) => {
+      const src = el.dataset.src ?? ''
+      const hintType = el.dataset.type || undefined
+      if (!src) return
+
+      const cacheKey = src + '|' + (hintType ?? '')
+      const cached = smartartCache.current.get(cacheKey)
+      if (cached) {
+        el.innerHTML = cached
+        el.classList.add('smartart-rendered')
+        injectSmartartSaveBtn(el)
+        return
+      }
+
+      try {
+        const raw = atob(src)
+        const svg = renderSmartArt(raw, hintType)
+        smartartCache.current.set(cacheKey, svg)
+        if (el.isConnected && !el.classList.contains('smartart-rendered')) {
+          el.innerHTML = svg
+          el.classList.add('smartart-rendered')
+          injectSmartartSaveBtn(el)
+        }
+      } catch (e) {
+        el.classList.add('smartart-error')
+        el.textContent = 'SmartArt error: ' + String(e)
+      }
+    })
+  }) // intentionally no deps — must run after every render
+
   function handleContentClick(e: React.MouseEvent<HTMLDivElement>) {
     const target = e.target as Element
 
@@ -346,12 +399,26 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       return
     }
     // pikchr save button — must be checked before svg to avoid lightbox opening
-    if (target.closest('.pikchr-save-btn')) {
+    if (target.closest('.pikchr-save-btn') && !target.closest('.smartart-placeholder')) {
       const placeholder = target.closest('.pikchr-placeholder') as HTMLDivElement | null
       const src = decodeURIComponent(placeholder?.getAttribute('data-src') ?? '')
       if (src) {
         const name = deriveArtifactName(src, 'pikchr', 'pikchr')
         onSaveAsArtifactRef.current?.(src, 'pikchr', name, target as HTMLElement)
+      }
+      return
+    }
+
+    // smartart save button
+    if (target.closest('.smartart-save-btn')) {
+      const placeholder = target.closest('.smartart-placeholder') as HTMLDivElement | null
+      const encoded = placeholder?.dataset.src ?? ''
+      if (encoded) {
+        try {
+          const raw = atob(encoded)
+          const name = deriveArtifactName(raw, 'smartart', 'smartart')
+          onSaveAsArtifactRef.current?.(raw, 'smartart', name, target as HTMLElement)
+        } catch { /* ignore atob errors */ }
       }
       return
     }
