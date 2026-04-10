@@ -6,6 +6,9 @@ import { renderProcess } from './layouts/process'
 import { renderList } from './layouts/list'
 import { renderCycle } from './layouts/cycle'
 import { renderMatrix } from './layouts/matrix'
+import { renderHierarchy } from './layouts/hierarchy'
+import { renderPyramid } from './layouts/pyramid'
+import { renderRelationship } from './layouts/relationship'
 
 type LayoutRenderer = (spec: SmartArtSpec, theme: SmartArtTheme) => string
 
@@ -39,6 +42,28 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   'pros-cons': renderMatrix,
   comparison: renderMatrix,
   'matrix-2x2': renderMatrix,
+
+  // hierarchy family
+  'org-chart': renderHierarchy,
+  tree: renderHierarchy,
+  'decision-tree': renderHierarchy,
+  bracket: renderHierarchy,
+  'mind-map': renderHierarchy,
+
+  // pyramid family
+  pyramid: renderPyramid,
+  'inverted-pyramid': renderPyramid,
+  'pyramid-list': renderPyramid,
+  'segmented-pyramid': renderPyramid,
+  'diamond-pyramid': renderPyramid,
+
+  // relationship family
+  venn: renderRelationship,
+  'venn-3': renderRelationship,
+  concentric: renderRelationship,
+  balance: renderRelationship,
+  'opposing-arrows': renderRelationship,
+  web: renderRelationship,
 }
 
 export function renderSmartArt(raw: string, hintType?: string): string {

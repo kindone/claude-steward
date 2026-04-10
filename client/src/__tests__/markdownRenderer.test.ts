@@ -2,7 +2,13 @@
  * Tests for markdownRenderer.ts utilities.
  */
 import { describe, it, expect } from 'vitest'
-import { splitContent, buildMarkedOptions, preprocessKaTeX } from '../lib/markdownRenderer'
+import {
+  splitContent,
+  buildMarkedOptions,
+  preprocessKaTeX,
+  utf8ToBase64,
+  utf8FromBase64,
+} from '../lib/markdownRenderer'
 import { marked } from 'marked'
 
 // ── splitContent ─────────────────────────────────────────────────────────────
@@ -70,6 +76,20 @@ describe('buildMarkedOptions – mermaid', () => {
     const html = marked.parse('```js\nconsole.log(1)\n```', { renderer }) as string
     expect(html).not.toContain('mermaid-placeholder')
     expect(html).toContain('<code')
+  })
+
+  it('smartart fences with Unicode do not throw (UTF-8 base64)', () => {
+    const body = 'type: process\n你好\n'
+    const { renderer } = buildMarkedOptions(null)
+    const md = `\`\`\`smartart\n${body}\`\`\``
+    expect(() => marked.parse(md, { renderer })).not.toThrow()
+    const html = marked.parse(md, { renderer }) as string
+    expect(html).toContain('class="smartart-placeholder"')
+    const b64 = (html.match(/data-src="([^"]+)"/) ?? [])[1]
+    expect(b64).toBeDefined()
+    // marked normalizes trailing newlines on code tokens
+    expect(utf8FromBase64(b64!).replace(/\n$/, '')).toBe(body.replace(/\n$/, ''))
+    expect(utf8ToBase64('ascii only')).toBe(btoa('ascii only'))
   })
 })
 

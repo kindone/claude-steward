@@ -102,6 +102,7 @@ body {
   position: absolute;
   top: 6px;
   right: 6px;
+  z-index: 10;
   padding: 2px 6px;
   background: rgba(26, 26, 26, 0.8);
   border: 1px solid #444;

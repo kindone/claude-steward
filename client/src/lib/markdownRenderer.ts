@@ -82,7 +82,7 @@ export function buildMarkedOptions(projectId: string | null): { renderer: Instan
     if (token.lang?.startsWith('smartart')) {
       // Encode the diagram source; MessageBubble hydrates these via smartart/renderer.ts.
       const hintType = token.lang.replace('smartart', '').trim()
-      const encoded = btoa(token.text)
+      const encoded = utf8ToBase64(token.text)
       return `<div class="smartart-placeholder" data-src="${encoded}" data-type="${escapeAttr(hintType)}"></div>`
     }
     // Add data-runnable-lang to <pre> so MessageBubble can inject Run buttons.
@@ -171,4 +171,34 @@ function resolveImageHref(href: string | null | undefined, projectId: string): s
 /** Minimal HTML attribute escaping. */
 function escapeAttr(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/** Escape for safe text inside HTML elements (e.g. fallback &lt;pre&gt;). */
+export function escapeHtmlPlain(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+/**
+ * Base64-encode UTF-8 text for use in HTML attributes.
+ * Plain `btoa(string)` throws DOMException (read-only `.message`) when the string
+ * contains code points outside Latin-1; marked then crashes trying to append
+ * to that exception's message.
+ */
+export function utf8ToBase64(s: string): string {
+  const bytes = new TextEncoder().encode(s)
+  let bin = ''
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i])
+  }
+  return btoa(bin)
+}
+
+/** Decode strings produced by {@link utf8ToBase64}. */
+export function utf8FromBase64(b64: string): string {
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) {
+    bytes[i] = bin.charCodeAt(i)
+  }
+  return new TextDecoder().decode(bytes)
 }

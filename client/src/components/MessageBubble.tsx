@@ -10,7 +10,13 @@ import 'highlight.js/styles/github-dark.css'
 import 'katex/dist/katex.min.css'
 import type { ClaudeErrorCode, ToolCall } from '../lib/api'
 import { toolDisplayName, toolDisplayDetail, deriveArtifactName } from '../lib/api'
-import { splitContent, buildMarkedOptions, preprocessKaTeX } from '../lib/markdownRenderer'
+import {
+  splitContent,
+  buildMarkedOptions,
+  preprocessKaTeX,
+  utf8FromBase64,
+  escapeHtmlPlain,
+} from '../lib/markdownRenderer'
 import { HtmlPreview } from './HtmlPreview'
 import { ImageLightbox, type LightboxContent } from './ImageLightbox'
 import { KernelOutputPanel, type OutputPanelState } from './KernelOutputPanel'
@@ -26,13 +32,20 @@ marked.use({ breaks: true })
 
 /** Render a markdown segment to sanitized HTML. */
 function renderMarkdown(content: string, projectId: string | null): string {
-  const withKatex = preprocessKaTeX(content)
-  const { renderer } = buildMarkedOptions(projectId)
-  const html = marked.parse(withKatex, { renderer }) as string
-  return DOMPurify.sanitize(html, {
+  const purifyOpts = {
     ADD_ATTR: ['data-graph', 'data-src', 'data-type', 'data-runnable-lang', 'style'],
     ADD_TAGS: ['div'],
-  })
+  }
+  try {
+    const withKatex = preprocessKaTeX(content)
+    const { renderer } = buildMarkedOptions(projectId)
+    const html = marked.parse(withKatex, { renderer }) as string
+    return DOMPurify.sanitize(html, purifyOpts)
+  } catch (err) {
+    console.error('renderMarkdown failed', err)
+    const fallback = `<pre class="whitespace-pre-wrap break-words text-red-300/90 text-xs">${escapeHtmlPlain(content)}</pre>`
+    return DOMPurify.sanitize(fallback, purifyOpts)
+  }
 }
 
 type Props = {
@@ -358,7 +371,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       }
 
       try {
-        const raw = atob(src)
+        const raw = utf8FromBase64(src)
         const svg = renderSmartArt(raw, hintType)
         smartartCache.current.set(cacheKey, svg)
         if (el.isConnected && !el.classList.contains('smartart-rendered')) {
@@ -415,10 +428,16 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       const encoded = placeholder?.dataset.src ?? ''
       if (encoded) {
         try {
-          const raw = atob(encoded)
+          const raw = utf8FromBase64(encoded)
+          const hintType = placeholder?.dataset.type?.trim() ?? ''
+          // Prepend type as front-matter if the content has no `type:` line already
+          const hasFrontMatterType = /^\s*type\s*:/m.test(raw)
+          const content = (!hasFrontMatterType && hintType)
+            ? `type: ${hintType}\n\n${raw}`
+            : raw
           const name = deriveArtifactName(raw, 'smartart', 'smartart')
-          onSaveAsArtifactRef.current?.(raw, 'smartart', name, target as HTMLElement)
-        } catch { /* ignore atob errors */ }
+          onSaveAsArtifactRef.current?.(content, 'smartart', name, target as HTMLElement)
+        } catch { /* ignore decode errors */ }
       }
       return
     }
