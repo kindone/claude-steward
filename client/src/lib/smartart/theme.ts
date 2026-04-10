@@ -42,7 +42,9 @@ export const LAYOUT_CATEGORY: Record<string, string> = {
   'org-chart':'hierarchy','mind-map':'hierarchy','tree':'hierarchy','bracket':'hierarchy','decision-tree':'hierarchy',
   'h-org-chart':'hierarchy','hierarchy-list':'hierarchy','radial-tree':'hierarchy','sitemap':'hierarchy','bracket-tree':'hierarchy',
   // relationship
-  'venn':'relationship','venn-3':'relationship','concentric':'relationship','balance':'relationship','opposing-arrows':'relationship','web':'relationship',
+  'venn':'relationship','venn-3':'relationship','venn-4':'relationship','concentric':'relationship',
+  'balance':'relationship','counterbalance':'relationship','opposing-arrows':'relationship','web':'relationship',
+  'cluster':'relationship','target':'relationship','radial':'relationship','converging':'relationship','diverging':'relationship','plus':'relationship',
   // matrix
   'matrix-2x2':'matrix','swot':'matrix','bcg':'matrix','ansoff':'matrix','comparison':'matrix','pros-cons':'matrix',
   // pyramid

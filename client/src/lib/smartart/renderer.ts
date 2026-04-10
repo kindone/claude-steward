@@ -92,10 +92,18 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   // relationship family
   venn: renderRelationship,
   'venn-3': renderRelationship,
+  'venn-4': renderRelationship,
   concentric: renderRelationship,
   balance: renderRelationship,
+  counterbalance: renderRelationship,
   'opposing-arrows': renderRelationship,
   web: renderRelationship,
+  cluster: renderRelationship,
+  target: renderRelationship,
+  radial: renderRelationship,
+  converging: renderRelationship,
+  diverging: renderRelationship,
+  plus: renderRelationship,
 
   // statistical family
   'progress-list': renderStatistical,
