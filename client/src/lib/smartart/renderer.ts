@@ -25,6 +25,16 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   roadmap: renderProcess,
   waterfall: renderProcess,
   'snake-process': renderProcess,
+  'step-down': renderProcess,
+  'step-up': renderProcess,
+  'circle-process': renderProcess,
+  equation: renderProcess,
+  'bending-process': renderProcess,
+  'segmented-bar': renderProcess,
+  'phase-process': renderProcess,
+  'timeline-h': renderProcess,
+  'timeline-v': renderProcess,
+  swimlane: renderProcess,
 
   // list family
   'bullet-list': renderList,
@@ -32,6 +42,15 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   checklist: renderList,
   'two-column-list': renderList,
   'timeline-list': renderList,
+  'block-list': renderList,
+  'chevron-list': renderList,
+  'card-list': renderList,
+  'zigzag-list': renderList,
+  'ribbon-list': renderList,
+  'hexagon-list': renderList,
+  'trapezoid-list': renderList,
+  'tab-list': renderList,
+  'circle-list': renderList,
   'icon-list': renderList,
 
   // cycle family
