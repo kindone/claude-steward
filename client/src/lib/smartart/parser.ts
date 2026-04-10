@@ -145,7 +145,9 @@ function _parseSmartArt(raw: string, hintType?: string): SmartArtSpec {
   // Check if the entire body is a single arrow-chain line
   const bodyLines = lines.slice(bodyStart).filter(l => l.trim())
   if (bodyLines.length === 1 && bodyLines[0].includes(' → ')) {
-    const parts = bodyLines[0].split(' → ')
+    // Strip any leading bullet marker (- or *) before splitting
+    const chainLine = bodyLines[0].trim().replace(/^[-*]\s+/, '')
+    const parts = chainLine.split(' → ')
     spec.items = parts.map(p => parseItem(p.trim()))
     return spec
   }
@@ -188,7 +190,9 @@ function _parseSmartArt(raw: string, hintType?: string): SmartArtSpec {
 
     // Arrow chain line (can appear as a body line)
     if (trimmed.includes(' → ') && !trimmed.startsWith('→')) {
-      const parts = trimmed.split(' → ')
+      // Strip any leading bullet marker (- or *) before splitting
+      const chainLine = trimmed.replace(/^[-*]\s+/, '')
+      const parts = chainLine.split(' → ')
       const items = parts.map(p => parseItem(p.trim()))
       spec.items.push(...items)
       stack.length = 0

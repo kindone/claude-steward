@@ -3,8 +3,9 @@ import { marked } from 'marked'
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
 import type { Artifact } from '../lib/api'
-import { buildMarkedOptions } from '../lib/markdownRenderer'
+import { buildMarkedOptions, utf8FromBase64 } from '../lib/markdownRenderer'
 import { renderPikchr } from '../lib/pikchrRenderer'
+import { renderSmartArt } from '../lib/smartart/renderer'
 import { SmartArtView } from './SmartArtView'
 
 interface Props {
@@ -121,10 +122,11 @@ function ChartView({ content }: { content: string }) {
 function ReportView({ content }: { content: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const pikchrCache = useRef<Map<string, string>>(new Map())
+  const smartartCache = useRef<Map<string, string>>(new Map())
 
   const html = DOMPurify.sanitize(
     marked.parse(content, { renderer: buildMarkedOptions(null).renderer, breaks: true }) as string,
-    { ADD_ATTR: ['style', 'data-src'] }
+    { ADD_ATTR: ['style', 'data-src', 'data-type'] }
   )
 
   // Hydrate pikchr placeholders after render (same pattern as MessageBubble)
@@ -152,6 +154,38 @@ function ReportView({ content }: { content: string }) {
         el.classList.add('pikchr-error')
         el.textContent = `Pikchr error: ${String(err)}`
       })
+    })
+  })
+
+  // Hydrate smartart placeholders (synchronous — same pattern as MessageBubble)
+  useEffect(() => {
+    if (!containerRef.current) return
+    const placeholders = containerRef.current.querySelectorAll<HTMLDivElement>(
+      '.smartart-placeholder:not(.smartart-rendered)'
+    )
+    placeholders.forEach((el) => {
+      const encoded = el.dataset.src ?? ''
+      if (!encoded) return
+      const hintType = el.dataset.type || undefined
+      const cacheKey = encoded + '|' + (hintType ?? '')
+      const cached = smartartCache.current.get(cacheKey)
+      if (cached) {
+        el.innerHTML = cached
+        el.classList.add('smartart-rendered')
+        return
+      }
+      try {
+        const raw = utf8FromBase64(encoded)
+        const svg = renderSmartArt(raw, hintType)
+        smartartCache.current.set(cacheKey, svg)
+        if (el.isConnected && !el.classList.contains('smartart-rendered')) {
+          el.innerHTML = svg
+          el.classList.add('smartart-rendered')
+        }
+      } catch (e) {
+        el.classList.add('smartart-error')
+        el.textContent = `SmartArt error: ${String(e)}`
+      }
     })
   })
 

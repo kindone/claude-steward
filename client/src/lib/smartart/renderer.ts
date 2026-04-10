@@ -9,6 +9,9 @@ import { renderMatrix } from './layouts/matrix'
 import { renderHierarchy } from './layouts/hierarchy'
 import { renderPyramid } from './layouts/pyramid'
 import { renderRelationship } from './layouts/relationship'
+import { renderStatistical } from './layouts/statistical'
+import { renderPlanning } from './layouts/planning'
+import { renderTechnical } from './layouts/technical'
 
 type LayoutRenderer = (spec: SmartArtSpec, theme: SmartArtTheme) => string
 
@@ -64,6 +67,25 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   balance: renderRelationship,
   'opposing-arrows': renderRelationship,
   web: renderRelationship,
+
+  // statistical family
+  'progress-list': renderStatistical,
+  'bullet-chart': renderStatistical,
+  scorecard: renderStatistical,
+  treemap: renderStatistical,
+  sankey: renderStatistical,
+
+  // planning family
+  kanban: renderPlanning,
+  gantt: renderPlanning,
+  'gantt-lite': renderPlanning,
+  'sprint-board': renderPlanning,
+
+  // technical family
+  'layered-arch': renderTechnical,
+  entity: renderTechnical,
+  network: renderTechnical,
+  pipeline: renderTechnical,
 }
 
 export function renderSmartArt(raw: string, hintType?: string): string {
