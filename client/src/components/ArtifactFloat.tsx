@@ -25,9 +25,11 @@ const DEFAULT_WIDTH = 420
 const MIN_WIDTH = 280
 
 function readStoredWidth(): number {
-  const maxWidth = typeof window !== 'undefined'
-    ? Math.floor(window.innerWidth * 0.95)
-    : DEFAULT_WIDTH
+  if (typeof window === 'undefined') return DEFAULT_WIDTH
+  const vw = window.innerWidth
+  // On narrow screens (mobile), default to 90vw so the panel is usable
+  const defaultWidth = vw < 640 ? Math.floor(vw * 0.9) : DEFAULT_WIDTH
+  const maxWidth = Math.floor(vw * 0.95)
   try {
     const raw = localStorage.getItem(PANEL_WIDTH_KEY)
     if (raw) {
@@ -35,7 +37,7 @@ function readStoredWidth(): number {
       if (!isNaN(n)) return Math.min(n, maxWidth)
     }
   } catch { /* ignore */ }
-  return Math.min(DEFAULT_WIDTH, maxWidth)
+  return Math.min(defaultWidth, maxWidth)
 }
 
 export function ArtifactFloat({
@@ -51,6 +53,7 @@ export function ArtifactFloat({
 }: Props) {
   const [panelWidth, setPanelWidth] = useState(readStoredWidth)
   const [isDragging, setIsDragging] = useState(false)
+  const [panelHidden, setPanelHidden] = useState(false)
 
   const dragStartRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
@@ -63,39 +66,64 @@ export function ArtifactFloat({
     ?? nonMinimized[0]
   const activeId = activeEntry?.artifact.id ?? null
 
-  // ── Resize handle ─────────────────────────────────────────────────────────────
+  // Auto-show panel when new artifacts are opened
+  useEffect(() => {
+    if (hasPanel) setPanelHidden(false)
+  }, [nonMinimized.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Resize handle (mouse + touch) ─────────────────────────────────────────────
+
+  const applyResize = useCallback((clientX: number) => {
+    if (!dragStartRef.current) return
+    const maxWidth = Math.floor(window.innerWidth * 0.95)
+    const newWidth = Math.max(
+      MIN_WIDTH,
+      Math.min(maxWidth, dragStartRef.current.startWidth - (clientX - dragStartRef.current.startX))
+    )
+    setPanelWidth(newWidth)
+  }, [])
 
   const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
     dragStartRef.current = { startX: e.clientX, startWidth: panelWidth }
     setIsDragging(true)
 
-    const onMouseMove = (ev: MouseEvent) => {
-      if (!dragStartRef.current) return
-      const maxWidth = Math.floor(window.innerWidth * 0.7)
-      const newWidth = Math.max(
-        MIN_WIDTH,
-        Math.min(maxWidth, dragStartRef.current.startWidth - (ev.clientX - dragStartRef.current.startX))
-      )
-      setPanelWidth(newWidth)
-    }
+    const onMouseMove = (ev: MouseEvent) => applyResize(ev.clientX)
 
     const onMouseUp = () => {
       setIsDragging(false)
       dragStartRef.current = null
       document.removeEventListener('mousemove', onMouseMove)
       document.removeEventListener('mouseup', onMouseUp)
-      // Persist
-      try {
-        localStorage.setItem(PANEL_WIDTH_KEY, String(panelWidth))
-      } catch { /* ignore */ }
     }
 
     document.addEventListener('mousemove', onMouseMove)
     document.addEventListener('mouseup', onMouseUp)
-  }, [panelWidth])
+  }, [panelWidth, applyResize])
 
-  // Persist width on change (also covers mouseup path above)
+  const handleResizeTouchStart = useCallback((e: React.TouchEvent) => {
+    e.preventDefault()
+    const touch = e.touches[0]
+    dragStartRef.current = { startX: touch.clientX, startWidth: panelWidth }
+    setIsDragging(true)
+
+    const onTouchMove = (ev: TouchEvent) => {
+      ev.preventDefault()
+      applyResize(ev.touches[0].clientX)
+    }
+
+    const onTouchEnd = () => {
+      setIsDragging(false)
+      dragStartRef.current = null
+      document.removeEventListener('touchmove', onTouchMove)
+      document.removeEventListener('touchend', onTouchEnd)
+    }
+
+    document.addEventListener('touchmove', onTouchMove, { passive: false })
+    document.addEventListener('touchend', onTouchEnd)
+  }, [panelWidth, applyResize])
+
+  // Persist width on change
   useEffect(() => {
     try {
       localStorage.setItem(PANEL_WIDTH_KEY, String(panelWidth))
@@ -138,10 +166,47 @@ export function ArtifactFloat({
     </button>
   ))
 
+  // ── Show-panel tab (when panel is hidden but artifacts are open) ───────────────
+
+  const showPanelPill = hasPanel && panelHidden ? (
+    <button
+      onClick={() => setPanelHidden(false)}
+      title={`Show artifact panel (${nonMinimized.length} open)`}
+      style={{
+        position: 'fixed',
+        right: 0,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        width: 28,
+        height: 80,
+        background: '#1a1a1a',
+        border: '1px solid #2a2a2a',
+        borderRight: 'none',
+        borderRadius: '6px 0 0 6px',
+        cursor: 'pointer',
+        writingMode: 'vertical-rl',
+        textOrientation: 'mixed',
+        fontSize: 11,
+        color: '#666',
+        padding: '6px 0',
+        zIndex: 199,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 4,
+      }}
+    >
+      <span style={{ fontSize: 9 }}>◀</span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        Art {nonMinimized.length > 1 ? `(${nonMinimized.length})` : ''}
+      </span>
+    </button>
+  ) : null
+
   // ── Main panel ────────────────────────────────────────────────────────────────
 
-  if (!hasPanel) {
-    return <>{minimizedPills}</>
+  if (!hasPanel || panelHidden) {
+    return <>{minimizedPills}{showPanelPill}</>
   }
 
   return (
@@ -162,9 +227,10 @@ export function ArtifactFloat({
           overflow: 'hidden',
         }}
       >
-        {/* Resize handle */}
+        {/* Resize handle (mouse + touch) */}
         <div
           onMouseDown={handleResizeMouseDown}
+          onTouchStart={handleResizeTouchStart}
           style={{
             position: 'absolute',
             left: 0,
@@ -172,6 +238,7 @@ export function ArtifactFloat({
             width: 6,
             height: '100%',
             cursor: 'ew-resize',
+            touchAction: 'none',
             background: isDragging
               ? 'rgba(99,102,241,0.6)'
               : undefined,
@@ -195,65 +262,87 @@ export function ArtifactFloat({
             style={{
               display: 'flex',
               flexDirection: 'row',
+              alignItems: 'stretch',
               gap: 4,
-              padding: '4px 8px 0 8px',
+              padding: '4px 4px 0 8px',
               flexShrink: 0,
               overflowX: 'auto',
               borderBottom: '1px solid #1f1f1f',
             }}
           >
-            {nonMinimized.map((entry) => {
-              const isActive = entry.artifact.id === activeId
-              return (
-                <div
-                  key={entry.artifact.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 4,
-                    padding: '4px 8px',
-                    borderRadius: '6px 6px 0 0',
-                    background: isActive ? '#1a1a1a' : 'transparent',
-                    border: isActive ? '1px solid #2a2a2a' : '1px solid transparent',
-                    borderBottom: isActive ? '1px solid #1a1a1a' : '1px solid transparent',
-                    cursor: 'pointer',
-                    flexShrink: 0,
-                    maxWidth: 140,
-                  }}
-                  onClick={() => onActivate(entry.artifact.id)}
-                >
-                  <span
+            <div style={{ display: 'flex', flexDirection: 'row', gap: 4, flex: 1, overflowX: 'auto' }}>
+              {nonMinimized.map((entry) => {
+                const isActive = entry.artifact.id === activeId
+                return (
+                  <div
+                    key={entry.artifact.id}
                     style={{
-                      fontSize: 11,
-                      color: isActive ? '#ccc' : '#666',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      maxWidth: 100,
-                    }}
-                    title={entry.artifact.name}
-                  >
-                    {entry.artifact.name}
-                  </span>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); onMinimize(entry.artifact.id) }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      padding: '4px 8px',
+                      borderRadius: '6px 6px 0 0',
+                      background: isActive ? '#1a1a1a' : 'transparent',
+                      border: isActive ? '1px solid #2a2a2a' : '1px solid transparent',
+                      borderBottom: isActive ? '1px solid #1a1a1a' : '1px solid transparent',
                       cursor: 'pointer',
-                      color: '#555',
-                      fontSize: 11,
-                      padding: 0,
-                      lineHeight: 1,
                       flexShrink: 0,
+                      maxWidth: 140,
                     }}
-                    title="Minimize"
+                    onClick={() => onActivate(entry.artifact.id)}
                   >
-                    ×
-                  </button>
-                </div>
-              )
-            })}
+                    <span
+                      style={{
+                        fontSize: 11,
+                        color: isActive ? '#ccc' : '#666',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: 100,
+                      }}
+                      title={entry.artifact.name}
+                    >
+                      {entry.artifact.name}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); onMinimize(entry.artifact.id) }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        cursor: 'pointer',
+                        color: '#555',
+                        fontSize: 11,
+                        padding: 0,
+                        lineHeight: 1,
+                        flexShrink: 0,
+                      }}
+                      title="Minimize"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+            {/* Hide panel button — always visible */}
+            <button
+              onClick={() => setPanelHidden(true)}
+              title="Hide panel"
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#444',
+                fontSize: 14,
+                padding: '0 6px',
+                flexShrink: 0,
+                alignSelf: 'center',
+                marginBottom: 4,
+                lineHeight: 1,
+              }}
+            >
+              ›
+            </button>
           </div>
         )}
 
@@ -286,6 +375,13 @@ export function ArtifactFloat({
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 14, padding: '0 4px' }}
             >
               ×
+            </button>
+            <button
+              onClick={() => setPanelHidden(true)}
+              title="Hide panel"
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#444', fontSize: 16, padding: '0 4px', lineHeight: 1 }}
+            >
+              ›
             </button>
           </div>
         )}
