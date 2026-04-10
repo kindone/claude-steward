@@ -58,6 +58,11 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   'donut-cycle': renderCycle,
   'gear-cycle': renderCycle,
   spiral: renderCycle,
+  'block-cycle': renderCycle,
+  'segmented-cycle': renderCycle,
+  'nondirectional-cycle': renderCycle,
+  'multidirectional-cycle': renderCycle,
+  loop: renderCycle,
 
   // matrix family
   swot: renderMatrix,
@@ -68,8 +73,13 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   // hierarchy family
   'org-chart': renderHierarchy,
   tree: renderHierarchy,
+  'h-org-chart': renderHierarchy,
+  'hierarchy-list': renderHierarchy,
+  'radial-tree': renderHierarchy,
   'decision-tree': renderHierarchy,
+  sitemap: renderHierarchy,
   bracket: renderHierarchy,
+  'bracket-tree': renderHierarchy,
   'mind-map': renderHierarchy,
 
   // pyramid family

@@ -37,8 +37,10 @@ export const LAYOUT_CATEGORY: Record<string, string> = {
   'process':'process','chevron-process':'process','arrow-process':'process','circular-process':'process','funnel':'process','roadmap':'process','swimlane':'process','waterfall':'process','snake-process':'process',
   // cycle
   'cycle':'cycle','gear-cycle':'cycle','donut-cycle':'cycle','figure-eight':'cycle','spiral':'cycle',
+  'block-cycle':'cycle','segmented-cycle':'cycle','nondirectional-cycle':'cycle','multidirectional-cycle':'cycle','loop':'cycle',
   // hierarchy
   'org-chart':'hierarchy','mind-map':'hierarchy','tree':'hierarchy','bracket':'hierarchy','decision-tree':'hierarchy',
+  'h-org-chart':'hierarchy','hierarchy-list':'hierarchy','radial-tree':'hierarchy','sitemap':'hierarchy','bracket-tree':'hierarchy',
   // relationship
   'venn':'relationship','venn-3':'relationship','concentric':'relationship','balance':'relationship','opposing-arrows':'relationship','web':'relationship',
   // matrix
