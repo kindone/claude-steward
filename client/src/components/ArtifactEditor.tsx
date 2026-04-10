@@ -6,6 +6,8 @@ import { ArtifactCodeMirror } from './ArtifactCodeMirror'
 import { KernelOutputPanel, type OutputPanelState } from './KernelOutputPanel'
 import { runCode, normalizeLanguage } from '../lib/kernelApi'
 
+type ViewMode = 'split' | 'source' | 'preview'
+
 interface Props {
   artifact: Artifact
   content: string
@@ -23,6 +25,7 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
   const [viewerContent, setViewerContent] = useState(content)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
   const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor')
+  const [viewMode, setViewMode] = useState<ViewMode>('split')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [refreshCmd, setRefreshCmd] = useState('')
   const [refreshSched, setRefreshSched] = useState('')
@@ -187,6 +190,25 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
             {mobileTab === 'editor' ? 'Preview' : 'Edit'}
           </button>
         )}
+        {/* Desktop view mode toggle — types with a preview pane */}
+        {!isMobile && artifact.type !== 'code' && (
+          <div className="flex items-center rounded border border-[#2a2a2a] overflow-hidden text-[11px] flex-shrink-0">
+            {(['split', 'source', 'preview'] as ViewMode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => setViewMode(m)}
+                title={{ split: 'Side by side', source: 'Source only', preview: 'Preview only' }[m]}
+                className={`px-2 py-0.5 transition-colors ${
+                  viewMode === m
+                    ? 'bg-[#2a2a2a] text-[#ccc]'
+                    : 'text-[#555] hover:text-[#888] hover:bg-[#1a1a1a]'
+                }`}
+              >
+                {{ split: '⬛⬛', source: '≡', preview: '◻' }[m]}
+              </button>
+            ))}
+          </div>
+        )}
         {/* Run button — code artifacts only */}
         {canRun && (
           <button
@@ -256,17 +278,23 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
           )}
         </div>
       ) : isMobile ? (
+        // Mobile: single-pane tab toggle
         <div className="flex-1 overflow-hidden">
           {mobileTab === 'editor' ? editorEl : previewEl}
         </div>
       ) : (
+        // Desktop: view mode — split / source-only / preview-only
         <div className="flex flex-row flex-1 overflow-hidden">
-          <div className="w-1/2 h-full border-r border-[#1f1f1f] overflow-hidden flex">
-            {editorEl}
-          </div>
-          <div className="w-1/2 h-full overflow-auto">
-            {previewEl}
-          </div>
+          {(viewMode === 'split' || viewMode === 'source') && (
+            <div className={`h-full overflow-hidden flex ${viewMode === 'split' ? 'w-1/2 border-r border-[#1f1f1f]' : 'w-full'}`}>
+              {editorEl}
+            </div>
+          )}
+          {(viewMode === 'split' || viewMode === 'preview') && (
+            <div className={`h-full overflow-auto ${viewMode === 'split' ? 'w-1/2' : 'w-full'}`}>
+              {previewEl}
+            </div>
+          )}
         </div>
       )}
     </div>
