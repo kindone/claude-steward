@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import type { Artifact } from '../lib/api'
 import { updateArtifact } from '../lib/api'
 import { ArtifactViewer } from './ArtifactViewer'
@@ -18,6 +18,16 @@ interface Props {
 
 type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
+// Memoized wrapper — bails out when viewerContent and artifact haven't changed,
+// so ArtifactViewer never re-renders during keystrokes (only after debounce fires).
+const PreviewPane = memo(function PreviewPane({ artifact, content }: { artifact: Artifact; content: string }) {
+  return (
+    <div className="w-full h-full overflow-auto p-3">
+      <ArtifactViewer artifact={artifact} content={content} />
+    </div>
+  )
+})
+
 export function ArtifactEditor({ artifact, content, projectId, onChange, onSave }: Props) {
   // Local editing value — starts from content prop but is independent after that
   const [localContent, setLocalContent] = useState(content)
@@ -36,6 +46,9 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // True while the user is actively editing — prevents the content-prop useEffect
+  // from immediately updating viewerContent and bypassing the debounce.
+  const userEditingRef = useRef(false)
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
 
   // Sync settings from metadata when artifact changes
@@ -52,22 +65,35 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
     } catch { /* ignore */ }
   }, [artifact.metadata])
 
-  // Sync local state if the content prop changes externally (e.g. SSE refresh)
+  // Sync local state if the content prop changes externally (e.g. SSE refresh).
+  // Skip viewerContent sync when the user is actively typing — the debounce
+  // in handleChange owns that update path.
   useEffect(() => {
     setLocalContent(content)
-    setViewerContent(content)
+    if (!userEditingRef.current) {
+      setViewerContent(content)
+    }
   }, [content])
 
   const handleChange = useCallback((val: string) => {
     setLocalContent(val)
     onChange(val)
 
-    if (artifact.type === 'chart') {
-      // Debounce chart preview — expensive Vega re-render
+    // 1000ms: report/html (markdown parse + MdArt hydration)
+    //  600ms: chart/mdart/pikchr (SVG / Vega compile)
+    const previewDelay =
+      artifact.type === 'report' || artifact.type === 'html' ? 1000
+      : artifact.type === 'chart' || artifact.type === 'mdart' || artifact.type === 'pikchr' ? 600
+      : 0
+
+    if (previewDelay > 0) {
+      // Mark as user-editing so the content-prop useEffect doesn't bypass the debounce
+      userEditingRef.current = true
       if (debounceRef.current) clearTimeout(debounceRef.current)
       debounceRef.current = setTimeout(() => {
+        userEditingRef.current = false
         setViewerContent(val)
-      }, 400)
+      }, previewDelay)
     } else {
       setViewerContent(val)
     }
@@ -156,8 +182,6 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
   }
   const badgeClass = typeBadgeColor[artifact.type] ?? 'text-[#888] bg-[#222] border-[#333]'
 
-  const viewerArtifact = { ...artifact }
-
   const editorEl = (
     <ArtifactCodeMirror
       value={localContent}
@@ -167,11 +191,7 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
     />
   )
 
-  const previewEl = (
-    <div className="w-full h-full overflow-auto p-3">
-      <ArtifactViewer artifact={viewerArtifact} content={viewerContent} />
-    </div>
-  )
+  const previewEl = <PreviewPane artifact={artifact} content={viewerContent} />
 
   return (
     <div className="flex flex-col h-full">

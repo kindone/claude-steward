@@ -1,9 +1,9 @@
-import { useEffect, useRef } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { EditorState } from '@codemirror/state'
 import { EditorView, lineNumbers } from '@codemirror/view'
 import { defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { keymap } from '@codemirror/view'
-import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language'
+import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language'
 import { oneDark } from '@codemirror/theme-one-dark'
 import { python } from '@codemirror/lang-python'
 import { javascript } from '@codemirror/lang-javascript'
@@ -39,7 +39,9 @@ function langExtension(language: string): Extension {
       return cpp()
     case 'markdown':
     case 'md':
-      return markdown()
+      // Disable codeLanguages (embedded language parsing inside fenced code blocks)
+      // — it re-parses every block on every keystroke and is expensive for long docs.
+      return markdown({ codeLanguages: [] })
     case 'json':
       return json()
     case 'html':
@@ -53,13 +55,25 @@ function langExtension(language: string): Extension {
   }
 }
 
-export function ArtifactCodeMirror({ value, onChange, language, readOnly = false, className }: Props) {
+export const ArtifactCodeMirror = memo(function ArtifactCodeMirror({ value, onChange, language, readOnly = false, className }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
 
   // Keep onChange stable inside editor via ref
   const onChangeRef = useRef(onChange)
   useEffect(() => { onChangeRef.current = onChange }, [onChange])
+
+  // Debounce timer for notifying React — CodeMirror updates its own state
+  // immediately on every keystroke, but React only gets notified after a
+  // 150ms pause. This eliminates per-keystroke React re-renders.
+  const notifyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Tracks the last value we notified React about. The value-sync useEffect
+  // skips dispatching when it sees this value — it's our own round-trip, not
+  // an external change. Without this, there's a race: user types during the
+  // gap between our notification and React processing it, causing the stale
+  // value to be dispatched back into the editor and the cursor to jump.
+  const lastNotifiedRef = useRef(value)
 
   // Create / recreate editor when language or readOnly changes
   useEffect(() => {
@@ -69,11 +83,22 @@ export function ArtifactCodeMirror({ value, onChange, language, readOnly = false
       oneDark,
       lineNumbers(),
       syntaxHighlighting(defaultHighlightStyle),
-      bracketMatching(),
       keymap.of([indentWithTab, ...defaultKeymap]),
       langExtension(language),
       EditorView.updateListener.of(u => {
-        if (u.docChanged) onChangeRef.current(u.state.doc.toString())
+        if (!u.docChanged) return
+        // Debounce React notification — editor updates its own rope immediately,
+        // but we only push to React state after a 150ms typing pause.
+        // Read from viewRef.current at fire-time (not u.state at set-time) so
+        // we always send the current content, never stale mid-burst content.
+        if (notifyTimerRef.current) clearTimeout(notifyTimerRef.current)
+        notifyTimerRef.current = setTimeout(() => {
+          const doc = viewRef.current?.state.doc.toString()
+          if (doc !== undefined) {
+            lastNotifiedRef.current = doc
+            onChangeRef.current(doc)
+          }
+        }, 150)
       }),
       EditorView.theme({
         '&': { background: '#0d0d0d !important', height: '100%' },
@@ -110,14 +135,19 @@ export function ArtifactCodeMirror({ value, onChange, language, readOnly = false
 
     viewRef.current = view
     return () => {
+      if (notifyTimerRef.current) clearTimeout(notifyTimerRef.current)
       view.destroy()
       viewRef.current = null
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language, readOnly])
 
-  // Sync external value changes (e.g. SSE refresh) without resetting cursor
+  // Sync external value changes (e.g. SSE refresh) without resetting cursor.
+  // Skip when the value is our own round-trip from the debounced notification —
+  // the editor already has this content and dispatching would clobber any chars
+  // typed in the gap between notification and React processing.
   useEffect(() => {
+    if (value === lastNotifiedRef.current) return
     const view = viewRef.current
     if (!view) return
     const current = view.state.doc.toString()
@@ -133,4 +163,4 @@ export function ArtifactCodeMirror({ value, onChange, language, readOnly = false
       style={{ background: '#0d0d0d' }}
     />
   )
-}
+})
