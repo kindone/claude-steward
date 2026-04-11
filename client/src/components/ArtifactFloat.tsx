@@ -54,6 +54,7 @@ export function ArtifactFloat({
   const [panelWidth, setPanelWidth] = useState(readStoredWidth)
   const [isDragging, setIsDragging] = useState(false)
   const [panelHidden, setPanelHidden] = useState(false)
+  const [isMaximized, setIsMaximized] = useState(false)
 
   const dragStartRef = useRef<{ startX: number; startWidth: number } | null>(null)
 
@@ -70,6 +71,8 @@ export function ArtifactFloat({
   useEffect(() => {
     if (hasPanel) setPanelHidden(false)
   }, [nonMinimized.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const effectiveWidth = isMaximized ? window.innerWidth : panelWidth
 
   // ── Resize handle (mouse + touch) ─────────────────────────────────────────────
 
@@ -218,7 +221,7 @@ export function ArtifactFloat({
           right: 0,
           top: 0,
           height: '100dvh',
-          width: panelWidth,
+          width: effectiveWidth,
           zIndex: 200,
           background: '#111',
           borderLeft: '1px solid #1f1f1f',
@@ -227,34 +230,36 @@ export function ArtifactFloat({
           overflow: 'hidden',
         }}
       >
-        {/* Resize handle (mouse + touch) */}
-        <div
-          onMouseDown={handleResizeMouseDown}
-          onTouchStart={handleResizeTouchStart}
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            width: 6,
-            height: '100%',
-            cursor: 'ew-resize',
-            touchAction: 'none',
-            background: isDragging
-              ? 'rgba(99,102,241,0.6)'
-              : undefined,
-            zIndex: 1,
-          }}
-          onMouseEnter={(e) => {
-            if (!isDragging) {
-              (e.currentTarget as HTMLDivElement).style.background = 'rgba(99,102,241,0.3)'
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (!isDragging) {
-              (e.currentTarget as HTMLDivElement).style.background = ''
-            }
-          }}
-        />
+        {/* Resize handle (mouse + touch) — hidden when maximized */}
+        {!isMaximized && (
+          <div
+            onMouseDown={handleResizeMouseDown}
+            onTouchStart={handleResizeTouchStart}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: 6,
+              height: '100%',
+              cursor: 'ew-resize',
+              touchAction: 'none',
+              background: isDragging
+                ? 'rgba(99,102,241,0.6)'
+                : undefined,
+              zIndex: 1,
+            }}
+            onMouseEnter={(e) => {
+              if (!isDragging) {
+                (e.currentTarget as HTMLDivElement).style.background = 'rgba(99,102,241,0.3)'
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isDragging) {
+                (e.currentTarget as HTMLDivElement).style.background = ''
+              }
+            }}
+          />
+        )}
 
         {/* Tab bar (multiple non-minimized artifacts) */}
         {nonMinimized.length > 1 && (
@@ -324,7 +329,25 @@ export function ArtifactFloat({
                 )
               })}
             </div>
-            {/* Hide panel button — always visible */}
+            {/* Maximize + hide panel buttons — always visible */}
+            <button
+              onClick={() => setIsMaximized((v) => !v)}
+              title={isMaximized ? 'Restore size' : 'Maximize'}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                color: '#444',
+                fontSize: 13,
+                padding: '0 4px',
+                flexShrink: 0,
+                alignSelf: 'center',
+                marginBottom: 4,
+                lineHeight: 1,
+              }}
+            >
+              {isMaximized ? '⤡' : '⤢'}
+            </button>
             <button
               onClick={() => setPanelHidden(true)}
               title="Hide panel"
@@ -368,6 +391,13 @@ export function ArtifactFloat({
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 14, padding: '0 4px' }}
             >
               −
+            </button>
+            <button
+              onClick={() => setIsMaximized((v) => !v)}
+              title={isMaximized ? 'Restore size' : 'Maximize'}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 13, padding: '0 4px', lineHeight: 1 }}
+            >
+              {isMaximized ? '⤡' : '⤢'}
             </button>
             <button
               onClick={() => onClose(activeEntry.artifact.id)}
