@@ -135,7 +135,8 @@ router.post('/apps/:configId/start', async (req, res) => {
       }
       appSlotQueries.assign(liveSlot, config.id)
       appSlotQueries.markRunning(liveSlot, live.pid)
-      const url = `https://app${liveSlot}.steward.jradoo.com`
+      const appDomain = process.env.APP_DOMAIN ?? 'localhost'
+      const url = `https://app${liveSlot}.${appDomain}`
       res.json({ slot: liveSlot, port: live.port, pid: live.pid, url })
       return
     }
@@ -169,7 +170,8 @@ router.post('/apps/:configId/start', async (req, res) => {
   try {
     const started = await appsClient.start(config.id, port, command, config.work_dir)
     appSlotQueries.markRunning(freeSlot.slot, started.pid)
-    res.json({ slot: freeSlot.slot, port, pid: started.pid, url: `https://app${freeSlot.slot}.steward.jradoo.com` })
+    const appDomain = process.env.APP_DOMAIN ?? 'localhost'
+    res.json({ slot: freeSlot.slot, port, pid: started.pid, url: `https://app${freeSlot.slot}.${appDomain}` })
   } catch (err) {
     appSlotQueries.markError(freeSlot.slot, String(err))
     res.status(502).json({ error: `Failed to start app: ${String(err)}` })

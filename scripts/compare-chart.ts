@@ -32,7 +32,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 // server/data/charts/ is outside the Vite build output (server/public/) so it
 // survives `npm run build` which runs with emptyOutDir: true.
 const CHARTS_DIR = resolve(__dirname, '../server/data/charts');
-const BASE_URL   = 'https://steward.jradoo.com';
+const BASE_URL   = process.env.STEWARD_URL ?? 'http://localhost:3001';
 
 // ─── Range config ─────────────────────────────────────────────────────────────
 

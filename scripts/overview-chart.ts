@@ -18,7 +18,7 @@ import { fetchWithCache, type SeriesData } from './lib/fetch.js';
 const __dirname  = dirname(fileURLToPath(import.meta.url));
 const CHARTS_DIR = resolve(__dirname, '../server/data/charts');
 const WATCHLIST  = resolve(__dirname, 'watchlist.json');
-const BASE_URL   = 'https://steward.jradoo.com';
+const BASE_URL   = process.env.STEWARD_URL ?? 'http://localhost:3001';
 
 // ─── Range config ─────────────────────────────────────────────────────────────
 

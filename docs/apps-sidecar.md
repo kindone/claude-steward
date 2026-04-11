@@ -21,12 +21,12 @@ This mirrors the worker architecture: the sidecar holds the process lifecycle, t
 
 | Slot | Port | URL |
 |---|---|---|
-| 1 | 4001 | `https://app1.steward.jradoo.com` |
-| 2 | 4002 | `https://app2.steward.jradoo.com` |
+| 1 | 4001 | `https://app1.steward.yourdomain.com` |
+| 2 | 4002 | `https://app2.steward.yourdomain.com` |
 | … | … | … |
-| 10 | 4010 | `https://app10.steward.jradoo.com` |
+| 10 | 4010 | `https://app10.steward.yourdomain.com` |
 
-nginx proxies `app{N}.steward.jradoo.com → 127.0.0.1:400N` using a wildcard TLS cert (`*.steward.jradoo.com`). Ports are always open; a 502 means nothing is running on that slot.
+nginx proxies `app{N}.steward.yourdomain.com → 127.0.0.1:400N` using a wildcard TLS cert (`*.steward.yourdomain.com`). Ports are always open; a 502 means nothing is running on that slot.
 
 A **config** (`app_configs`) is a definition — name, command template, work dir. It can exist without a slot.
 A **slot** is a running instance — holds a pid and a port. Claiming a slot = start; releasing = stop.

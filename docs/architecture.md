@@ -58,14 +58,14 @@ claude-steward/               ← npm workspace root
 
 | Domain | nginx upstream | When |
 |---|---|---|
-| `steward.jradoo.com` | `127.0.0.1:3001` | Production |
-| `dev.steward.jradoo.com` | `127.0.0.1:5173` | Dev (Vite HMR) |
-| `safe.steward.jradoo.com` | `127.0.0.1:3003` | Always |
-| `app1–app10.steward.jradoo.com` | `127.0.0.1:4001–4010` | Mini-apps (wildcard TLS cert) |
+| `steward.yourdomain.com` | `127.0.0.1:3001` | Production |
+| `dev.steward.yourdomain.com` | `127.0.0.1:5173` | Dev (Vite HMR) |
+| `safe.steward.yourdomain.com` | `127.0.0.1:3003` | Always |
+| `app1–app10.steward.yourdomain.com` | `127.0.0.1:4001–4010` | Mini-apps (wildcard TLS cert) |
 
 Switching between dev and production requires one `proxy_pass` line change in `/etc/nginx/sites-available/steward`. See [Self-Management](self-management.md) for the exact steps.
 
-TLS: `steward.jradoo.com` and `dev/safe` subdomains use individual certs. `app1–app10` use a wildcard cert (`*.steward.jradoo.com`) provisioned via Let's Encrypt DNS-01 challenge with the Route 53 plugin. Config: `/etc/nginx/sites-available/steward-apps`.
+TLS: `steward.yourdomain.com` and `dev/safe` subdomains use individual certs. `app1–app10` use a wildcard cert (`*.steward.yourdomain.com`) provisioned via Let's Encrypt DNS-01 challenge with the Route 53 plugin. Config: `/etc/nginx/sites-available/steward-apps`.
 
 ---
 
@@ -76,12 +76,12 @@ Browser
   │  HTTPS (TLS terminated by nginx)
   ▼
 nginx
-  ├─ steward.jradoo.com          → :5173 (dev) or :3001 (prod)
-  ├─ safe.steward.jradoo.com    → :3003
-  └─ app{1-10}.steward.jradoo.com → :4001–:4010 (mini-apps)
+  ├─ steward.yourdomain.com          → :5173 (dev) or :3001 (prod)
+  ├─ safe.steward.yourdomain.com    → :3003
+  └─ app{1-10}.steward.yourdomain.com → :4001–:4010 (mini-apps)
 
   ┌─────────────────────────────────────────────────────────┐
-  │  steward.jradoo.com                                     │
+  │  steward.yourdomain.com                                     │
   │                                                         │
   │  GET  /api/meta                 app metadata (no auth)  │
   │  POST /api/auth/register/start  passkey registration    │
@@ -131,7 +131,7 @@ nginx
   └─────────────────────────────────────────────────────────┘
 
   ┌─────────────────────────────────────────────────────────┐
-  │  safe.steward.jradoo.com                                │
+  │  safe.steward.yourdomain.com                                │
   │                                                         │
   │  POST /chat   SSE stream (--dangerously-skip-permissions)│
   │  GET  /ping                                             │
@@ -148,7 +148,7 @@ nginx
 
 ## Authentication
 
-### Main app (`steward.jradoo.com`)
+### Main app (`steward.yourdomain.com`)
 
 Uses **Passkeys (WebAuthn)**. The full flow:
 
@@ -164,7 +164,7 @@ Auth-related routes (`/api/auth/*`) are mounted **before** the `requireAuth` mid
 
 Credential storage: `passkey_credentials` table (credential ID + COSE public key + sign counter). Session storage: `auth_sessions` table (random 32-byte token + expiry). Challenges are kept in-memory with a 5-minute TTL (single-user, so one slot per operation type).
 
-### Safe-mode (`safe.steward.jradoo.com`)
+### Safe-mode (`safe.steward.yourdomain.com`)
 
 Independent auth: still uses `API_KEY` bearer token checked inline in `safe/server.js`. Safe-mode intentionally has no DB access and no dependency on the main auth system.
 

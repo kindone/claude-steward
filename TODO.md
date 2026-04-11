@@ -50,8 +50,8 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
 - [ ] **ADRs in `docs/adr/`** — structured Architecture Decision Records capturing *why* key decisions were made (node:sqlite over better-sqlite3, worker IPC over in-process, safe/ freeze policy); helps Claude judge whether constraints are load-bearing
 
 ### Dev / Production Workflow
-- [ ] **Production deploy workflow** — develop + test on `dev.steward.jradoo.com` → `npm run build` → `POST /api/admin/reload` hot-reloads `steward.jradoo.com`; document and wire up the build step so deploying is a single command
-- [ ] **Environment switcher UI** — floating toggle (authenticated users only) to navigate between `steward.jradoo.com` (prod) and `dev.steward.jradoo.com` (dev); consider long-press on header to avoid accidental switches; works in Capacitor WebView too
+- [ ] **Production deploy workflow** — develop + test on `dev.steward.yourdomain.com` → `npm run build` → `POST /api/admin/reload` hot-reloads `steward.yourdomain.com`; document and wire up the build step so deploying is a single command
+- [ ] **Environment switcher UI** — floating toggle (authenticated users only) to navigate between `steward.yourdomain.com` (prod) and `dev.steward.yourdomain.com` (dev); consider long-press on header to avoid accidental switches; works in Capacitor WebView too
 
 ### Operational Reliability
 - [ ] **Enhanced `npm run status`** — extend beyond port checks to cover: PM2 process names + states, required env vars present (`APP_DOMAIN`, `VAPID_PUBLIC_KEY`), nginx `proxy_pass` targets match expected ports, live nginx config matches repo copy (`config/nginx-*.conf`), `server/public/` freshness for prod, TLS cert expiry days

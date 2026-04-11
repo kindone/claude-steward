@@ -15,8 +15,12 @@ client/.env.local
 # Build output served by Express during production
 server/public/
 
-# Claude Code local permission grants (machine-specific)
+# Claude Code local permission grants and MCP config (machine-specific, contains secrets)
 .claude/settings.local.json
+.claude/settings.json
+
+# Personal data — not committed
+scripts/watchlist.json
 
 # TypeScript compiler output in source directories (tsc without outDir)
 client/src/**/*.js

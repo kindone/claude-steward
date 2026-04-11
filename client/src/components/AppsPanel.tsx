@@ -182,7 +182,7 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
           const isRunning = app.status === 'running'
           const isStarting = app.status === 'starting'
           const isBusy = busy[app.id] ?? false
-          const appUrl = app.slot != null ? `https://app${app.slot}.steward.jradoo.com` : null
+          const appUrl = app.slot != null ? `https://app${app.slot}.${window.location.hostname}` : null
 
           return (
             <li key={app.id} className="bg-[#111] border border-[#1f1f1f] rounded-lg px-2.5 py-2 flex flex-col gap-1.5">

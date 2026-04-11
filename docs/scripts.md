@@ -6,7 +6,7 @@ Utility scripts in `scripts/` for data fetching, chart generation, and watchlist
 
 ## Stock Charts
 
-Three scripts for visualising stock and FX price data as SVG charts served from `https://steward.jradoo.com/charts/`.
+Three scripts for visualising stock and FX price data as SVG charts served from `https://steward.yourdomain.com/charts/`.
 
 ### `scripts/stock-chart.ts` — single-ticker chart
 
@@ -136,4 +136,4 @@ The server registers a static route before the SPA catch-all:
 app.use('/charts', express.static(path.join(__dirname, '../data/charts')))
 ```
 
-Charts are publicly accessible (no auth) at `https://steward.jradoo.com/charts/<filename>.svg`.
+Charts are publicly accessible (no auth) at `https://steward.yourdomain.com/charts/<filename>.svg`.

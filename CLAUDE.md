@@ -74,7 +74,7 @@ When deploying changes: **build must succeed before reload**. Always verify `npm
 - **ESM + dotenv ordering**: `dotenv.config()` runs in `index.ts`'s body, *after* all imports evaluate. Read `process.env.*` inside functions (lazy), never at module top-level — or you'll get `undefined`.
 - **PM2 env caching**: `pm2 restart` keeps the old env snapshot. To apply new env vars: `pm2 restart ecosystem.dev.config.cjs --only steward-server --update-env`.
 - **Run `tsc` after client changes.** The language server misses some errors that only surface at compile time. Always run `npm run build --workspace=client` (or `cd client && npx tsc --noEmit`) after TypeScript changes in `client/`.
-- **Dev vs prod routing**: nginx routes `dev.steward.jradoo.com → :5173` (Vite, HMR over WSS). nginx routes `steward.jradoo.com → :3001` (prod, built static files). Do not set `build.watch` non-null in `vite.config.ts` unconditionally — that activates watch mode for all builds including production.
+- **Dev vs prod routing**: nginx routes `dev.steward.yourdomain.com → :5173` (Vite, HMR over WSS). nginx routes `steward.yourdomain.com → :3001` (prod, built static files). Do not set `build.watch` non-null in `vite.config.ts` unconditionally — that activates watch mode for all builds including production.
 - **Scheduling: use the `steward-schedules` MCP tools.** The MCP server is registered in `~/.claude.json` (Claude Code's global config — **not** `.claude/settings.json`) and provides `schedule_list`, `schedule_create`, `schedule_update`, `schedule_delete`. The registration is auto-synced by `syncClaudeSettings()` on every server startup. Never emit `<schedule>` text blocks (old mechanism, no longer processed) and never call `CronCreate`/`CronDelete` (session-only harness tools, not persisted). The `session_id` is injected into every system prompt — no DB query needed. See `docs/scheduler.md` for architecture and the `~/.claude.json` external dependency; `docs/scheduler-usage.md` for tool usage.
 - **Get current time via Bash, not system prompt.** The system prompt contains current time at session start, but it becomes stale as the conversation progresses. When scheduling, run `date "+%H:%M:%S %Z" && date -u "+%H:%M:%S UTC"` via Bash to get the accurate current time, then calculate the cron expression relative to that.
 - **Memory-safe builds.** The instance has ~4GB RAM and no swap. Repeated `npm install` + build cycles can exhaust memory and freeze the system (observed: `systemd-journald: Under memory pressure`). Rules: (1) diagnose dep issues first, then do **one** clean `npm install --include=dev`; never retry blindly. (2) Run `npm run build --workspace=client` and `--workspace=server` **sequentially**, not the combined `npm run build` which runs both concurrently. (3) Avoid running builds while Claude CLI processes are active when possible.
@@ -101,7 +101,7 @@ These have caused significant bugs — do not skip:
 | 3002 | steward-server (dev) | dev |
 | 5173 | steward-client (Vite) | dev |
 | 3003 | steward-safe | always |
-| 4001–4010 | steward-apps (mini-apps) | both; slot N → port 400N → `app{N}.steward.jradoo.com` |
+| 4001–4010 | steward-apps (mini-apps) | both; slot N → port 400N → `app{N}.steward.yourdomain.com` |
 | `/tmp/claude-worker.sock` | steward-worker | both |
 | `/tmp/claude-apps.sock` | steward-apps sidecar | both |
 

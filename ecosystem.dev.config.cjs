@@ -10,7 +10,7 @@
  *   pm2 logs                # tail all logs
  *
  * Dev cycle:
- *   nginx proxies dev.steward.jradoo.com → :5173 (Vite dev server, HMR enabled).
+ *   nginx proxies dev.steward.yourdomain.com → :5173 (Vite dev server, HMR enabled).
  *   Vite proxies /api → :3002 (steward-server). WebSocket upgrades are forwarded
  *   by nginx using the ws-map in /etc/nginx/conf.d/ws-map.conf.
  *

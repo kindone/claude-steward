@@ -103,7 +103,7 @@ steward-safe    (node safe/server.js)             port 3003  ← frozen, same as
 ```
 
 **How dev HMR works through nginx:**
-nginx proxies `dev.steward.jradoo.com → :5173` (Vite dev server). WebSocket upgrade headers (`Upgrade`, `Connection`) are forwarded via the `$connection_upgrade` map in `/etc/nginx/conf.d/ws-map.conf`, so HMR works end-to-end over HTTPS/WSS. Vite proxies `/api → :3002` internally (configured in `vite.config.ts`), so API calls are transparent.
+nginx proxies `dev.steward.yourdomain.com → :5173` (Vite dev server). WebSocket upgrade headers (`Upgrade`, `Connection`) are forwarded via the `$connection_upgrade` map in `/etc/nginx/conf.d/ws-map.conf`, so HMR works end-to-end over HTTPS/WSS. Vite proxies `/api → :3002` internally (configured in `vite.config.ts`), so API calls are transparent.
 
 ### Upgrade flow in dev mode
 
@@ -128,17 +128,17 @@ nginx sits in front of both domains and handles TLS termination. Configs live in
 
 | Domain | nginx config | Upstream |
 |---|---|---|
-| `steward.jradoo.com` | `steward` | `:3001` (prod `steward-main`) |
-| `dev.steward.jradoo.com` | `steward-dev` | `:5173` (Vite HMR dev server; proxies `/api` to `:3002`) |
-| `safe.steward.jradoo.com` | `steward-safe` | `:3003` (always) |
+| `steward.yourdomain.com` | `steward` | `:3001` (prod `steward-main`) |
+| `dev.steward.yourdomain.com` | `steward-dev` | `:5173` (Vite HMR dev server; proxies `/api` to `:3002`) |
+| `safe.steward.yourdomain.com` | `steward-safe` | `:3003` (always) |
 
 Both main and safe domains have Let's Encrypt certs (auto-renewing via certbot systemd timer).
 
 ### Enabling the dev subdomain (optional)
 
-To run dev and production at the same time (prod at `steward.jradoo.com`, dev at `dev.steward.jradoo.com`):
+To run dev and production at the same time (prod at `steward.yourdomain.com`, dev at `dev.steward.yourdomain.com`):
 
-1. **DNS:** Add an A record for `dev.steward.jradoo.com` pointing at your server IP.
+1. **DNS:** Add an A record for `dev.steward.yourdomain.com` pointing at your server IP.
 
 2. **Install the dev nginx config:**
    ```bash
@@ -149,7 +149,7 @@ To run dev and production at the same time (prod at `steward.jradoo.com`, dev at
 
 3. **Get a TLS cert:**
    ```bash
-   sudo certbot --nginx -d dev.steward.jradoo.com
+   sudo certbot --nginx -d dev.steward.yourdomain.com
    ```
 
 4. **Reload nginx:**
@@ -157,7 +157,7 @@ To run dev and production at the same time (prod at `steward.jradoo.com`, dev at
    sudo nginx -t && sudo systemctl reload nginx
    ```
 
-5. **Start dev:** `npm run up:dev` (Vite on :5173). Prod can stay on `npm run up` (main on :3001). Then open `https://dev.steward.jradoo.com` for dev and `https://steward.jradoo.com` for prod.
+5. **Start dev:** `npm run up:dev` (Vite on :5173). Prod can stay on `npm run up` (main on :3001). Then open `https://dev.steward.yourdomain.com` for dev and `https://steward.yourdomain.com` for prod.
 
 The config file is in the repo at `config/nginx-dev.steward.conf`; it proxies to `127.0.0.1:5173` and includes WebSocket upgrade for Vite HMR.
 

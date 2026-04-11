@@ -51,4 +51,4 @@ Read `scripts/watchlist.json` first to get current state.
 - Korean tickers end in .KS — Yahoo Finance supports them natively
 - FX pairs use Yahoo Finance syntax: KRW=X (USD/KRW), EURKRW=X (EUR/KRW), JPYKRW=X, etc.
 - Point counts differ between KS (~31/wk) and US (~36/wk) due to different market hours — expected, the chart handles it
-- Charts are saved to server/data/charts/ and served at https://steward.jradoo.com/charts/
+- Charts are saved to server/data/charts/ and served at https://steward.yourdomain.com/charts/
