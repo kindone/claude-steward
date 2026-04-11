@@ -1,5 +1,5 @@
-import type { SmartArtSpec } from '../parser'
-import type { SmartArtTheme } from '../theme'
+import type { MdArtSpec } from '../parser'
+import type { MdArtTheme } from '../theme'
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -21,18 +21,18 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
-function titleEl(W: number, title: string, theme: SmartArtTheme): string {
+function titleEl(W: number, title: string, theme: MdArtTheme): string {
   return `<text x="${W / 2}" y="20" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(title)}</text>`
 }
 
-function svgWrap(W: number, H: number, theme: SmartArtTheme, parts: string[]): string {
+function svgWrap(W: number, H: number, theme: MdArtTheme, parts: string[]): string {
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
     <rect width="${W}" height="${H}" fill="${theme.bg}" rx="8"/>
     ${parts.join('\n    ')}
   </svg>`
 }
 
-export function renderCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
+export function renderCycle(spec: MdArtSpec, theme: MdArtTheme): string {
   switch (spec.type) {
     case 'donut-cycle':           return renderDonutCycle(spec, theme)
     case 'block-cycle':           return renderBlockCycle(spec, theme)
@@ -48,7 +48,7 @@ export function renderCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Circle cycle ──────────────────────────────────────────────────────────────
 
-function renderCircleCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderCircleCycle(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -146,7 +146,7 @@ function renderCircleCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Donut cycle ───────────────────────────────────────────────────────────────
 
-function renderDonutCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderDonutCycle(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -216,7 +216,7 @@ function gearPath(cx: number, cy: number, outerR: number, innerR: number, teeth:
   return 'M ' + points.join(' L ') + ' Z'
 }
 
-function renderGearCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderGearCycle(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -307,7 +307,7 @@ function renderGearCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Block cycle ───────────────────────────────────────────────────────────────
 
-function renderBlockCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderBlockCycle(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -420,7 +420,7 @@ function renderBlockCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Segmented cycle ───────────────────────────────────────────────────────────
 
-function renderSegmentedCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderSegmentedCycle(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -481,7 +481,7 @@ function renderSegmentedCycle(spec: SmartArtSpec, theme: SmartArtTheme): string 
 
 // ── Nondirectional cycle ──────────────────────────────────────────────────────
 
-function renderNondirectionalCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderNondirectionalCycle(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -524,7 +524,7 @@ function renderNondirectionalCycle(spec: SmartArtSpec, theme: SmartArtTheme): st
 
 // ── Multidirectional cycle ────────────────────────────────────────────────────
 
-function renderMultidirectionalCycle(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderMultidirectionalCycle(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -572,7 +572,7 @@ function renderMultidirectionalCycle(spec: SmartArtSpec, theme: SmartArtTheme): 
 
 // ── Spiral ────────────────────────────────────────────────────────────────────
 
-function renderSpiral(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderSpiral(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -626,7 +626,7 @@ function renderSpiral(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Loop (figure-8) ───────────────────────────────────────────────────────────
 
-function renderLoop(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderLoop(spec: MdArtSpec, theme: MdArtTheme): string {
   // Figure-8 (loop): two overlapping circles. Left items on outer-left half (π/2→3π/2).
   // Right items on outer-right half (−π/2→π/2). Solid outer arcs show primary flow;
   // dashed inner arcs cross through the overlap zone for the figure-8 return path.
@@ -757,7 +757,7 @@ function renderLoop(spec: SmartArtSpec, theme: SmartArtTheme): string {
   return svgWrap(W, H, theme, parts)
 }
 
-function renderEmpty(theme: SmartArtTheme): string {
+function renderEmpty(theme: MdArtTheme): string {
   return `<svg viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
     <rect width="400" height="80" fill="${theme.bg}" rx="6"/>
     <text x="200" y="44" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif">No items</text>

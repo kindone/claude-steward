@@ -1,7 +1,7 @@
-import { parseSmartArt } from './parser'
+import { parseMdArt } from './parser'
 import { getTheme } from './theme'
-import type { SmartArtSpec } from './parser'
-import type { SmartArtTheme } from './theme'
+import type { MdArtSpec } from './parser'
+import type { MdArtTheme } from './theme'
 import { renderProcess } from './layouts/process'
 import { renderList } from './layouts/list'
 import { renderCycle } from './layouts/cycle'
@@ -13,7 +13,7 @@ import { renderStatistical } from './layouts/statistical'
 import { renderPlanning } from './layouts/planning'
 import { renderTechnical } from './layouts/technical'
 
-type LayoutRenderer = (spec: SmartArtSpec, theme: SmartArtTheme) => string
+type LayoutRenderer = (spec: MdArtSpec, theme: MdArtTheme) => string
 
 const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   // process family
@@ -138,9 +138,9 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   class: renderTechnical,
 }
 
-export function renderSmartArt(raw: string, hintType?: string): string {
+export function renderMdArt(raw: string, hintType?: string): string {
   try {
-    const spec = parseSmartArt(raw, hintType)
+    const spec = parseMdArt(raw, hintType)
     const theme = getTheme(spec.type, spec.theme)
     const renderer = LAYOUT_RENDERERS[spec.type]
     if (!renderer) return renderFallback(spec, theme)
@@ -150,10 +150,10 @@ export function renderSmartArt(raw: string, hintType?: string): string {
   }
 }
 
-function renderFallback(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderFallback(spec: MdArtSpec, theme: MdArtTheme): string {
   const W = 360
   const H = 80
-  const label = spec.type ? `${spec.type} (${spec.items.length} items)` : `SmartArt (${spec.items.length} items)`
+  const label = spec.type ? `${spec.type} (${spec.items.length} items)` : `MdArt (${spec.items.length} items)`
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
     <rect width="${W}" height="${H}" fill="${theme.bg}" rx="8" stroke="${theme.border}" stroke-width="1"/>
     <text x="${W / 2}" y="34" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${label}</text>
@@ -164,7 +164,7 @@ function renderFallback(spec: SmartArtSpec, theme: SmartArtTheme): string {
 function renderError(msg: string): string {
   return `<svg viewBox="0 0 300 60" xmlns="http://www.w3.org/2000/svg">
     <rect width="300" height="60" fill="#1a0a0a" rx="4"/>
-    <text x="150" y="28" text-anchor="middle" font-size="11" fill="#f87171" font-family="system-ui,sans-serif">SmartArt error</text>
+    <text x="150" y="28" text-anchor="middle" font-size="11" fill="#f87171" font-family="system-ui,sans-serif">MdArt error</text>
     <text x="150" y="44" text-anchor="middle" font-size="9" fill="#7f1d1d" font-family="system-ui,sans-serif">${msg.slice(0, 60).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</text>
   </svg>`
 }

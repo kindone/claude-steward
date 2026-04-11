@@ -34,7 +34,7 @@ function artifactExtension(type: string, metadata: Record<string, unknown> | nul
     }
     case 'pikchr':   return '.pikchr'
     case 'html':     return '.html'
-    case 'smartart': return '.smartart'
+    case 'mdart': return '.mdart'
     default: return '.bin'
   }
 }
@@ -79,7 +79,7 @@ projectArtifactsRouter.post('/', (req, res) => {
     res.status(400).json({ error: 'name is required' })
     return
   }
-  const validTypes = ['chart', 'report', 'data', 'code', 'pikchr', 'html', 'smartart']
+  const validTypes = ['chart', 'report', 'data', 'code', 'pikchr', 'html', 'mdart']
   if (!type || !validTypes.includes(type)) {
     res.status(400).json({ error: `type must be one of: ${validTypes.join(', ')}` })
     return
@@ -108,7 +108,7 @@ projectArtifactsRouter.post('/', (req, res) => {
     id,
     project_id: (req.params as ProjectArtifactParams).projectId,
     name: name.trim(),
-    type: type as 'chart' | 'report' | 'data' | 'code' | 'pikchr' | 'html' | 'smartart',
+    type: type as 'chart' | 'report' | 'data' | 'code' | 'pikchr' | 'html' | 'mdart',
     path: relPath,
     metadata: metadata ? JSON.stringify(metadata) : null,
     created_from_session: created_from_session ?? null,

@@ -78,13 +78,13 @@ describe('buildMarkedOptions – mermaid', () => {
     expect(html).toContain('<code')
   })
 
-  it('smartart fences with Unicode do not throw (UTF-8 base64)', () => {
+  it('mdart fences with Unicode do not throw (UTF-8 base64)', () => {
     const body = 'type: process\n你好\n'
     const { renderer } = buildMarkedOptions(null)
-    const md = `\`\`\`smartart\n${body}\`\`\``
+    const md = `\`\`\`mdart\n${body}\`\`\``
     expect(() => marked.parse(md, { renderer })).not.toThrow()
     const html = marked.parse(md, { renderer }) as string
-    expect(html).toContain('class="smartart-placeholder"')
+    expect(html).toContain('class="mdart-placeholder"')
     const b64 = (html.match(/data-src="([^"]+)"/) ?? [])[1]
     expect(b64).toBeDefined()
     // marked normalizes trailing newlines on code tokens

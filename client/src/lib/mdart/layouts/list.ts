@@ -1,5 +1,5 @@
-import type { SmartArtSpec } from '../parser'
-import type { SmartArtTheme } from '../theme'
+import type { MdArtSpec } from '../parser'
+import type { MdArtTheme } from '../theme'
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -17,7 +17,7 @@ function lerpColor(c1: string, c2: string, t: number): string {
   return '#' + [lerp(r1, r2), lerp(g1, g2), lerp(b1, b2)].map(v => v.toString(16).padStart(2, '0')).join('')
 }
 
-export function renderList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+export function renderList(spec: MdArtSpec, theme: MdArtTheme): string {
   switch (spec.type) {
     case 'numbered-list':   return renderNumberedList(spec, theme)
     case 'checklist':       return renderChecklist(spec, theme)
@@ -39,7 +39,7 @@ export function renderList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Bullet list ───────────────────────────────────────────────────────────────
 
-function renderBulletList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderBulletList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -94,7 +94,7 @@ function renderBulletList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Numbered list ─────────────────────────────────────────────────────────────
 
-function renderNumberedList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderNumberedList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -141,7 +141,7 @@ function renderNumberedList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Checklist ─────────────────────────────────────────────────────────────────
 
-function renderChecklist(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderChecklist(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -192,7 +192,7 @@ function renderChecklist(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Two-column list ───────────────────────────────────────────────────────────
 
-function renderTwoColumnList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderTwoColumnList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -239,7 +239,7 @@ function renderTwoColumnList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Timeline list ─────────────────────────────────────────────────────────────
 
-function renderTimelineList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderTimelineList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -298,7 +298,7 @@ function renderTimelineList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Block list ────────────────────────────────────────────────────────────────
 // 2-column grid of colored blocks; label: value for subtitle
 
-function renderBlockList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderBlockList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 500
@@ -329,7 +329,7 @@ function renderBlockList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Chevron list ──────────────────────────────────────────────────────────────
 // Stacked horizontal chevron arrows
 
-function renderChevronList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderChevronList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 500
@@ -357,7 +357,7 @@ function renderChevronList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Card list ─────────────────────────────────────────────────────────────────
 // Vertical cards with colored header; top-level items = columns, children = rows
 
-function renderCardList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderCardList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 500
@@ -389,7 +389,7 @@ function renderCardList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Zigzag list ───────────────────────────────────────────────────────────────
 // Alternating left/right nodes connected by a center spine
 
-function renderZigzagList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderZigzagList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 500
@@ -420,7 +420,7 @@ function renderZigzagList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Ribbon list ───────────────────────────────────────────────────────────────
 // Bold banner ribbons with folded left edge
 
-function renderRibbonList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderRibbonList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 500
@@ -453,7 +453,7 @@ function renderRibbonList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Hexagon list ──────────────────────────────────────────────────────────────
 // Honeycomb grid of pointy-top hexagons
 
-function renderHexagonList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderHexagonList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 500
@@ -492,7 +492,7 @@ function renderHexagonList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Trapezoid list ────────────────────────────────────────────────────────────
 // Stacked widening trapezoid bands (horizontal pyramid)
 
-function renderTrapezoidList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderTrapezoidList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 500, BAND_H = 28, GAP = 3
@@ -520,7 +520,7 @@ function renderTrapezoidList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Tab list ──────────────────────────────────────────────────────────────────
 // Tabbed panel: top-level items = tabs; first item's children shown in content panel
 
-function renderTabList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderTabList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 500, TAB_H = 28, CONTENT_H = 100, TAB_W = Math.min(110, (W - 8) / items.length)
@@ -571,7 +571,7 @@ function renderTabList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Circle list ───────────────────────────────────────────────────────────────
 // Numbered circles connected by a vertical dashed line
 
-function renderCircleList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderCircleList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 500, ROW_H = 44, R = 16, LEFT = 28
@@ -597,7 +597,7 @@ function renderCircleList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // Rows with colored circle badge + label + value description
 // Attrs: first attr treated as emoji/icon displayed in the badge
 
-function renderIconList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderIconList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 500, ROW_H = 44, CIRCLE_R = 18, LEFT = 24
@@ -627,14 +627,14 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
-function svg(W: number, H: number, theme: SmartArtTheme, parts: string[]): string {
+function svg(W: number, H: number, theme: MdArtTheme, parts: string[]): string {
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
     <rect width="${W}" height="${H}" fill="${theme.bg}" rx="8"/>
     ${parts.join('\n    ')}
   </svg>`
 }
 
-function renderEmpty(theme: SmartArtTheme): string {
+function renderEmpty(theme: MdArtTheme): string {
   return `<svg viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
     <rect width="400" height="80" fill="${theme.bg}" rx="6"/>
     <text x="200" y="44" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif">No items</text>

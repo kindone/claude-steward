@@ -5,7 +5,7 @@ import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
 import mermaid from 'mermaid'
 import { renderPikchr } from '../lib/pikchrRenderer'
-import { renderSmartArt } from '../lib/smartart/renderer'
+import { renderMdArt } from '../lib/mdart/renderer'
 import 'highlight.js/styles/github-dark.css'
 import 'katex/dist/katex.min.css'
 import type { ClaudeErrorCode, ToolCall } from '../lib/api'
@@ -75,8 +75,8 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
   const mermaidCache = useRef<Map<string, string>>(new Map())
   /** Per-message pikchr SVG cache: source → rendered SVG string. */
   const pikchrCache = useRef<Map<string, string>>(new Map())
-  /** Per-message smartart SVG cache: source → rendered SVG string. */
-  const smartartCache = useRef<Map<string, string>>(new Map())
+  /** Per-message mdart SVG cache: source → rendered SVG string. */
+  const mdartCache = useRef<Map<string, string>>(new Map())
 
   // ── Kernel code execution state ─────────────────────────────────────────────
   /** Per-block run state: block index → output panel state */
@@ -337,20 +337,20 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
     })
   }) // intentionally no deps — must run after every render
 
-  // SmartArt rendering — synchronous (no WASM), mirrors the pikchr pattern.
+  // MdArt rendering — synchronous (no WASM), mirrors the pikchr pattern.
   // Renders immediately (no need to wait for streaming to finish) since it's
   // pure JS. Still uses cache to survive innerHTML resets from re-renders.
   useEffect(() => {
     if (!contentRef.current || role !== 'assistant' || errorCode) return
     const placeholders = contentRef.current.querySelectorAll<HTMLDivElement>(
-      '.smartart-placeholder:not(.smartart-rendered)'
+      '.mdart-placeholder:not(.mdart-rendered)'
     )
     if (placeholders.length === 0) return
 
-    const injectSmartartSaveBtn = (el: HTMLDivElement) => {
-      if (el.querySelector('.smartart-save-btn')) return
+    const injectMdartSaveBtn = (el: HTMLDivElement) => {
+      if (el.querySelector('.mdart-save-btn')) return
       const btn = document.createElement('button')
-      btn.className = 'smartart-save-btn pikchr-save-btn'
+      btn.className = 'mdart-save-btn pikchr-save-btn'
       btn.title = 'Save as artifact'
       btn.textContent = '📎'
       el.appendChild(btn)
@@ -362,26 +362,26 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       if (!src) return
 
       const cacheKey = src + '|' + (hintType ?? '')
-      const cached = smartartCache.current.get(cacheKey)
+      const cached = mdartCache.current.get(cacheKey)
       if (cached) {
         el.innerHTML = cached
-        el.classList.add('smartart-rendered')
-        injectSmartartSaveBtn(el)
+        el.classList.add('mdart-rendered')
+        injectMdartSaveBtn(el)
         return
       }
 
       try {
         const raw = utf8FromBase64(src)
-        const svg = renderSmartArt(raw, hintType)
-        smartartCache.current.set(cacheKey, svg)
-        if (el.isConnected && !el.classList.contains('smartart-rendered')) {
+        const svg = renderMdArt(raw, hintType)
+        mdartCache.current.set(cacheKey, svg)
+        if (el.isConnected && !el.classList.contains('mdart-rendered')) {
           el.innerHTML = svg
-          el.classList.add('smartart-rendered')
-          injectSmartartSaveBtn(el)
+          el.classList.add('mdart-rendered')
+          injectMdartSaveBtn(el)
         }
       } catch (e) {
-        el.classList.add('smartart-error')
-        el.textContent = 'SmartArt error: ' + String(e)
+        el.classList.add('mdart-error')
+        el.textContent = 'MdArt error: ' + String(e)
       }
     })
   }) // intentionally no deps — must run after every render
@@ -412,7 +412,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       return
     }
     // pikchr save button — must be checked before svg to avoid lightbox opening
-    if (target.closest('.pikchr-save-btn') && !target.closest('.smartart-placeholder')) {
+    if (target.closest('.pikchr-save-btn') && !target.closest('.mdart-placeholder')) {
       const placeholder = target.closest('.pikchr-placeholder') as HTMLDivElement | null
       const src = decodeURIComponent(placeholder?.getAttribute('data-src') ?? '')
       if (src) {
@@ -422,9 +422,9 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       return
     }
 
-    // smartart save button
-    if (target.closest('.smartart-save-btn')) {
-      const placeholder = target.closest('.smartart-placeholder') as HTMLDivElement | null
+    // mdart save button
+    if (target.closest('.mdart-save-btn')) {
+      const placeholder = target.closest('.mdart-placeholder') as HTMLDivElement | null
       const encoded = placeholder?.dataset.src ?? ''
       if (encoded) {
         try {
@@ -435,8 +435,8 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
           const content = (!hasFrontMatterType && hintType)
             ? `type: ${hintType}\n\n${raw}`
             : raw
-          const name = deriveArtifactName(raw, 'smartart', 'smartart')
-          onSaveAsArtifactRef.current?.(content, 'smartart', name, target as HTMLElement)
+          const name = deriveArtifactName(raw, 'mdart', 'mdart')
+          onSaveAsArtifactRef.current?.(content, 'mdart', name, target as HTMLElement)
         } catch { /* ignore decode errors */ }
       }
       return

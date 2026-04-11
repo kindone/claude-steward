@@ -1,6 +1,6 @@
-# SmartArt — Implementation Plan
+# MdArt — Implementation Plan
 
-Markdown code-fence syntax that renders structured text into SVG diagrams, similar to PowerPoint SmartArt. Triggered by ` ```smartart ` fences in chat and supported as a dedicated artifact type.
+Markdown code-fence syntax that renders structured text into SVG diagrams, similar to PowerPoint MdArt. Triggered by ` ```mdart ` fences in chat and supported as a dedicated artifact type.
 
 ---
 
@@ -10,16 +10,16 @@ Markdown code-fence syntax that renders structured text into SVG diagrams, simil
 
 | Artifact | Category | Layouts |
 |---|---|---|
-| SmartArt · LIST Layouts | LIST | 12 |
-| SmartArt · PROCESS Layouts | PROCESS | 15 |
-| SmartArt · CYCLE Layouts | CYCLE | 8 |
-| SmartArt · HIERARCHY Layouts | HIERARCHY | 8 |
-| SmartArt · RELATIONSHIP Layouts | RELATIONSHIP | 12 |
-| SmartArt · MATRIX Layouts | MATRIX | 7 |
-| SmartArt · PYRAMID Layouts | PYRAMID | 5 |
-| SmartArt · STATISTICAL Layouts | STATISTICAL | 5 |
-| SmartArt · PLANNING Layouts | PLANNING | 3 |
-| SmartArt · TECHNICAL Layouts | TECHNICAL | 4 |
+| MdArt · LIST Layouts | LIST | 12 |
+| MdArt · PROCESS Layouts | PROCESS | 15 |
+| MdArt · CYCLE Layouts | CYCLE | 8 |
+| MdArt · HIERARCHY Layouts | HIERARCHY | 8 |
+| MdArt · RELATIONSHIP Layouts | RELATIONSHIP | 12 |
+| MdArt · MATRIX Layouts | MATRIX | 7 |
+| MdArt · PYRAMID Layouts | PYRAMID | 5 |
+| MdArt · STATISTICAL Layouts | STATISTICAL | 5 |
+| MdArt · PLANNING Layouts | PLANNING | 3 |
+| MdArt · TECHNICAL Layouts | TECHNICAL | 4 |
 
 **~79 distinct layout types** across all 10 categories.
 
@@ -30,7 +30,7 @@ Markdown code-fence syntax that renders structured text into SVG diagrams, simil
 ### Simple (inline)
 
 ```
-```smartart process
+```mdart process
 Discovery → Design → Build → Test → Deploy
 ```
 ```
@@ -38,7 +38,7 @@ Discovery → Design → Build → Test → Deploy
 ### Rich (block with YAML front-matter)
 
 ```
-```smartart
+```mdart
 type: swot
 title: Product Launch
 
@@ -70,7 +70,7 @@ Five syntax tiers, ordered by how much structure they add beyond plain lists:
 One additional form for **true graphs** (multiple parents, mesh topology) that can't be folded into a single-root tree:
 
 ```
-```smartart network
+```mdart network
 nodes:
   - App Server 1
   - App Server 2
@@ -133,9 +133,9 @@ Still all list syntax — just two named sections. Used only when the graph trul
 ### File layout
 
 ```
-client/src/lib/smartart/
-  parser.ts              ← raw fence text → SmartArtSpec
-  renderer.ts            ← SmartArtSpec → SVG string (orchestrator)
+client/src/lib/mdart/
+  parser.ts              ← raw fence text → MdArtSpec
+  renderer.ts            ← MdArtSpec → SVG string (orchestrator)
   theme.ts               ← color palettes keyed by layout type
   layouts/
     list.ts              → 12 types
@@ -150,7 +150,7 @@ client/src/lib/smartart/
     technical.ts         → 4 types
 
 client/src/components/
-  SmartArtView.tsx       ← artifact viewer component (edit + live re-render)
+  MdArtView.tsx       ← artifact viewer component (edit + live re-render)
 ```
 
 ### Data flow
@@ -160,9 +160,9 @@ raw fence text
       ↓
   parseFrontMatter()     → { type, theme, title, options }
       ↓
-  parseBody(type, text)  → SmartArtData  (typed union per layout family)
+  parseBody(type, text)  → MdArtData  (typed union per layout family)
       ↓
-  SmartArtSpec = { layout, data, options }
+  MdArtSpec = { layout, data, options }
       ↓
   layouts/<family>.ts    → SVGSpec  (plain JS object: elements + attrs)
       ↓
@@ -205,31 +205,31 @@ Named overrides: `theme: amber`, `theme: rose`, `theme: mono-light` (print-frien
 
 ### Chat messages (like pikchr)
 
-1. `markdownRenderer.ts` — detect ` ```smartart ` fences, emit:
+1. `markdownRenderer.ts` — detect ` ```mdart ` fences, emit:
    ```html
-   <div class="smartart-placeholder" data-src="<base64-encoded source>" data-type="process">
+   <div class="mdart-placeholder" data-src="<base64-encoded source>" data-type="process">
    ```
-2. `MessageBubble.tsx` hydration effect — call `renderSmartArt(src)` → inject SVG into placeholder
-3. Overlay 📎 button on hover → "Save as Artifact" (saves source text as `smartart` artifact)
+2. `MessageBubble.tsx` hydration effect — call `renderMdArt(src)` → inject SVG into placeholder
+3. Overlay 📎 button on hover → "Save as Artifact" (saves source text as `mdart` artifact)
 
-### Artifact type `smartart`
+### Artifact type `mdart`
 
-- **Server:** add `'smartart'` to `validTypes` in `routes/artifacts.ts` and `db/index.ts`; `artifactExtension()` returns `.smartart`
-- **`ArtifactViewer.tsx`:** add `SmartArtView` component — split layout (editor left, live SVG right), re-renders on every keystroke, no server round-trip
-- **`ArtifactPanel.tsx`:** teal badge for smartart type
-- **`api.ts`:** add `'smartart'` to `ArtifactType` union
+- **Server:** add `'mdart'` to `validTypes` in `routes/artifacts.ts` and `db/index.ts`; `artifactExtension()` returns `.mdart`
+- **`ArtifactViewer.tsx`:** add `MdArtView` component — split layout (editor left, live SVG right), re-renders on every keystroke, no server round-trip
+- **`ArtifactPanel.tsx`:** teal badge for mdart type
+- **`api.ts`:** add `'mdart'` to `ArtifactType` union
 
 ### MCP tool (works automatically)
 
 ```
-artifact_create(type: "smartart", content: "type: process\n...")
+artifact_create(type: "mdart", content: "type: process\n...")
 ```
 
 No extra work needed — falls through to the existing artifact pipeline.
 
 ### System prompt addition
 
-`server/src/lib/smartartPrompt.ts` — injected into every session, describes the fence syntax so Claude can author SmartArt diagrams on request.
+`server/src/lib/mdartPrompt.ts` — injected into every session, describes the fence syntax so Claude can author MdArt diagrams on request.
 
 ---
 
@@ -239,21 +239,21 @@ No extra work needed — falls through to the existing artifact pipeline.
 
 | File | Purpose |
 |---|---|
-| `client/src/lib/smartart/parser.ts` | Front-matter + body parser |
-| `client/src/lib/smartart/renderer.ts` | SVGSpec → SVG string orchestrator |
-| `client/src/lib/smartart/theme.ts` | Color palette definitions |
-| `client/src/lib/smartart/layouts/list.ts` | 12 list layout engines |
-| `client/src/lib/smartart/layouts/process.ts` | 15 process layout engines |
-| `client/src/lib/smartart/layouts/cycle.ts` | 8 cycle layout engines |
-| `client/src/lib/smartart/layouts/hierarchy.ts` | 8 hierarchy layout engines |
-| `client/src/lib/smartart/layouts/relationship.ts` | 12 relationship layout engines |
-| `client/src/lib/smartart/layouts/matrix.ts` | 7 matrix layout engines |
-| `client/src/lib/smartart/layouts/pyramid.ts` | 5 pyramid layout engines |
-| `client/src/lib/smartart/layouts/statistical.ts` | 5 statistical layout engines |
-| `client/src/lib/smartart/layouts/planning.ts` | 3 planning layout engines |
-| `client/src/lib/smartart/layouts/technical.ts` | 4 technical layout engines |
-| `client/src/components/SmartArtView.tsx` | Artifact viewer: editor + live render |
-| `server/src/lib/smartartPrompt.ts` | System prompt instructions |
+| `client/src/lib/mdart/parser.ts` | Front-matter + body parser |
+| `client/src/lib/mdart/renderer.ts` | SVGSpec → SVG string orchestrator |
+| `client/src/lib/mdart/theme.ts` | Color palette definitions |
+| `client/src/lib/mdart/layouts/list.ts` | 12 list layout engines |
+| `client/src/lib/mdart/layouts/process.ts` | 15 process layout engines |
+| `client/src/lib/mdart/layouts/cycle.ts` | 8 cycle layout engines |
+| `client/src/lib/mdart/layouts/hierarchy.ts` | 8 hierarchy layout engines |
+| `client/src/lib/mdart/layouts/relationship.ts` | 12 relationship layout engines |
+| `client/src/lib/mdart/layouts/matrix.ts` | 7 matrix layout engines |
+| `client/src/lib/mdart/layouts/pyramid.ts` | 5 pyramid layout engines |
+| `client/src/lib/mdart/layouts/statistical.ts` | 5 statistical layout engines |
+| `client/src/lib/mdart/layouts/planning.ts` | 3 planning layout engines |
+| `client/src/lib/mdart/layouts/technical.ts` | 4 technical layout engines |
+| `client/src/components/MdArtView.tsx` | Artifact viewer: editor + live render |
+| `server/src/lib/mdartPrompt.ts` | System prompt instructions |
 
 ### Modified files
 
@@ -261,12 +261,12 @@ No extra work needed — falls through to the existing artifact pipeline.
 |---|---|
 | `client/src/lib/markdownRenderer.ts` | Detect fence, emit placeholder div |
 | `client/src/components/MessageBubble.tsx` | Hydrate placeholders, add 📎 save button |
-| `client/src/components/ArtifactViewer.tsx` | Dispatch to `SmartArtView` |
-| `client/src/components/ArtifactPanel.tsx` | Teal badge for smartart type |
-| `client/src/lib/api.ts` | Add `'smartart'` to `ArtifactType` union |
-| `server/src/routes/artifacts.ts` | Add `'smartart'` to `validTypes` |
-| `server/src/db/index.ts` | Add `'smartart'` to `ArtifactType` |
-| `server/src/routes/chat.ts` | Import and inject `smartartPrompt` |
+| `client/src/components/ArtifactViewer.tsx` | Dispatch to `MdArtView` |
+| `client/src/components/ArtifactPanel.tsx` | Teal badge for mdart type |
+| `client/src/lib/api.ts` | Add `'mdart'` to `ArtifactType` union |
+| `server/src/routes/artifacts.ts` | Add `'mdart'` to `validTypes` |
+| `server/src/db/index.ts` | Add `'mdart'` to `ArtifactType` |
+| `server/src/routes/chat.ts` | Import and inject `mdartPrompt` |
 
 ---
 
@@ -297,7 +297,7 @@ Ordered by value × implementation complexity:
 
 ## Open Questions
 
-1. **Inline vs block editor for SmartArtView:** full CodeMirror (like ArtifactEditor) or plain `<textarea>` for phase 1?
+1. **Inline vs block editor for MdArtView:** full CodeMirror (like ArtifactEditor) or plain `<textarea>` for phase 1?
 2. **Export:** "Download as SVG" / "Download as PNG" button on the artifact viewer?
 3. **Animation:** optional CSS transitions on process arrows, cycle rotation? Probably post-MVP.
 4. **i18n labels:** named matrix types (BCG, Ansoff, SWOT) have fixed English quadrant labels — parameterize or hardcode for now?

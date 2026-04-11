@@ -1,5 +1,5 @@
-import type { SmartArtSpec } from '../parser'
-import type { SmartArtTheme } from '../theme'
+import type { MdArtSpec } from '../parser'
+import type { MdArtTheme } from '../theme'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ function truncate(s: string, max: number): string {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function renderStatistical(spec: SmartArtSpec, theme: SmartArtTheme): string {
+export function renderStatistical(spec: MdArtSpec, theme: MdArtTheme): string {
   switch (spec.type) {
     case 'scorecard':      return renderScorecard(spec, theme)
     case 'treemap':        return renderTreemap(spec, theme)
@@ -30,7 +30,7 @@ export function renderStatistical(spec: SmartArtSpec, theme: SmartArtTheme): str
 // ── Progress list ─────────────────────────────────────────────────────────────
 // Syntax: `- Label: 92` or `- Label: 92%`
 
-function renderProgressList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderProgressList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -76,7 +76,7 @@ function renderProgressList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Scorecard ─────────────────────────────────────────────────────────────────
 // Syntax: `- Label: VALUE [+change]`
 
-function renderScorecard(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderScorecard(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -116,7 +116,7 @@ function renderScorecard(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Treemap ───────────────────────────────────────────────────────────────────
 // Syntax: `- Label: value` (value proportional to area)
 
-function renderTreemap(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderTreemap(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -160,7 +160,7 @@ function renderTreemap(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Bullet chart ─────────────────────────────────────────────────────────────
 // Syntax: `- Label: value [target]`  e.g. `- Revenue: 72 [85]`
 
-function renderBulletChart(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderBulletChart(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -207,7 +207,7 @@ function renderBulletChart(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Sankey (simplified flow diagram) ─────────────────────────────────────────
 // Syntax: top-level items = sources (value = weight); children = destination names
 
-function renderSankey(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderSankey(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -299,7 +299,7 @@ function renderSankey(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Waffle chart ──────────────────────────────────────────────────────────────
 // Syntax: `- Label: value%`  — items are segments; 100 squares total
 
-function renderWaffle(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderWaffle(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -345,7 +345,7 @@ function renderWaffle(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Gauge / Speedometer ───────────────────────────────────────────────────────
 // Syntax: `- Label: 72%`  — multiple items render side-by-side gauges
 
-function renderGauge(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderGauge(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -389,7 +389,7 @@ function renderGauge(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Radar / Spider chart ──────────────────────────────────────────────────────
 // Syntax: `- Axis: value`  (3+ items)
 
-function renderRadar(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderRadar(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length < 3) return renderEmpty(theme)
 
@@ -446,7 +446,7 @@ function renderRadar(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Heatmap ───────────────────────────────────────────────────────────────────
 // Syntax: top-level = rows; children = cells with numeric label or `value`
 
-function renderHeatmap(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderHeatmap(spec: MdArtSpec, theme: MdArtTheme): string {
   const rows = spec.items
   if (rows.length === 0) return renderEmpty(theme)
 
@@ -496,7 +496,7 @@ function renderHeatmap(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Shared ────────────────────────────────────────────────────────────────────
 
-function svg(W: number, H: number, theme: SmartArtTheme, title: string | undefined, parts: string[]): string {
+function svg(W: number, H: number, theme: MdArtTheme, title: string | undefined, parts: string[]): string {
   const titleEl = title
     ? `<text x="${W / 2}" y="20" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(title)}</text>`
     : ''
@@ -506,7 +506,7 @@ function svg(W: number, H: number, theme: SmartArtTheme, title: string | undefin
 </svg>`
 }
 
-function renderEmpty(theme: SmartArtTheme): string {
+function renderEmpty(theme: MdArtTheme): string {
   return `<svg viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:${theme.bg};border-radius:8px">
   <text x="150" y="42" text-anchor="middle" font-size="12" fill="${theme.textMuted}" font-family="system-ui,sans-serif">No items</text>
 </svg>`

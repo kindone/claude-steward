@@ -1,5 +1,5 @@
-import type { SmartArtSpec, SmartArtItem } from '../parser'
-import type { SmartArtTheme } from '../theme'
+import type { MdArtSpec, MdArtItem } from '../parser'
+import type { MdArtTheme } from '../theme'
 
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
@@ -9,7 +9,7 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
-export function renderMatrix(spec: SmartArtSpec, theme: SmartArtTheme): string {
+export function renderMatrix(spec: MdArtSpec, theme: MdArtTheme): string {
   switch (spec.type) {
     case 'pros-cons':    return renderProsCons(spec, theme)
     case 'comparison':   return renderComparison(spec, theme)
@@ -30,7 +30,7 @@ interface SwotQuadrant {
   textColor: string
 }
 
-function renderSwot(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderSwot(spec: MdArtSpec, theme: MdArtTheme): string {
   // Collect items by prefix char or by group name
   const quadrantMap: Record<string, SwotQuadrant> = {
     S: { label: 'Strengths', items: [], fill: '#064e3b', textColor: '#6ee7b7' },
@@ -111,10 +111,10 @@ function renderSwot(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Pros / Cons ───────────────────────────────────────────────────────────────
 
-function renderProsCons(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderProsCons(spec: MdArtSpec, theme: MdArtTheme): string {
   // Expect top-level items with children: "Pros" and "Cons"
-  let pros: SmartArtItem[] = []
-  let cons: SmartArtItem[] = []
+  let pros: MdArtItem[] = []
+  let cons: MdArtItem[] = []
 
   for (const item of spec.items) {
     const lower = item.label.toLowerCase()
@@ -186,7 +186,7 @@ function renderProsCons(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Comparison ────────────────────────────────────────────────────────────────
 
-function renderComparison(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderComparison(spec: MdArtSpec, theme: MdArtTheme): string {
   // Top-level items are columns; their children are rows
   const cols = spec.items
   if (cols.length === 0) return renderEmpty(theme)
@@ -261,7 +261,7 @@ function renderComparison(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Matrix 2×2 (generic labeled quadrant) ─────────────────────────────────────
 
-function renderMatrix2x2(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderMatrix2x2(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items.slice(0, 4)
   const W = 500, TITLE_H = spec.title ? 28 : 0
   const CELL_W = W / 2, CELL_H = 168
@@ -304,7 +304,7 @@ const BCG_QUADS = [
   { key: 'dogs',      keywords: ['dog'],              label: '✕ Dogs',            sub: 'Low growth · Low share',   fill: '#3b0a0a', text: '#fca5a5' },
 ]
 
-function renderBcg(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderBcg(spec: MdArtSpec, theme: MdArtTheme): string {
   const buckets: Record<string, string[]> = Object.fromEntries(BCG_QUADS.map(q => [q.key, []]))
   let slotIdx = 0
   for (const item of spec.items) {
@@ -361,7 +361,7 @@ const ANSOFF_QUADS = [
   { key: 'diversification', keywords: ['divers'],         label: 'Diversification',     sub: 'New product · New market',           fill: '#4c0519', text: '#fda4af' },
 ]
 
-function renderAnsoff(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderAnsoff(spec: MdArtSpec, theme: MdArtTheme): string {
   const buckets: Record<string, string[]> = Object.fromEntries(ANSOFF_QUADS.map(q => [q.key, []]))
   let slotIdx = 0
   for (const item of spec.items) {
@@ -410,7 +410,7 @@ function renderAnsoff(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Matrix N×M (generic grid) ─────────────────────────────────────────────────
 
-function renderMatrixNxM(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderMatrixNxM(spec: MdArtSpec, theme: MdArtTheme): string {
   const rows = spec.items
   if (rows.length === 0) return renderEmpty(theme)
   const numCols = Math.max(...rows.map(r => r.children.length), 1)
@@ -465,7 +465,7 @@ function lerpColorLocal(c1: string, c2: string, t: number): string {
   return '#' + [lerp(r1, r2), lerp(g1, g2), lerp(b1, b2)].map(v => v.toString(16).padStart(2, '0')).join('')
 }
 
-function renderEmpty(theme: SmartArtTheme): string {
+function renderEmpty(theme: MdArtTheme): string {
   return `<svg viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
     <rect width="400" height="80" fill="${theme.bg}" rx="6"/>
     <text x="200" y="44" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif">No items</text>

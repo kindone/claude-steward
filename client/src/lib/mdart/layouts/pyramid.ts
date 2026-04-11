@@ -1,5 +1,5 @@
-import type { SmartArtSpec } from '../parser'
-import type { SmartArtTheme } from '../theme'
+import type { MdArtSpec } from '../parser'
+import type { MdArtTheme } from '../theme'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ function lerpColor(c1: string, c2: string, t: number): string {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function renderPyramid(spec: SmartArtSpec, theme: SmartArtTheme): string {
+export function renderPyramid(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -99,7 +99,7 @@ export function renderPyramid(spec: SmartArtSpec, theme: SmartArtTheme): string 
 
 // ── Fallback ──────────────────────────────────────────────────────────────────
 
-function renderEmpty(theme: SmartArtTheme): string {
+function renderEmpty(theme: MdArtTheme): string {
   return `<svg viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:${theme.bg};border-radius:8px">
   <text x="150" y="42" text-anchor="middle" font-size="12" fill="${theme.textMuted}" font-family="system-ui,sans-serif">No items</text>
 </svg>`

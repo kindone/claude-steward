@@ -1,19 +1,19 @@
 import { useEffect, useState } from 'react'
-import { renderSmartArt } from '../lib/smartart/renderer'
+import { renderMdArt } from '../lib/mdart/renderer'
 
 interface Props {
   content: string
 }
 
 /**
- * Pure SmartArt preview — renders source text to SVG.
+ * Pure MdArt preview — renders source text to SVG.
  * Layout and view mode toggling is owned by ArtifactEditor.
  */
-export function SmartArtView({ content }: Props) {
-  const [svg, setSvg] = useState(() => renderSmartArt(content))
+export function MdArtView({ content }: Props) {
+  const [svg, setSvg] = useState(() => renderMdArt(content))
 
   useEffect(() => {
-    setSvg(renderSmartArt(content))
+    setSvg(renderMdArt(content))
   }, [content])
 
   function handleDownload() {
@@ -21,7 +21,7 @@ export function SmartArtView({ content }: Props) {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = 'smartart.svg'
+    a.download = 'mdart.svg'
     a.click()
     URL.revokeObjectURL(url)
   }

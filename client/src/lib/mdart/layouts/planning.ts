@@ -1,5 +1,5 @@
-import type { SmartArtSpec } from '../parser'
-import type { SmartArtTheme } from '../theme'
+import type { MdArtSpec } from '../parser'
+import type { MdArtTheme } from '../theme'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ function truncate(s: string, max: number): string {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function renderPlanning(spec: SmartArtSpec, theme: SmartArtTheme): string {
+export function renderPlanning(spec: MdArtSpec, theme: MdArtTheme): string {
   switch (spec.type) {
     case 'gantt':
     case 'gantt-lite':   return renderGantt(spec, theme)
@@ -29,7 +29,7 @@ export function renderPlanning(spec: SmartArtSpec, theme: SmartArtTheme): string
 // Top-level items = columns; children = cards
 // Syntax: `- Column\n  - Card [done]`
 
-function renderKanban(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderKanban(spec: MdArtSpec, theme: MdArtTheme): string {
   const columns = spec.items
   if (columns.length === 0) return renderEmpty(theme)
 
@@ -96,7 +96,7 @@ function renderKanban(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // Syntax: `- Task [wk1-wk4]` or `- Task: 1-4`
 // Time unit labels auto-generated as integers
 
-function renderGantt(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderGantt(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -163,7 +163,7 @@ function renderGantt(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // Like kanban but cards carry story-point badges + velocity bar at bottom
 // Syntax: `- Column\n  - Card: points [active|done]`
 
-function renderSprintBoard(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderSprintBoard(spec: MdArtSpec, theme: MdArtTheme): string {
   const columns = spec.items
   if (columns.length === 0) return renderEmpty(theme)
 
@@ -239,7 +239,7 @@ function renderSprintBoard(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // Horizontal event timeline with alternating above/below labels
 // Syntax: `- Event label [active|done]`  or  `- Date: Event`
 
-function renderTimeline(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderTimeline(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -303,7 +303,7 @@ function renderTimeline(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // Vertical tracker with diamond markers and status badges
 // Syntax: `- Phase name [done|active]`  optional value = status text
 
-function renderMilestone(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderMilestone(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -352,7 +352,7 @@ function renderMilestone(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // Left-to-right tree: root → L1 phases → L2 tasks
 // Syntax: `- Phase\n  - Task [done]`  (title used as root label)
 
-function renderWbs(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderWbs(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -434,7 +434,7 @@ function renderWbs(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Shared ────────────────────────────────────────────────────────────────────
 
-function svgWrap(W: number, H: number, theme: SmartArtTheme, title: string | undefined, parts: string[]): string {
+function svgWrap(W: number, H: number, theme: MdArtTheme, title: string | undefined, parts: string[]): string {
   const titleEl = title
     ? `<text x="${W / 2}" y="20" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(title)}</text>`
     : ''
@@ -444,7 +444,7 @@ function svgWrap(W: number, H: number, theme: SmartArtTheme, title: string | und
 </svg>`
 }
 
-function renderEmpty(theme: SmartArtTheme): string {
+function renderEmpty(theme: MdArtTheme): string {
   return `<svg viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:${theme.bg};border-radius:8px">
   <text x="150" y="42" text-anchor="middle" font-size="12" fill="${theme.textMuted}" font-family="system-ui,sans-serif">No items</text>
 </svg>`

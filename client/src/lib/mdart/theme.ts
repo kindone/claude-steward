@@ -1,4 +1,4 @@
-export interface SmartArtTheme {
+export interface MdArtTheme {
   primary: string
   secondary: string
   accent: string
@@ -10,7 +10,7 @@ export interface SmartArtTheme {
   textMuted: string
 }
 
-export const CATEGORY_THEMES: Record<string, SmartArtTheme> = {
+export const CATEGORY_THEMES: Record<string, MdArtTheme> = {
   list:         { primary:'#06b6d4', secondary:'#0891b2', accent:'#22d3ee', muted:'#164e63', bg:'#080f18', surface:'#0a1a20', border:'#0e3040', text:'#e2e8f0', textMuted:'#67e8f9' },
   process:      { primary:'#10b981', secondary:'#059669', accent:'#34d399', muted:'#064e3b', bg:'#080f10', surface:'#0a1a14', border:'#0e3020', text:'#e2e8f0', textMuted:'#6ee7b7' },
   cycle:        { primary:'#8b5cf6', secondary:'#7c3aed', accent:'#a78bfa', muted:'#4c1d95', bg:'#0e0a1a', surface:'#130f20', border:'#2d1f50', text:'#e2e8f0', textMuted:'#c4b5fd' },
@@ -24,7 +24,7 @@ export const CATEGORY_THEMES: Record<string, SmartArtTheme> = {
 }
 
 // Named overrides
-export const NAMED_THEMES: Record<string, SmartArtTheme> = {
+export const NAMED_THEMES: Record<string, MdArtTheme> = {
   'mono-light': { primary:'#374151', secondary:'#1f2937', accent:'#6b7280', muted:'#d1d5db', bg:'#ffffff', surface:'#f9fafb', border:'#e5e7eb', text:'#111827', textMuted:'#6b7280' },
   'mono-dark':  { primary:'#9ca3af', secondary:'#6b7280', accent:'#d1d5db', muted:'#374151', bg:'#111827', surface:'#1f2937', border:'#374151', text:'#f9fafb', textMuted:'#9ca3af' },
 }
@@ -59,7 +59,7 @@ export const LAYOUT_CATEGORY: Record<string, string> = {
   'sequence':'technical','state-machine':'technical','class':'technical',
 }
 
-export function getTheme(type: string, override?: string): SmartArtTheme {
+export function getTheme(type: string, override?: string): MdArtTheme {
   if (override && NAMED_THEMES[override]) return NAMED_THEMES[override]
   if (override && CATEGORY_THEMES[override]) return CATEGORY_THEMES[override]
   const category = LAYOUT_CATEGORY[type] ?? 'process'

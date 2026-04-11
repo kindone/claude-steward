@@ -9,7 +9,7 @@ You have access to MCP tools for managing steward artifacts (from the "steward-a
 
 - artifact_list(session_id) — list all artifacts in the current project
 - artifact_create(session_id, name, type, content, metadata?) — create a new artifact that appears in the Art panel
-  — type: "chart" (Vega-Lite JSON) | "report" (Markdown) | "data" (JSON/CSV) | "code" (any language) | "pikchr" | "html" (self-contained page, rendered in sandboxed iframe) | "smartart" (SmartArt diagram source)
+  — type: "chart" (Vega-Lite JSON) | "report" (Markdown) | "data" (JSON/CSV) | "code" (any language) | "pikchr" | "html" (self-contained page, rendered in sandboxed iframe) | "mdart" (MdArt diagram source)
   — metadata: { language: "python" } for code, { format: "csv" } for data artifacts
   — Use this to publish analysis results, charts, or code so the user can view, run, and save them.`
 

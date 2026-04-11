@@ -1,5 +1,5 @@
-import type { SmartArtSpec } from '../parser'
-import type { SmartArtTheme } from '../theme'
+import type { MdArtSpec } from '../parser'
+import type { MdArtTheme } from '../theme'
 
 // ── Color helpers ─────────────────────────────────────────────────────────────
 
@@ -40,7 +40,7 @@ function wrapText(text: string, maxChars: number): string[] {
 
 // ── Process (default horizontal) ─────────────────────────────────────────────
 
-export function renderProcess(spec: SmartArtSpec, theme: SmartArtTheme): string {
+export function renderProcess(spec: MdArtSpec, theme: MdArtTheme): string {
   switch (spec.type) {
     case 'funnel':          return renderFunnel(spec, theme)
     case 'roadmap':         return renderRoadmap(spec, theme)
@@ -58,7 +58,7 @@ export function renderProcess(spec: SmartArtSpec, theme: SmartArtTheme): string 
   }
 }
 
-function renderHorizontalProcess(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderHorizontalProcess(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) {
     return `<svg viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
@@ -125,7 +125,7 @@ function renderHorizontalProcess(spec: SmartArtSpec, theme: SmartArtTheme): stri
   </svg>`
 }
 
-function renderVerticalProcess(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderVerticalProcess(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   const n = items.length
   const W = 400
@@ -163,7 +163,7 @@ function renderVerticalProcess(spec: SmartArtSpec, theme: SmartArtTheme): string
 
 // ── Funnel ────────────────────────────────────────────────────────────────────
 
-function renderFunnel(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderFunnel(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -203,7 +203,7 @@ function renderFunnel(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Roadmap ───────────────────────────────────────────────────────────────────
 
-function renderRoadmap(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderRoadmap(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -260,13 +260,13 @@ function renderRoadmap(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // step-down: each box shifts right + down (top-left → bottom-right)
 // step-up:   each box shifts right + up  (bottom-left → top-right)
 
-function renderStepDown(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderStepDown(spec: MdArtSpec, theme: MdArtTheme): string {
   return renderStaircase(spec, theme, false)
 }
-function renderStepUp(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderStepUp(spec: MdArtSpec, theme: MdArtTheme): string {
   return renderStaircase(spec, theme, true)
 }
-function renderStaircase(spec: SmartArtSpec, theme: SmartArtTheme, ascending: boolean): string {
+function renderStaircase(spec: MdArtSpec, theme: MdArtTheme, ascending: boolean): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const n = items.length
@@ -314,7 +314,7 @@ function renderStaircase(spec: SmartArtSpec, theme: SmartArtTheme, ascending: bo
 // ── Circle process ────────────────────────────────────────────────────────────
 // Horizontal row of circles with arrows; label + value as subtitle in each
 
-function renderCircleProcess(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderCircleProcess(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const n = items.length
@@ -347,7 +347,7 @@ function renderCircleProcess(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // A + B + … = Result. First N-1 items are operands; last item is the result.
 // Children of each item displayed as sub-text.
 
-function renderEquation(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderEquation(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const n = items.length
@@ -393,7 +393,7 @@ function renderEquation(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Bending process (snake) ───────────────────────────────────────────────────
 // Multi-row snake: row 1 L→R, u-turn, row 2 R→L, etc.
 
-function renderBendingProcess(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderBendingProcess(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const n = items.length
@@ -452,7 +452,7 @@ function renderBendingProcess(spec: SmartArtSpec, theme: SmartArtTheme): string 
 // ── Segmented bar ─────────────────────────────────────────────────────────────
 // Horizontal bar divided into segments; item.value as % (e.g. "30%")
 
-function renderSegmentedBar(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderSegmentedBar(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 560, BAR_H = 32, LABEL_H = 22
@@ -487,7 +487,7 @@ function renderSegmentedBar(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Phase process ─────────────────────────────────────────────────────────────
 // Columns: top-level items = phase headers; children = task rows inside each column
 
-function renderPhaseProcess(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderPhaseProcess(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const n = Math.min(items.length, 4)
@@ -522,7 +522,7 @@ function renderPhaseProcess(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Timeline horizontal ───────────────────────────────────────────────────────
 // Horizontal spine, alternating labels above/below; label as date, value as event name
 
-function renderTimelineH(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderTimelineH(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const n = items.length
@@ -559,7 +559,7 @@ function renderTimelineH(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Timeline vertical ─────────────────────────────────────────────────────────
 // Vertical spine on left; dots with date (value) on left + title + children on right
 
-function renderTimelineV(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderTimelineV(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const n = items.length
@@ -590,7 +590,7 @@ function renderTimelineV(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // ── Swimlane ──────────────────────────────────────────────────────────────────
 // Horizontal lanes; top-level items = lanes, children = steps within each lane
 
-function renderSwimlane(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderSwimlane(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const W = 560
@@ -637,18 +637,18 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
-function titleEl(W: number, title: string, theme: SmartArtTheme): string {
+function titleEl(W: number, title: string, theme: MdArtTheme): string {
   return `<text x="${W / 2}" y="20" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(title)}</text>`
 }
 
-function svgWrap(W: number, H: number, theme: SmartArtTheme, parts: string[]): string {
+function svgWrap(W: number, H: number, theme: MdArtTheme, parts: string[]): string {
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto">
     <rect width="${W}" height="${H}" fill="${theme.bg}" rx="8"/>
     ${parts.join('\n    ')}
   </svg>`
 }
 
-function renderEmpty(theme: SmartArtTheme): string {
+function renderEmpty(theme: MdArtTheme): string {
   return `<svg viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
     <rect width="400" height="80" fill="${theme.bg}" rx="6"/>
     <text x="200" y="44" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif">No items</text>

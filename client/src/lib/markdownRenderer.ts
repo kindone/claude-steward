@@ -79,11 +79,11 @@ export function buildMarkedOptions(projectId: string | null): { renderer: Instan
       const encoded = encodeURIComponent(token.text)
       return `<div class="pikchr-placeholder" data-src="${encoded}"></div>`
     }
-    if (token.lang?.startsWith('smartart')) {
-      // Encode the diagram source; MessageBubble hydrates these via smartart/renderer.ts.
-      const hintType = token.lang.replace('smartart', '').trim()
+    if (token.lang?.startsWith('mdart')) {
+      // Encode the diagram source; MessageBubble hydrates these via mdart/renderer.ts.
+      const hintType = token.lang.replace('mdart', '').trim()
       const encoded = utf8ToBase64(token.text)
-      return `<div class="smartart-placeholder" data-src="${encoded}" data-type="${escapeAttr(hintType)}"></div>`
+      return `<div class="mdart-placeholder" data-src="${encoded}" data-type="${escapeAttr(hintType)}"></div>`
     }
     // Add data-runnable-lang to <pre> so MessageBubble can inject Run buttons.
     // The code content is read from the <code> element's textContent at run time.

@@ -52,7 +52,7 @@ const updateArtifactTimestampStmt = db.prepare(
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
-export type ArtifactType = 'chart' | 'report' | 'data' | 'code' | 'pikchr' | 'html' | 'smartart'
+export type ArtifactType = 'chart' | 'report' | 'data' | 'code' | 'pikchr' | 'html' | 'mdart'
 
 export interface ArtifactRow {
   id: string
@@ -95,7 +95,7 @@ export function artifactExtension(type: ArtifactType, metadata: Record<string, u
     }
     case 'pikchr':   return '.pikchr'
     case 'html':     return '.html'
-    case 'smartart': return '.smartart'
+    case 'mdart': return '.mdart'
     default:         return '.bin'
   }
 }

@@ -48,7 +48,7 @@ const server = new Server(
   { capabilities: { tools: {} } },
 )
 
-const VALID_TYPES: ArtifactType[] = ['chart', 'report', 'data', 'code', 'pikchr', 'html', 'smartart']
+const VALID_TYPES: ArtifactType[] = ['chart', 'report', 'data', 'code', 'pikchr', 'html', 'mdart']
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
@@ -71,7 +71,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       description:
         'Create a new artifact in the current project. ' +
         'The artifact is saved as a file in the project directory and appears immediately in the Art panel. ' +
-        'Types: "chart" (Vega-Lite JSON), "report" (Markdown), "data" (JSON/CSV), "code" (any language), "pikchr" (diagram), "html" (self-contained HTML page rendered in a sandboxed iframe), "smartart" (SmartArt diagram source text rendered as SVG). ' +
+        'Types: "chart" (Vega-Lite JSON), "report" (Markdown), "data" (JSON/CSV), "code" (any language), "pikchr" (diagram), "html" (self-contained HTML page rendered in a sandboxed iframe), "mdart" (MdArt diagram source text rendered as SVG). ' +
         'For code artifacts, pass metadata.language (e.g. "python", "typescript"). ' +
         'For data artifacts, pass metadata.format ("json" or "csv"). ' +
         'For chart artifacts, content should be a valid Vega-Lite spec JSON string.',
@@ -89,7 +89,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           type: {
             type: 'string',
             enum: VALID_TYPES,
-            description: 'Artifact type: chart | report | data | code | pikchr | html | smartart',
+            description: 'Artifact type: chart | report | data | code | pikchr | html | mdart',
           },
           content: {
             type: 'string',

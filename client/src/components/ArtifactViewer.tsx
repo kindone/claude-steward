@@ -5,8 +5,8 @@ import hljs from 'highlight.js'
 import type { Artifact } from '../lib/api'
 import { buildMarkedOptions, utf8FromBase64 } from '../lib/markdownRenderer'
 import { renderPikchr } from '../lib/pikchrRenderer'
-import { renderSmartArt } from '../lib/smartart/renderer'
-import { SmartArtView } from './SmartArtView'
+import { renderMdArt } from '../lib/mdart/renderer'
+import { MdArtView } from './MdArtView'
 
 interface Props {
   artifact: Artifact
@@ -122,7 +122,7 @@ function ChartView({ content }: { content: string }) {
 function ReportView({ content }: { content: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const pikchrCache = useRef<Map<string, string>>(new Map())
-  const smartartCache = useRef<Map<string, string>>(new Map())
+  const mdartCache = useRef<Map<string, string>>(new Map())
 
   const html = DOMPurify.sanitize(
     marked.parse(content, { renderer: buildMarkedOptions(null).renderer, breaks: true }) as string,
@@ -157,34 +157,34 @@ function ReportView({ content }: { content: string }) {
     })
   })
 
-  // Hydrate smartart placeholders (synchronous — same pattern as MessageBubble)
+  // Hydrate mdart placeholders (synchronous — same pattern as MessageBubble)
   useEffect(() => {
     if (!containerRef.current) return
     const placeholders = containerRef.current.querySelectorAll<HTMLDivElement>(
-      '.smartart-placeholder:not(.smartart-rendered)'
+      '.mdart-placeholder:not(.mdart-rendered)'
     )
     placeholders.forEach((el) => {
       const encoded = el.dataset.src ?? ''
       if (!encoded) return
       const hintType = el.dataset.type || undefined
       const cacheKey = encoded + '|' + (hintType ?? '')
-      const cached = smartartCache.current.get(cacheKey)
+      const cached = mdartCache.current.get(cacheKey)
       if (cached) {
         el.innerHTML = cached
-        el.classList.add('smartart-rendered')
+        el.classList.add('mdart-rendered')
         return
       }
       try {
         const raw = utf8FromBase64(encoded)
-        const svg = renderSmartArt(raw, hintType)
-        smartartCache.current.set(cacheKey, svg)
-        if (el.isConnected && !el.classList.contains('smartart-rendered')) {
+        const svg = renderMdArt(raw, hintType)
+        mdartCache.current.set(cacheKey, svg)
+        if (el.isConnected && !el.classList.contains('mdart-rendered')) {
           el.innerHTML = svg
-          el.classList.add('smartart-rendered')
+          el.classList.add('mdart-rendered')
         }
       } catch (e) {
-        el.classList.add('smartart-error')
-        el.textContent = `SmartArt error: ${String(e)}`
+        el.classList.add('mdart-error')
+        el.textContent = `MdArt error: ${String(e)}`
       }
     })
   })
@@ -480,7 +480,7 @@ export function ArtifactViewer({ artifact, content, className }: Props) {
       {artifact.type === 'code' && <CodeView content={content} artifact={artifact} />}
       {artifact.type === 'pikchr'   && <PikchrView content={content} />}
       {artifact.type === 'html'     && <HtmlView content={content} />}
-      {artifact.type === 'smartart' && <SmartArtView content={content} />}
+      {artifact.type === 'mdart' && <MdArtView content={content} />}
     </div>
   )
 }

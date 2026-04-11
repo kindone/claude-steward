@@ -1,5 +1,5 @@
-import type { SmartArtItem, SmartArtSpec } from '../parser'
-import type { SmartArtTheme } from '../theme'
+import type { MdArtItem, MdArtSpec } from '../parser'
+import type { MdArtTheme } from '../theme'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -11,12 +11,12 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
-function countLeaves(item: SmartArtItem): number {
+function countLeaves(item: MdArtItem): number {
   if (item.children.length === 0) return 1
   return item.children.reduce((s, c) => s + countLeaves(c), 0)
 }
 
-function maxDepth(items: SmartArtItem[]): number {
+function maxDepth(items: MdArtItem[]): number {
   if (items.length === 0) return 0
   return 1 + Math.max(...items.map(i => maxDepth(i.children)))
 }
@@ -33,7 +33,7 @@ interface RenderedNode {
 }
 
 function layoutNodes(
-  items: SmartArtItem[],
+  items: MdArtItem[],
   startX: number,
   y: number,
   totalW: number,
@@ -66,7 +66,7 @@ function flatNodes(nodes: RenderedNode[]): RenderedNode[] {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function renderHierarchy(spec: SmartArtSpec, theme: SmartArtTheme): string {
+export function renderHierarchy(spec: MdArtSpec, theme: MdArtTheme): string {
   switch (spec.type) {
     case 'mind-map':       return renderMindMap(spec, theme)
     case 'h-org-chart':    return renderHOrgChart(spec, theme)
@@ -85,7 +85,7 @@ export function renderHierarchy(spec: SmartArtSpec, theme: SmartArtTheme): strin
 const BOX_W = 110
 const BOX_H = 30
 
-function renderOrgChart(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderOrgChart(spec: MdArtSpec, theme: MdArtTheme): string {
   if (spec.items.length === 0) return renderEmpty(theme)
 
   const W = 640
@@ -127,13 +127,13 @@ function renderOrgChart(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Mind-map (radial) ─────────────────────────────────────────────────────────
 
-function renderMindMap(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderMindMap(spec: MdArtSpec, theme: MdArtTheme): string {
   const W = 640, H = 480
   const cx = W / 2, cy = H / 2
 
   // Determine center label and branches
   let centerLabel: string
-  let branches: SmartArtItem[]
+  let branches: MdArtItem[]
 
   if (spec.title) {
     centerLabel = spec.title
@@ -200,7 +200,7 @@ function renderMindMap(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── H-org-chart (left-to-right) ───────────────────────────────────────────────
 
-function renderHOrgChart(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderHOrgChart(spec: MdArtSpec, theme: MdArtTheme): string {
   if (spec.items.length === 0) return renderEmpty(theme)
   const depth = maxDepth(spec.items)
   const totalLeaves = spec.items.reduce((s, i) => s + countLeaves(i), 0) || 1
@@ -212,7 +212,7 @@ function renderHOrgChart(spec: SmartArtSpec, theme: SmartArtTheme): string {
   interface HNode { label: string; x: number; y: number; parentX?: number; parentY?: number }
   const hnodes: HNode[] = []
 
-  function layoutH(items: SmartArtItem[], level: number, leafStart: number, totalH: number, px?: number, py?: number) {
+  function layoutH(items: MdArtItem[], level: number, leafStart: number, totalH: number, px?: number, py?: number) {
     const tot = items.reduce((s, i) => s + countLeaves(i), 0) || 1
     let leafY = leafStart
     for (const item of items) {
@@ -246,10 +246,10 @@ function renderHOrgChart(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Hierarchy-list (file-explorer tree) ───────────────────────────────────────
 
-function renderHierarchyList(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderHierarchyList(spec: MdArtSpec, theme: MdArtTheme): string {
   interface Row { label: string; depth: number; isLast: boolean; parentHasSibling: boolean[] }
   const rows: Row[] = []
-  function flatten(items: SmartArtItem[], depth: number, phs: boolean[]) {
+  function flatten(items: MdArtItem[], depth: number, phs: boolean[]) {
     items.forEach((item, i) => {
       const isLast = i === items.length - 1
       rows.push({ label: item.label, depth, isLast, parentHasSibling: [...phs] })
@@ -302,10 +302,10 @@ function renderHierarchyList(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Radial-tree (hub and spoke) ────────────────────────────────────────────────
 
-function renderRadialTree(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderRadialTree(spec: MdArtSpec, theme: MdArtTheme): string {
   const W = 600, H = 500
   const cx = W / 2, cy = H / 2
-  let centerLabel: string, branches: SmartArtItem[]
+  let centerLabel: string, branches: MdArtItem[]
   if (spec.title) {
     centerLabel = spec.title; branches = spec.items
   } else if (spec.items.length === 1) {
@@ -359,7 +359,7 @@ function renderRadialTree(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Decision-tree (diamonds + leaves) ─────────────────────────────────────────
 
-function renderDecisionTree(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderDecisionTree(spec: MdArtSpec, theme: MdArtTheme): string {
   if (spec.items.length === 0) return renderEmpty(theme)
   const W = 640
   const depth = maxDepth(spec.items)
@@ -413,7 +413,7 @@ function renderDecisionTree(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Sitemap (wide shallow tree, solid-color boxes) ─────────────────────────────
 
-function renderSitemap(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderSitemap(spec: MdArtSpec, theme: MdArtTheme): string {
   if (spec.items.length === 0) return renderEmpty(theme)
   interface SNode { label: string; level: number; x: number; y: number; parentX?: number; parentY?: number }
   const snodes: SNode[] = []
@@ -425,7 +425,7 @@ function renderSitemap(spec: SmartArtSpec, theme: SmartArtTheme): string {
   function bw(l: number) { return BW[Math.min(l, 2)] }
   function bh(l: number) { return BH[Math.min(l, 2)] }
 
-  function layout(items: SmartArtItem[], level: number, x0: number, x1: number, px?: number, py?: number) {
+  function layout(items: MdArtItem[], level: number, x0: number, x1: number, px?: number, py?: number) {
     const tot = items.reduce((s, i) => s + countLeaves(i), 0) || 1
     let cx2 = x0
     for (const item of items) {
@@ -462,7 +462,7 @@ function renderSitemap(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Bracket-tree (tournament bracket) ─────────────────────────────────────────
 
-function renderBracketTree(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderBracketTree(spec: MdArtSpec, theme: MdArtTheme): string {
   const contestants = spec.items.map(i => i.label)
   if (contestants.length === 0) contestants.push('TBD')
   const rounds = Math.max(1, Math.ceil(Math.log2(Math.max(contestants.length, 2))))
@@ -526,7 +526,7 @@ function renderBracketTree(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Fallback ──────────────────────────────────────────────────────────────────
 
-function renderEmpty(theme: SmartArtTheme): string {
+function renderEmpty(theme: MdArtTheme): string {
   return `<svg viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:${theme.bg};border-radius:8px">
   <text x="150" y="42" text-anchor="middle" font-size="12" fill="${theme.textMuted}" font-family="system-ui,sans-serif">No items</text>
 </svg>`

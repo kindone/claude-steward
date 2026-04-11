@@ -1,21 +1,21 @@
-export interface SmartArtItem {
+export interface MdArtItem {
   label: string
   value?: string          // from "label: value" pattern
   attrs: string[]         // from [attr, attr] brackets
-  children: SmartArtItem[]
-  flowChildren: SmartArtItem[]   // → prefixed children
+  children: MdArtItem[]
+  flowChildren: MdArtItem[]   // → prefixed children
   prefix?: '+' | '-' | '?' | '!'  // swot prefix chars
   isIntersection?: boolean        // label contains ∩
   isMilestone?: boolean           // * prefix
 }
 
-export interface SmartArtSpec {
+export interface MdArtSpec {
   type: string
   theme?: string
   title?: string
   direction?: 'LR' | 'TB'
   width?: number
-  items: SmartArtItem[]
+  items: MdArtItem[]
   nodes?: string[]        // for network graph sections
   edges?: Array<{from: string, to: string}>
   raw: string
@@ -45,7 +45,7 @@ function parseLabelValue(raw: string): { label: string; value?: string } {
   return { label, value: value || undefined }
 }
 
-function parseItem(rawLine: string): SmartArtItem {
+function parseItem(rawLine: string): MdArtItem {
   const { cleanLabel, attrs } = parseAttrs(rawLine)
   const { label, value } = parseLabelValue(cleanLabel)
   return {
@@ -70,9 +70,9 @@ function indentLevel(line: string): number {
 
 // ── Main parser ───────────────────────────────────────────────────────────────
 
-export function parseSmartArt(raw: string, hintType?: string): SmartArtSpec {
+export function parseMdArt(raw: string, hintType?: string): MdArtSpec {
   try {
-    return _parseSmartArt(raw, hintType)
+    return _parseMdArt(raw, hintType)
   } catch {
     // On any parse error, return a minimal valid spec
     return {
@@ -83,9 +83,9 @@ export function parseSmartArt(raw: string, hintType?: string): SmartArtSpec {
   }
 }
 
-function _parseSmartArt(raw: string, hintType?: string): SmartArtSpec {
+function _parseMdArt(raw: string, hintType?: string): MdArtSpec {
   const lines = raw.split('\n')
-  const spec: SmartArtSpec = {
+  const spec: MdArtSpec = {
     type: hintType ?? '',
     items: [],
     raw,
@@ -154,7 +154,7 @@ function _parseSmartArt(raw: string, hintType?: string): SmartArtSpec {
 
   // ── Hierarchical list parsing ──────────────────────────────────────────────
   // Stack-based: track indent depth
-  const stack: Array<{ item: SmartArtItem; depth: number }> = []
+  const stack: Array<{ item: MdArtItem; depth: number }> = []
 
   for (let i = bodyStart; i < lines.length; i++) {
     const line = lines[i]
@@ -207,7 +207,7 @@ function _parseSmartArt(raw: string, hintType?: string): SmartArtSpec {
       const raw = trimmed.slice(2).trim()
       const item = parseItem(raw)
       // Find the nearest ancestor at a shallower depth
-      let parentItem: SmartArtItem | null = null
+      let parentItem: MdArtItem | null = null
       for (let si = stack.length - 1; si >= 0; si--) {
         if (stack[si].depth < depth) {
           parentItem = stack[si].item

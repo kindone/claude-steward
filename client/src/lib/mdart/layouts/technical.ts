@@ -1,5 +1,5 @@
-import type { SmartArtSpec } from '../parser'
-import type { SmartArtTheme } from '../theme'
+import type { MdArtSpec } from '../parser'
+import type { MdArtTheme } from '../theme'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ function lerpColor(c1: string, c2: string, t: number): string {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function renderTechnical(spec: SmartArtSpec, theme: SmartArtTheme): string {
+export function renderTechnical(spec: MdArtSpec, theme: MdArtTheme): string {
   switch (spec.type) {
     case 'entity':         return renderEntity(spec, theme)
     case 'network':        return renderNetwork(spec, theme)
@@ -41,7 +41,7 @@ export function renderTechnical(spec: SmartArtSpec, theme: SmartArtTheme): strin
 // Top-level items = layers (top to bottom); children = components in that layer
 // Syntax: `- Layer Name\n  - Component A\n  - Component B`
 
-function renderLayeredArch(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderLayeredArch(spec: MdArtSpec, theme: MdArtTheme): string {
   const layers = spec.items
   if (layers.length === 0) return renderEmpty(theme)
 
@@ -100,7 +100,7 @@ function renderLayeredArch(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // Top-level items = entity tables; children = fields with [PK] / [FK] attrs
 // Syntax: `- User\n  - id [PK]\n  - email\n  - role_id [FK]`
 
-function renderEntity(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderEntity(spec: MdArtSpec, theme: MdArtTheme): string {
   const entities = spec.items
   if (entities.length === 0) return renderEmpty(theme)
 
@@ -163,7 +163,7 @@ function renderEntity(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // `→ Target` children under an item draw directed edges.
 // Syntax: `- Service A\n  → Service B\n  → Service C`
 
-function renderNetwork(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderNetwork(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -237,7 +237,7 @@ function renderNetwork(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // Horizontal stages with chevron arrows — like process but technical look
 // Syntax: `- Stage A → Stage B → Stage C` or bullet list
 
-function renderPipeline(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderPipeline(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -277,7 +277,7 @@ function renderPipeline(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // Each top-level item is a source actor; flow children define messages.
 // Syntax: `- Client\n  → Server: HTTP Request\n- Server\n  → DB: Query`
 
-function renderSequence(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderSequence(spec: MdArtSpec, theme: MdArtTheme): string {
   type Msg = { from: string; to: string; msg: string }
   const messages: Msg[] = []
   const actors: string[] = []
@@ -373,7 +373,7 @@ function renderSequence(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // Syntax: `- Idle\n  → Active: start\n- Active\n  → Idle: stop\n  → Error: fail [final]`
 // `[final]` attr or label "End"/"Final" draws a double-border final state.
 
-function renderStateMachine(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderStateMachine(spec: MdArtSpec, theme: MdArtTheme): string {
   const states = spec.items
   if (states.length === 0) return renderEmpty(theme)
 
@@ -470,7 +470,7 @@ function renderStateMachine(spec: SmartArtSpec, theme: SmartArtTheme): string {
 // Field attrs: [PK], [FK], [static]. Visibility prefix: +/-/#/~
 // Syntax: `- User [abstract]\n  - id [PK]\n  - name\n  + save()\n  + delete()`
 
-function renderClass(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderClass(spec: MdArtSpec, theme: MdArtTheme): string {
   const classes = spec.items
   if (classes.length === 0) return renderEmpty(theme)
 
@@ -574,7 +574,7 @@ function renderClass(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Shared ────────────────────────────────────────────────────────────────────
 
-function svgWrap(W: number, H: number, theme: SmartArtTheme, title: string | undefined, parts: string[]): string {
+function svgWrap(W: number, H: number, theme: MdArtTheme, title: string | undefined, parts: string[]): string {
   const titleEl = title
     ? `<text x="${W / 2}" y="20" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(title)}</text>`
     : ''
@@ -584,7 +584,7 @@ function svgWrap(W: number, H: number, theme: SmartArtTheme, title: string | und
 </svg>`
 }
 
-function renderEmpty(theme: SmartArtTheme): string {
+function renderEmpty(theme: MdArtTheme): string {
   return `<svg viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:${theme.bg};border-radius:8px">
   <text x="150" y="42" text-anchor="middle" font-size="12" fill="${theme.textMuted}" font-family="system-ui,sans-serif">No items</text>
 </svg>`

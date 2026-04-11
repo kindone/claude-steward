@@ -1,22 +1,22 @@
 /**
- * System prompt fragment that teaches Claude the SmartArt fence syntax.
+ * System prompt fragment that teaches Claude the MdArt fence syntax.
  * Injected into every session so Claude can author diagrams on request.
  */
 
-export function buildSmartArtFragment(): string {
+export function buildMdArtFragment(): string {
   return `
 ---
-You can create SmartArt diagrams using \`\`\`smartart fences. These render as SVG diagrams in the chat and can be saved as artifacts.
+You can create MdArt diagrams using \`\`\`mdart fences. These render as SVG diagrams in the chat and can be saved as artifacts.
 
 ## Syntax
 
 Inline type (simplest):
-\`\`\`smartart process
+\`\`\`mdart process
 Discovery → Design → Build → Test → Deploy
 \`\`\`
 
 Block with front-matter:
-\`\`\`smartart
+\`\`\`mdart
 type: swot
 title: Product Launch
 
@@ -64,6 +64,6 @@ title: Product Launch
 | \`title\` | \`title: Q3 Roadmap\` |
 | \`direction\` | \`direction: LR\` |
 
-Use SmartArt for structured concepts (processes, lists, comparisons, cycles). Prefer mermaid for flow charts with complex conditional logic.
+Use MdArt for structured concepts (processes, lists, comparisons, cycles). Prefer mermaid for flow charts with complex conditional logic.
 ---`
 }

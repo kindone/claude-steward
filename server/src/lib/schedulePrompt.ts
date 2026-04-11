@@ -6,7 +6,7 @@
 
 import type { Session } from '../db/index.js'
 import { buildArtifactFragment } from './artifactPrompt.js'
-import { buildSmartArtFragment } from './smartartPrompt.js'
+import { buildMdArtFragment } from './mdartPrompt.js'
 
 export function buildScheduleFragment(session: Session): string {
   const nowUtc = new Date()
@@ -72,9 +72,9 @@ Cron notes:
 export function buildEffectiveSystemPrompt(session: Session): string | null {
   const fragment = buildScheduleFragment(session)
   const artifactFragment = buildArtifactFragment(session.project_id)
-  const smartArtFragment = buildSmartArtFragment()
+  const mdArtFragment = buildMdArtFragment()
   if (session.system_prompt) {
-    return session.system_prompt + '\n' + fragment + artifactFragment + smartArtFragment
+    return session.system_prompt + '\n' + fragment + artifactFragment + mdArtFragment
   }
-  return fragment + artifactFragment + smartArtFragment
+  return fragment + artifactFragment + mdArtFragment
 }

@@ -1,5 +1,5 @@
-import type { SmartArtSpec } from '../parser'
-import type { SmartArtTheme } from '../theme'
+import type { MdArtSpec } from '../parser'
+import type { MdArtTheme } from '../theme'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -13,7 +13,7 @@ function truncate(s: string, max: number): string {
 
 // ── Entry point ───────────────────────────────────────────────────────────────
 
-export function renderRelationship(spec: SmartArtSpec, theme: SmartArtTheme): string {
+export function renderRelationship(spec: MdArtSpec, theme: MdArtTheme): string {
   switch (spec.type) {
     case 'concentric':        return renderConcentric(spec, theme)
     case 'venn-3':            return renderVenn3(spec, theme)
@@ -34,7 +34,7 @@ export function renderRelationship(spec: SmartArtSpec, theme: SmartArtTheme): st
 
 // ── 2-circle Venn ─────────────────────────────────────────────────────────────
 
-function renderVenn2(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderVenn2(spec: MdArtSpec, theme: MdArtTheme): string {
   const all = spec.items
   const circles      = all.filter(i => !i.isIntersection)
   const intersects   = all.filter(i => i.isIntersection)
@@ -96,7 +96,7 @@ function renderVenn2(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── 3-circle Venn ─────────────────────────────────────────────────────────────
 
-function renderVenn3(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderVenn3(spec: MdArtSpec, theme: MdArtTheme): string {
   const all = spec.items
   const circles    = all.filter(i => !i.isIntersection)
   const intersects = all.filter(i => i.isIntersection)
@@ -147,7 +147,7 @@ function renderVenn3(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Concentric rings ──────────────────────────────────────────────────────────
 
-function renderConcentric(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderConcentric(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
 
@@ -184,7 +184,7 @@ function renderConcentric(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Venn-4 (2×2 circle grid) ──────────────────────────────────────────────────
 
-function renderVenn4(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderVenn4(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items.filter(i => !i.isIntersection)
   const ixItem = spec.items.find(i => i.isIntersection)
   const W = 560, TITLE_H = spec.title ? 28 : 8, H = 380 + TITLE_H
@@ -214,7 +214,7 @@ function renderVenn4(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Target / Bullseye ─────────────────────────────────────────────────────────
 
-function renderTarget(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderTarget(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const n = items.length
@@ -239,7 +239,7 @@ function renderTarget(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Radial (non-hierarchical hub + peers) ─────────────────────────────────────
 
-function renderRadial(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderRadial(spec: MdArtSpec, theme: MdArtTheme): string {
   const centerLabel = spec.title ?? spec.items[0]?.label ?? 'Hub'
   const spokes = spec.title ? spec.items : spec.items.slice(1)
   const n = spokes.length || 1
@@ -277,7 +277,7 @@ function renderRadial(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Converging (many → one) ───────────────────────────────────────────────────
 
-function renderConverging(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderConverging(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   // Last item is target; all others converge into it
@@ -311,7 +311,7 @@ function renderConverging(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Diverging (one → many) ────────────────────────────────────────────────────
 
-function renderDiverging(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderDiverging(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   // First item is source; all others diverge from it
@@ -345,9 +345,9 @@ function renderDiverging(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Opposing arrows ───────────────────────────────────────────────────────────
 
-function renderOpposingArrows(spec: SmartArtSpec, theme: SmartArtTheme): string {
-  const left  = spec.items[0] ?? { label: 'Force A', children: [] as SmartArtSpec['items'][0]['children'] }
-  const right = spec.items[1] ?? { label: 'Force B', children: [] as SmartArtSpec['items'][0]['children'] }
+function renderOpposingArrows(spec: MdArtSpec, theme: MdArtTheme): string {
+  const left  = spec.items[0] ?? { label: 'Force A', children: [] as MdArtSpec['items'][0]['children'] }
+  const right = spec.items[1] ?? { label: 'Force B', children: [] as MdArtSpec['items'][0]['children'] }
   const W = 520, TITLE_H = spec.title ? 28 : 8, H = 240 + TITLE_H
   const cy = TITLE_H + (H - TITLE_H) / 2
   const AH = 68, gap = 18
@@ -371,9 +371,9 @@ function renderOpposingArrows(spec: SmartArtSpec, theme: SmartArtTheme): string 
 
 // ── Counterbalance (scale / balance) ─────────────────────────────────────────
 
-function renderCounterbalance(spec: SmartArtSpec, theme: SmartArtTheme): string {
-  const left  = spec.items[0] ?? { label: 'Side A', children: [] as SmartArtSpec['items'][0]['children'] }
-  const right = spec.items[1] ?? { label: 'Side B', children: [] as SmartArtSpec['items'][0]['children'] }
+function renderCounterbalance(spec: MdArtSpec, theme: MdArtTheme): string {
+  const left  = spec.items[0] ?? { label: 'Side A', children: [] as MdArtSpec['items'][0]['children'] }
+  const right = spec.items[1] ?? { label: 'Side B', children: [] as MdArtSpec['items'][0]['children'] }
   const W = 520, TITLE_H = spec.title ? 28 : 8, H = 300 + TITLE_H
   const bx = W / 2, beamY = TITLE_H + 76, beamW = 400, plateW = 130, plateH = 18
   const parts: string[] = []
@@ -403,7 +403,7 @@ function renderCounterbalance(spec: SmartArtSpec, theme: SmartArtTheme): string 
 
 // ── Plus / cross ──────────────────────────────────────────────────────────────
 
-function renderPlus(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderPlus(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   const W = 500, TITLE_H = spec.title ? 28 : 8, H = 400 + TITLE_H
   const cx = W / 2, cy = TITLE_H + (H - TITLE_H) / 2
@@ -435,7 +435,7 @@ function renderPlus(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Web (mesh network) ────────────────────────────────────────────────────────
 
-function renderWeb(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderWeb(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const n = items.length
@@ -471,7 +471,7 @@ function renderWeb(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Cluster (grouped nodes) ───────────────────────────────────────────────────
 
-function renderCluster(spec: SmartArtSpec, theme: SmartArtTheme): string {
+function renderCluster(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
   if (items.length === 0) return renderEmpty(theme)
   const n = items.length
@@ -510,7 +510,7 @@ function renderCluster(spec: SmartArtSpec, theme: SmartArtTheme): string {
 
 // ── Shared SVG wrapper ────────────────────────────────────────────────────────
 
-function svg(W: number, H: number, theme: SmartArtTheme, title: string | undefined, parts: string[]): string {
+function svg(W: number, H: number, theme: MdArtTheme, title: string | undefined, parts: string[]): string {
   const titleEl = title
     ? `<text x="${W / 2}" y="20" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(title)}</text>`
     : ''
@@ -520,7 +520,7 @@ function svg(W: number, H: number, theme: SmartArtTheme, title: string | undefin
 </svg>`
 }
 
-function renderEmpty(theme: SmartArtTheme): string {
+function renderEmpty(theme: MdArtTheme): string {
   return `<svg viewBox="0 0 300 80" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:${theme.bg};border-radius:8px">
   <text x="150" y="42" text-anchor="middle" font-size="12" fill="${theme.textMuted}" font-family="system-ui,sans-serif">No items</text>
 </svg>`
