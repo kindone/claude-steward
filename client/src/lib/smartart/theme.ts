@@ -46,11 +46,12 @@ export const LAYOUT_CATEGORY: Record<string, string> = {
   'balance':'relationship','counterbalance':'relationship','opposing-arrows':'relationship','web':'relationship',
   'cluster':'relationship','target':'relationship','radial':'relationship','converging':'relationship','diverging':'relationship','plus':'relationship',
   // matrix
-  'matrix-2x2':'matrix','swot':'matrix','bcg':'matrix','ansoff':'matrix','comparison':'matrix','pros-cons':'matrix',
+  'matrix-2x2':'matrix','matrix-nxm':'matrix','swot':'matrix','bcg':'matrix','ansoff':'matrix','comparison':'matrix','pros-cons':'matrix',
   // pyramid
   'pyramid':'pyramid','inverted-pyramid':'pyramid','pyramid-list':'pyramid','segmented-pyramid':'pyramid','diamond-pyramid':'pyramid',
   // statistical
   'treemap':'statistical','sankey':'statistical','bullet-chart':'statistical','progress-list':'statistical','scorecard':'statistical',
+  'waffle':'statistical','gauge':'statistical','radar':'statistical','heatmap':'statistical',
   // planning
   'kanban':'planning','gantt':'planning','gantt-lite':'planning','sprint-board':'planning',
   // technical

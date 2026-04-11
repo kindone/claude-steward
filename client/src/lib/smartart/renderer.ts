@@ -69,6 +69,9 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   'pros-cons': renderMatrix,
   comparison: renderMatrix,
   'matrix-2x2': renderMatrix,
+  bcg: renderMatrix,
+  ansoff: renderMatrix,
+  'matrix-nxm': renderMatrix,
 
   // hierarchy family
   'org-chart': renderHierarchy,
@@ -111,6 +114,10 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   scorecard: renderStatistical,
   treemap: renderStatistical,
   sankey: renderStatistical,
+  waffle: renderStatistical,
+  gauge: renderStatistical,
+  radar: renderStatistical,
+  heatmap: renderStatistical,
 
   // planning family
   kanban: renderPlanning,
