@@ -1,27 +1,44 @@
-# MdArt — Implementation Plan
+# MdArt — Reference
 
-Markdown code-fence syntax that renders structured text into SVG diagrams, similar to PowerPoint MdArt. Triggered by ` ```mdart ` fences in chat and supported as a dedicated artifact type.
+Markdown code-fence syntax that renders structured text into SVG diagrams. Triggered by ` ```mdart ` fences in chat and supported as a dedicated artifact type.
+
+**Status: fully implemented.** 99 layout types across 10 families.
 
 ---
 
 ## Visual Reference
 
-10-category SVG reference catalog has been built as HTML artifacts in the Art panel:
+10-category SVG reference catalog is available as HTML artifacts in the Art panel (search "SmartArt ·" or "MdArt ·"):
 
 | Artifact | Category | Layouts |
 |---|---|---|
-| MdArt · LIST Layouts | LIST | 12 |
-| MdArt · PROCESS Layouts | PROCESS | 15 |
-| MdArt · CYCLE Layouts | CYCLE | 8 |
-| MdArt · HIERARCHY Layouts | HIERARCHY | 8 |
-| MdArt · RELATIONSHIP Layouts | RELATIONSHIP | 12 |
-| MdArt · MATRIX Layouts | MATRIX | 7 |
-| MdArt · PYRAMID Layouts | PYRAMID | 5 |
-| MdArt · STATISTICAL Layouts | STATISTICAL | 5 |
-| MdArt · PLANNING Layouts | PLANNING | 3 |
-| MdArt · TECHNICAL Layouts | TECHNICAL | 4 |
+| SmartArt · LIST Layouts | LIST | 15 |
+| SmartArt · PROCESS Layouts | PROCESS | 18 |
+| SmartArt · CYCLE Layouts | CYCLE | 9 |
+| SmartArt · HIERARCHY Layouts | HIERARCHY | 10 |
+| SmartArt · RELATIONSHIP Layouts | RELATIONSHIP | 14 |
+| SmartArt · MATRIX Layouts | MATRIX | 7 |
+| SmartArt · PYRAMID Layouts | PYRAMID | 5 |
+| SmartArt · STATISTICAL Layouts | STATISTICAL | 9 |
+| SmartArt · PLANNING Layouts | PLANNING | 7 |
+| SmartArt · TECHNICAL Layouts | TECHNICAL | 7 |
 
-**~79 distinct layout types** across all 10 categories.
+**99 distinct layout types** across all 10 families.
+
+## Complete Type Listing
+
+| Family | Types |
+|---|---|
+| **Process** | `process`, `chevron-process`, `arrow-process`, `circular-process`, `funnel`, `roadmap`, `waterfall`, `snake-process`, `step-up`, `step-down`, `circle-process`, `equation`, `bending-process`, `segmented-bar`, `phase-process`, `timeline-h`, `timeline-v`, `swimlane` |
+| **List** | `bullet-list`, `numbered-list`, `checklist`, `two-column-list`, `timeline-list`, `block-list`, `chevron-list`, `card-list`, `zigzag-list`, `ribbon-list`, `hexagon-list`, `trapezoid-list`, `tab-list`, `circle-list`, `icon-list` |
+| **Cycle** | `cycle`, `donut-cycle`, `gear-cycle`, `spiral`, `block-cycle`, `segmented-cycle`, `nondirectional-cycle`, `multidirectional-cycle`, `loop` |
+| **Matrix** | `swot`, `pros-cons`, `comparison`, `matrix-2x2`, `bcg`, `ansoff`, `matrix-nxm` |
+| **Hierarchy** | `org-chart`, `tree`, `h-org-chart`, `hierarchy-list`, `radial-tree`, `decision-tree`, `sitemap`, `bracket`, `bracket-tree`, `mind-map` |
+| **Pyramid** | `pyramid`, `inverted-pyramid`, `pyramid-list`, `segmented-pyramid`, `diamond-pyramid` |
+| **Relationship** | `venn`, `venn-3`, `venn-4`, `concentric`, `balance`, `counterbalance`, `opposing-arrows`, `web`, `cluster`, `target`, `radial`, `converging`, `diverging`, `plus` |
+| **Statistical** | `progress-list`, `bullet-chart`, `scorecard`, `treemap`, `sankey`, `waffle`, `gauge`, `radar`, `heatmap` |
+| **Planning** | `kanban`, `gantt`, `gantt-lite`, `sprint-board`, `timeline`, `milestone`, `wbs` |
+| **Technical** | `layered-arch`, `entity`, `network`, `pipeline`, `sequence`, `state-machine`, `class` |
 
 ---
 
@@ -138,16 +155,16 @@ client/src/lib/mdart/
   renderer.ts            ← MdArtSpec → SVG string (orchestrator)
   theme.ts               ← color palettes keyed by layout type
   layouts/
-    list.ts              → 12 types
-    process.ts           → 15 types
-    cycle.ts             → 8 types
-    hierarchy.ts         → 8 types
-    relationship.ts      → 12 types
+    list.ts              → 15 types
+    process.ts           → 18 types
+    cycle.ts             → 9 types
+    hierarchy.ts         → 10 types
+    relationship.ts      → 14 types
     matrix.ts            → 7 types
     pyramid.ts           → 5 types
-    statistical.ts       → 5 types
-    planning.ts          → 3 types
-    technical.ts         → 4 types
+    statistical.ts       → 9 types
+    planning.ts          → 7 types
+    technical.ts         → 7 types
 
 client/src/components/
   MdArtView.tsx       ← artifact viewer component (edit + live re-render)
@@ -233,65 +250,12 @@ No extra work needed — falls through to the existing artifact pipeline.
 
 ---
 
-## Files to create / modify
+## Testing
 
-### New files
-
-| File | Purpose |
-|---|---|
-| `client/src/lib/mdart/parser.ts` | Front-matter + body parser |
-| `client/src/lib/mdart/renderer.ts` | SVGSpec → SVG string orchestrator |
-| `client/src/lib/mdart/theme.ts` | Color palette definitions |
-| `client/src/lib/mdart/layouts/list.ts` | 12 list layout engines |
-| `client/src/lib/mdart/layouts/process.ts` | 15 process layout engines |
-| `client/src/lib/mdart/layouts/cycle.ts` | 8 cycle layout engines |
-| `client/src/lib/mdart/layouts/hierarchy.ts` | 8 hierarchy layout engines |
-| `client/src/lib/mdart/layouts/relationship.ts` | 12 relationship layout engines |
-| `client/src/lib/mdart/layouts/matrix.ts` | 7 matrix layout engines |
-| `client/src/lib/mdart/layouts/pyramid.ts` | 5 pyramid layout engines |
-| `client/src/lib/mdart/layouts/statistical.ts` | 5 statistical layout engines |
-| `client/src/lib/mdart/layouts/planning.ts` | 3 planning layout engines |
-| `client/src/lib/mdart/layouts/technical.ts` | 4 technical layout engines |
-| `client/src/components/MdArtView.tsx` | Artifact viewer: editor + live render |
-| `server/src/lib/mdartPrompt.ts` | System prompt instructions |
-
-### Modified files
-
-| File | Change |
-|---|---|
-| `client/src/lib/markdownRenderer.ts` | Detect fence, emit placeholder div |
-| `client/src/components/MessageBubble.tsx` | Hydrate placeholders, add 📎 save button |
-| `client/src/components/ArtifactViewer.tsx` | Dispatch to `MdArtView` |
-| `client/src/components/ArtifactPanel.tsx` | Teal badge for mdart type |
-| `client/src/lib/api.ts` | Add `'mdart'` to `ArtifactType` union |
-| `server/src/routes/artifacts.ts` | Add `'mdart'` to `validTypes` |
-| `server/src/db/index.ts` | Add `'mdart'` to `ArtifactType` |
-| `server/src/routes/chat.ts` | Import and inject `mdartPrompt` |
-
----
-
-## Rollout Order
-
-Ordered by value × implementation complexity:
-
-| Priority | Types | Rationale |
-|---|---|---|
-| **1** | `process`, `list`, `cycle` | Most commonly requested; simple linear / circular layouts |
-| **2** | `swot`, `pros-cons`, `comparison` | High business value; fixed 2×2 or 2-column geometry |
-| **3** | `pyramid`, `matrix-2x2` | Simple geometry already prototyped in reference SVGs |
-| **4** | `hierarchy`, `org-chart`, `mind-map` | Need tree-layout algorithm (Reingold-Tilford or similar) |
-| **5** | `kanban`, `gantt-lite`, `sprint-board` | Planning types; card layout is straightforward |
-| **6** | `entity`, `layered-arch`, `pipeline` | Technical types; more complex node/edge parsing |
-| **7** | `treemap`, `sankey`, `bcg` | Data types require numeric inputs and value-proportional geometry |
-
----
-
-## Testing Plan
-
-- **Parser:** property-based tests (jsproptest) — generate random valid inputs, assert round-trip stability and no panics on malformed input
-- **Layout engines:** snapshot tests per layout type using known fixture inputs
+- **Parser:** 30 property-based tests (jsproptest) in `client/src/lib/mdart/parser.test.ts` — random input, round-trip stability, no panics on malformed input
+- **Layout engines:** snapshot tests per family using known fixture inputs
 - **Renderer:** assert valid SVG (no unclosed tags, valid viewBox, required attributes)
-- **Integration:** Playwright smoke test — type a fence in chat, assert SVG appears in DOM
+- **Integration:** Playwright smoke test — type a fence in chat, assert SVG appears in DOM (planned)
 
 ---
 
