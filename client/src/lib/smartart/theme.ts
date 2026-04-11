@@ -56,6 +56,7 @@ export const LAYOUT_CATEGORY: Record<string, string> = {
   'kanban':'planning','gantt':'planning','gantt-lite':'planning','sprint-board':'planning','timeline':'planning','milestone':'planning','wbs':'planning',
   // technical
   'network':'technical','layered-arch':'technical','pipeline':'technical','entity':'technical',
+  'sequence':'technical','state-machine':'technical','class':'technical',
 }
 
 export function getTheme(type: string, override?: string): SmartArtTheme {

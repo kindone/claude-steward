@@ -133,6 +133,9 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   entity: renderTechnical,
   network: renderTechnical,
   pipeline: renderTechnical,
+  sequence: renderTechnical,
+  'state-machine': renderTechnical,
+  class: renderTechnical,
 }
 
 export function renderSmartArt(raw: string, hintType?: string): string {
