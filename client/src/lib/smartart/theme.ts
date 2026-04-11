@@ -53,7 +53,7 @@ export const LAYOUT_CATEGORY: Record<string, string> = {
   'treemap':'statistical','sankey':'statistical','bullet-chart':'statistical','progress-list':'statistical','scorecard':'statistical',
   'waffle':'statistical','gauge':'statistical','radar':'statistical','heatmap':'statistical',
   // planning
-  'kanban':'planning','gantt':'planning','gantt-lite':'planning','sprint-board':'planning',
+  'kanban':'planning','gantt':'planning','gantt-lite':'planning','sprint-board':'planning','timeline':'planning','milestone':'planning','wbs':'planning',
   // technical
   'network':'technical','layered-arch':'technical','pipeline':'technical','entity':'technical',
 }

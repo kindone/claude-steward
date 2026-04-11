@@ -124,6 +124,9 @@ const LAYOUT_RENDERERS: Record<string, LayoutRenderer> = {
   gantt: renderPlanning,
   'gantt-lite': renderPlanning,
   'sprint-board': renderPlanning,
+  timeline: renderPlanning,
+  milestone: renderPlanning,
+  wbs: renderPlanning,
 
   // technical family
   'layered-arch': renderTechnical,
