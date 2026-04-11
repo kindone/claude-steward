@@ -7,6 +7,8 @@ import { buildMarkedOptions, utf8FromBase64 } from '../lib/markdownRenderer'
 import { renderPikchr } from '../lib/pikchrRenderer'
 import { renderMdArt } from '../lib/mdart/renderer'
 import { MdArtView } from './MdArtView'
+import { LinkPreviewCard } from './LinkPreviewCard'
+import type { LinkPreviewCardHandle } from './LinkPreviewCard'
 
 interface Props {
   artifact: Artifact
@@ -119,14 +121,52 @@ function ChartView({ content }: { content: string }) {
 
 // ── Report renderer ───────────────────────────────────────────────────────────
 
-function ReportView({ content }: { content: string }) {
+function ReportView({ content, projectId }: { content: string; projectId: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+  const marginRef = useRef<HTMLElement>(null)
   const pikchrCache = useRef<Map<string, string>>(new Map())
   const mdartCache = useRef<Map<string, string>>(new Map())
+  const [layout, setLayout] = useState<'compact' | 'narrow' | 'rich'>('compact')
+  const [hoveredLink, setHoveredLink] = useState<{ href: string; title: string; anchorRect: DOMRect } | null>(null)
+  const hoveredLinkRef = useRef(hoveredLink)   // readable inside stale event-listener closures
+  const hoverTimer     = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cardRef        = useRef<LinkPreviewCardHandle>(null)
+
+  // Keep ref in sync so stale event-listener closures can read current value.
+  useEffect(() => { hoveredLinkRef.current = hoveredLink }, [hoveredLink])
+
+  // Track container width — gate layout features on available space
+  // compact: <480px  narrow: 480–680px  rich: >680px
+  useEffect(() => {
+    const el = wrapperRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width ?? 0
+      if (width >= 680) setLayout('rich')
+      else if (width >= 480) setLayout('narrow')
+      else setLayout('compact')
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  // Encode artifact: link targets before marked parses them — artifact names
+  // can contain spaces and special chars which break markdown URL parsing.
+  // [text](artifact:My Report) → [text](artifact:My%20Report)
+  const preprocessed = content.replace(
+    /\[([^\]]+)\]\(artifact:([^)]+)\)/g,
+    (_, text: string, name: string) => `[${text}](artifact:${encodeURIComponent(name.trim())})`
+  )
 
   const html = DOMPurify.sanitize(
-    marked.parse(content, { renderer: buildMarkedOptions(null).renderer, breaks: true }) as string,
-    { ADD_ATTR: ['style', 'data-src', 'data-type'] }
+    marked.parse(preprocessed, { renderer: buildMarkedOptions(null).renderer, breaks: true }) as string,
+    {
+      ADD_ATTR: ['style', 'data-src', 'data-type'],
+      // Allow the artifact: URI scheme for inter-artifact links in addition to
+      // the standard DOMPurify allowlist (http/https/mailto/ftp/tel/etc).
+      ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp|artifact):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i,
+    }
   )
 
   // Hydrate pikchr placeholders after render (same pattern as MessageBubble)
@@ -189,12 +229,166 @@ function ReportView({ content }: { content: string }) {
     })
   })
 
+  // Link interaction → show LinkPreviewCard for artifact: links and external URLs.
+  // Uses event delegation on the prose container (links are inside dangerouslySetInnerHTML).
+  //
+  // Desktop: hover (mouseover/mouseout) with a short delay.
+  // Mobile:  tap (click) toggles the preview; artifact: links never navigate.
+  //          External links still navigate (browser handles them) but also
+  //          show a brief preview on first tap if the card isn't already open.
+  useEffect(() => {
+    const container = containerRef.current
+    if (!container) return
+
+    function getPreviewHref(target: EventTarget | null): string | null {
+      const link = (target as Element | null)?.closest<HTMLAnchorElement>('a[href]')
+      if (!link) return null
+      const href = link.getAttribute('href') ?? ''
+      if (!href || href.startsWith('#')) return null
+      return href
+    }
+
+    function onMouseOver(e: MouseEvent) {
+      const href = getPreviewHref(e.target)
+      if (!href) return
+      // Cancel any pending fade-on-mouseout — we're moving to another link.
+      clearTimeout(hoverTimer.current!)
+      const link = (e.target as Element).closest<HTMLAnchorElement>('a[href]')!
+      const title = link.getAttribute('title') ?? ''
+      // Capture rect synchronously during the event — before any React batching,
+      // re-renders, or iOS viewport adjustments can shift the element.
+      const anchorRect = link.getBoundingClientRect()
+      // If a card is already visible, swap instantly — no hover delay needed.
+      // Delay only on fresh hover to avoid flicker from quick mouse-overs.
+      const delay = hoveredLinkRef.current ? 0 : 280
+      hoverTimer.current = setTimeout(() => {
+        setHoveredLink({ href, title, anchorRect })
+      }, delay)
+    }
+
+    function onMouseOut(e: MouseEvent) {
+      if (!getPreviewHref(e.target)) return
+      clearTimeout(hoverTimer.current!)
+      // Delay fade slightly: if the cursor moves to another link, onMouseOver
+      // fires within ~50ms and cancels this timer before it fires (no fade shown,
+      // clean swap). Only triggers if cursor truly leaves all link areas.
+      hoverTimer.current = setTimeout(() => {
+        cardRef.current?.fadeNow()
+      }, 100)
+    }
+
+    function onClick(e: MouseEvent) {
+      const link = (e.target as Element).closest<HTMLAnchorElement>('a[href]')
+      if (!link) return
+      const href = link.getAttribute('href') ?? ''
+      if (!href || href.startsWith('#')) return
+
+      // Both artifact: and external links use the same tap logic:
+      // first tap shows the preview card; navigation (for external links) goes
+      // through the "Open →" button inside the card.
+      e.preventDefault()
+      const title = link.getAttribute('title') ?? ''
+      const anchorRect = link.getBoundingClientRect()
+      setHoveredLink(prev =>
+        prev?.href === href ? null : { href, title, anchorRect }
+      )
+    }
+
+    container.addEventListener('mouseover', onMouseOver)
+    container.addEventListener('mouseout', onMouseOut)
+    container.addEventListener('click', onClick)
+    return () => {
+      clearTimeout(hoverTimer.current!)
+      container.removeEventListener('mouseover', onMouseOver)
+      container.removeEventListener('mouseout', onMouseOut)
+      container.removeEventListener('click', onClick)
+    }
+  }, [])
+
+  // Lift footnotes into the sidenote margin when layout allows.
+  // Runs after html changes or layout mode switches.
+  useEffect(() => {
+    const container = containerRef.current
+    const margin = marginRef.current
+    if (!container || !margin) return
+
+    // Clear previously placed sidenotes
+    margin.innerHTML = ''
+
+    const fnSection = container.querySelector<HTMLElement>('section[data-footnotes]')
+
+    if (layout === 'compact' || !fnSection) {
+      // Restore footnote section in compact mode
+      if (fnSection) fnSection.style.display = ''
+      return
+    }
+
+    // Hide original footnote section — content moves to margin column
+    fnSection.style.display = 'none'
+
+    const fnItems = fnSection.querySelectorAll<HTMLElement>('li[id^="footnote-"]')
+    const marginRect = margin.getBoundingClientRect()
+
+    fnItems.forEach((li, index) => {
+      const refAnchor = container.querySelector<HTMLElement>(`a[href="#${li.id}"]`)
+      if (!refAnchor) return
+
+      const top = Math.max(0, refAnchor.getBoundingClientRect().top - marginRect.top)
+
+      // Clone content, remove back-reference arrow
+      const clone = li.cloneNode(true) as HTMLElement
+      clone.querySelector('[data-footnote-backref]')?.remove()
+
+      const note = document.createElement('div')
+      note.className = 'sidenote'
+      note.style.top = `${top}px`
+
+      // Prepend the footnote number
+      const marker = document.createElement('sup')
+      marker.className = 'sidenote-marker'
+      marker.textContent = String(index + 1)
+      note.appendChild(marker)
+      note.insertAdjacentHTML('beforeend', clone.innerHTML)
+
+      margin.appendChild(note)
+    })
+  }, [layout, html])
+
   return (
-    <div
-      ref={containerRef}
-      className="prose prose-invert prose-sm max-w-none px-1"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
+    <>
+      <div ref={wrapperRef} className="report-layout" data-layout={layout}>
+        <div className="report-main">
+          <div
+            ref={containerRef}
+            className="prose prose-invert prose-sm max-w-none px-1"
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        </div>
+        <aside ref={marginRef} className="report-margin" aria-label="Sidenotes" />
+      </div>
+      {hoveredLink && (
+        <>
+          {/* Backdrop for tap-outside dismiss on touch devices.
+              pointer-events disabled on hover-capable (desktop) devices so it
+              doesn't intercept mouseover, text selection, or link hover effects —
+              the card's fade-on-mouseout handles desktop dismiss already. */}
+          <div
+            className="link-preview-backdrop"
+            onClick={() => setHoveredLink(null)}
+          />
+          <LinkPreviewCard
+            key={hoveredLink.href}
+            ref={cardRef}
+            href={hoveredLink.href}
+            title={hoveredLink.title}
+            anchorRect={hoveredLink.anchorRect}
+            projectId={projectId}
+            onDismiss={() => setHoveredLink(null)}
+            onMouseEnter={() => clearTimeout(hoverTimer.current!)}
+          />
+        </>
+      )}
+    </>
   )
 }
 
@@ -475,7 +669,7 @@ export function ArtifactViewer({ artifact, content, className }: Props) {
   return (
     <div className={className ?? ''}>
       {artifact.type === 'chart' && <ChartView content={content} />}
-      {artifact.type === 'report' && <ReportView content={content} />}
+      {artifact.type === 'report' && <ReportView content={content} projectId={artifact.project_id} />}
       {artifact.type === 'data' && <DataView content={content} />}
       {artifact.type === 'code' && <CodeView content={content} artifact={artifact} />}
       {artifact.type === 'pikchr'   && <PikchrView content={content} />}

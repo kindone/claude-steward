@@ -8,7 +8,11 @@
  */
 
 import { marked } from 'marked'
+import markedFootnote from 'marked-footnote'
 import katex from 'katex'
+
+// Enable footnote syntax [^1] / [^1]: … globally for all marked.parse calls
+marked.use(markedFootnote())
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

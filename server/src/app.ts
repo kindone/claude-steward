@@ -18,6 +18,7 @@ import mcpNotifyRouter from './routes/mcp.js'
 import kernelsRouter from './routes/kernels.js'
 import notebooksRouter from './routes/notebooks.js'
 import { projectArtifactsRouter, artifactRouter } from './routes/artifacts.js'
+import linkPreviewRouter from './routes/linkPreview.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Monorepo root — two levels up from server/src/
@@ -69,6 +70,7 @@ export function createApp() {
   app.use('/api/projects/:projectId/notebooks', notebooksRouter)
   app.use('/api/projects/:projectId/artifacts', projectArtifactsRouter)
   app.use('/api/artifacts/:artifactId', artifactRouter)
+  app.use('/api/link-preview', linkPreviewRouter)
 
   if (NODE_ENV === 'production') {
     const publicDir = path.join(__dirname, '../public')

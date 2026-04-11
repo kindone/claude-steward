@@ -46,6 +46,17 @@ body {
 .prose p               { margin-bottom: 10px; }
 .prose p:last-child    { margin-bottom: 0; }
 
+.prose a {
+  color: #6b9fd4;
+  text-decoration: underline;
+  text-decoration-color: rgba(107, 159, 212, 0.35);
+  text-underline-offset: 2px;
+}
+.prose a:hover {
+  color: #93bbdf;
+  text-decoration-color: rgba(147, 187, 223, 0.6);
+}
+
 .prose h1,
 .prose h2,
 .prose h3              { margin: 16px 0 8px; font-weight: 600; }
@@ -160,6 +171,205 @@ body {
   margin: 0;
   white-space: pre-wrap;
   font-family: monospace;
+}
+
+/* ── Report two-column layout (Reassembly sidenote foundation) ──────────────
+   Three modes gated on observed container width:
+     compact  (<480px)  — single column, sidenote margin hidden
+     narrow   (480–680px) — narrow margin (~150px) appears
+     rich     (>680px)  — full margin (~200px), all sidenote features active
+   The ResizeObserver in ReportView sets data-layout= on .report-layout.
+   ──────────────────────────────────────────────────────────────────────── */
+.report-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-areas: 'main';
+}
+
+.report-main  { grid-area: main; min-width: 0; }
+.report-margin { display: none; grid-area: margin; min-width: 0; }
+
+.report-layout[data-layout='narrow'] {
+  grid-template-columns: 1fr 150px;
+  grid-template-areas: 'main margin';
+  column-gap: 16px;
+}
+
+.report-layout[data-layout='rich'] {
+  grid-template-columns: 1fr 200px;
+  grid-template-areas: 'main margin';
+  column-gap: 20px;
+}
+
+.report-layout[data-layout='narrow'] .report-margin,
+.report-layout[data-layout='rich'] .report-margin {
+  display: block;
+  position: relative;       /* anchor for absolutely-positioned sidenotes */
+  border-left: 1px solid #1f1f1f;
+  padding-left: 12px;
+  padding-top: 2px;
+}
+
+/* ── Sidenotes ── */
+.sidenote {
+  position: absolute;
+  left: 0;
+  right: 0;
+  font-size: 0.7rem;
+  color: #666;
+  line-height: 1.5;
+  padding-bottom: 8px;
+}
+
+.sidenote p {
+  margin: 0 0 3px;
+}
+
+.sidenote p:last-child {
+  margin: 0;
+}
+
+.sidenote a {
+  color: #555;
+  text-decoration: underline;
+  text-decoration-color: #333;
+}
+
+.sidenote a:hover {
+  color: #999;
+}
+
+.sidenote-marker {
+  font-size: 0.6rem;
+  color: #444;
+  vertical-align: super;
+  line-height: 0;
+  margin-right: 3px;
+  user-select: none;
+}
+
+/* ── Link preview card (Reassembly) ─────────────────────────────────────────── */
+.link-preview-card {
+  position: fixed;
+  z-index: 1000;
+  background: #161616;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  padding: 10px 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  pointer-events: auto;
+  animation: preview-in 0.12s ease-out;
+}
+
+@keyframes preview-in {
+  from { opacity: 0; transform: translateY(calc(var(--ty, -100%) - 4px)); }
+  to   { opacity: 1; }
+}
+
+.link-preview-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #555;
+  font-size: 0.75rem;
+}
+
+.link-preview-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 1.5px solid #333;
+  border-top-color: #666;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.link-preview-error,
+.link-preview-not-found {
+  font-size: 0.72rem;
+  color: #555;
+  font-style: italic;
+}
+
+.link-preview-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+}
+/* Desktop (hover-capable): don't intercept pointer events — hover-out fade
+   handles dismiss. Touch devices keep pointer-events for tap-outside dismiss. */
+@media (hover: hover) {
+  .link-preview-backdrop {
+    pointer-events: none;
+  }
+}
+
+.link-preview-open {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 0.72rem;
+  color: #6b9fd4;
+  text-decoration: none;
+  padding: 3px 8px;
+  border: 1px solid #6b9fd430;
+  border-radius: 4px;
+}
+.link-preview-open:hover {
+  background: #6b9fd415;
+}
+
+.link-preview-header {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin-bottom: 5px;
+}
+
+.link-preview-badge {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #555;
+  background: #1f1f1f;
+  border: 1px solid #2a2a2a;
+  border-radius: 3px;
+  padding: 1px 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
+.link-preview-domain {
+  font-size: 0.7rem;
+  color: #555;
+  flex-shrink: 0;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-preview-title {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #ccc;
+  line-height: 1.3;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.link-preview-excerpt {
+  font-size: 0.7rem;
+  color: #666;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
 }
 
 /* Image gallery grid — built dynamically when a message contains 3+ images */

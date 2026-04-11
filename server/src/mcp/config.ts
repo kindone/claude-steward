@@ -20,15 +20,37 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 /** Path to the generated MCP config JSON file. */
 export const MCP_CONFIG_PATH = path.join(__dirname, '../../data/steward-mcp.json')
 
+/** Path where the MCP notify secret is persisted across server restarts. */
+const MCP_SECRET_PATH = path.join(__dirname, '../../data/mcp-secret.txt')
+
 /**
- * Generate or reuse a stable MCP notify secret.
- * Stored in MCP_NOTIFY_SECRET env var if already set (e.g. across restarts),
- * otherwise generated fresh and written back to process.env so it's consistent
- * within this process lifetime.
+ * Return a stable MCP notify secret that survives server restarts.
+ *
+ * Priority:
+ *   1. process.env.MCP_NOTIFY_SECRET (set earlier in this process lifetime)
+ *   2. data/mcp-secret.txt (persisted from a previous run)
+ *   3. Fresh random secret — written to disk so next restart reuses it
+ *
+ * Without persistence, every `pm2 restart steward-main` generates a new secret.
+ * The running Claude Code session's MCP subprocess still holds the old secret,
+ * so its /api/mcp-notify POSTs get 401'd and SSE notifications are silently lost.
  */
 function getMcpSecret(): string {
   if (process.env.MCP_NOTIFY_SECRET) return process.env.MCP_NOTIFY_SECRET
+
+  const dataDir = path.dirname(MCP_SECRET_PATH)
+  fs.mkdirSync(dataDir, { recursive: true })
+
+  if (fs.existsSync(MCP_SECRET_PATH)) {
+    const stored = fs.readFileSync(MCP_SECRET_PATH, 'utf8').trim()
+    if (stored) {
+      process.env.MCP_NOTIFY_SECRET = stored
+      return stored
+    }
+  }
+
   const secret = randomBytes(32).toString('hex')
+  fs.writeFileSync(MCP_SECRET_PATH, secret, { mode: 0o600 })
   process.env.MCP_NOTIFY_SECRET = secret
   return secret
 }
