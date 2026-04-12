@@ -628,7 +628,7 @@ export default function App() {
       </div>
 
       {/* Main content */}
-      <main className="flex-1 flex overflow-hidden min-w-0">
+      <main className="flex-1 flex overflow-hidden min-w-0 min-h-0">
         {/* Chat column */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Mobile header bar */}
@@ -712,7 +712,7 @@ export default function App() {
           )}
         </div>
 
-        {/* Artifact float panel — fixed right overlay, does not push content */}
+        {/* Artifact panel — in-flow on desktop (chat narrows); fixed overlay on mobile / when maximized */}
         <ArtifactFloat
           openArtifacts={openArtifacts}
           activeArtifactId={activeArtifactId}

@@ -5,8 +5,9 @@ import { ArtifactViewer } from './ArtifactViewer'
 import { ArtifactCodeMirror } from './ArtifactCodeMirror'
 import { KernelOutputPanel, type OutputPanelState } from './KernelOutputPanel'
 import { runCode, normalizeLanguage } from '../lib/kernelApi'
+import { defaultDesktopViewMode, defaultMobileArtifactTab, type ArtifactDesktopViewMode } from '../lib/artifactViewDefaults'
 
-type ViewMode = 'split' | 'source' | 'preview'
+type ViewMode = ArtifactDesktopViewMode
 
 interface Props {
   artifact: Artifact
@@ -34,8 +35,8 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
   // For chart: debounced viewer content
   const [viewerContent, setViewerContent] = useState(content)
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
-  const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>('editor')
-  const [viewMode, setViewMode] = useState<ViewMode>('split')
+  const [mobileTab, setMobileTab] = useState<'editor' | 'preview'>(() => defaultMobileArtifactTab(artifact.type))
+  const [viewMode, setViewMode] = useState<ViewMode>(() => defaultDesktopViewMode(artifact.type))
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [refreshCmd, setRefreshCmd] = useState('')
   const [refreshSched, setRefreshSched] = useState('')
@@ -65,6 +66,12 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
   // from immediately updating viewerContent and bypassing the debounce.
   const userEditingRef = useRef(false)
   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640
+
+  // Per-artifact defaults when switching tabs (view mode is not shared across artifacts).
+  useEffect(() => {
+    setViewMode(defaultDesktopViewMode(artifact.type))
+    setMobileTab(defaultMobileArtifactTab(artifact.type))
+  }, [artifact.id, artifact.type])
 
   // Sync settings from metadata when artifact changes
   useEffect(() => {

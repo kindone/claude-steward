@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { Artifact } from '../lib/api'
 import { isBelowTailwindMd } from '../lib/viewport'
 import { ArtifactEditor } from './ArtifactEditor'
@@ -85,6 +85,9 @@ export function ArtifactFloat({
   }, [mobileExpandTick])
 
   const effectiveWidth = isMaximized ? window.innerWidth : panelWidth
+
+  /** Mobile and desktop-maximized stay fixed over the viewport; desktop default sits in main’s flex row so chat narrows. */
+  const overlayMode = isBelowTailwindMd() || isMaximized
 
   // ── Resize handle (mouse + touch) ─────────────────────────────────────────────
 
@@ -224,24 +227,37 @@ export function ArtifactFloat({
     return <>{minimizedPills}{showPanelPill}</>
   }
 
+  const panelShellStyle: CSSProperties = overlayMode
+    ? {
+        position: 'fixed',
+        right: 0,
+        top: 0,
+        height: '100dvh',
+        width: effectiveWidth,
+        zIndex: 200,
+        background: '#111',
+        borderLeft: '1px solid #1f1f1f',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }
+    : {
+        position: 'relative',
+        flexShrink: 0,
+        alignSelf: 'stretch',
+        minHeight: 0,
+        width: effectiveWidth,
+        background: '#111',
+        borderLeft: '1px solid #1f1f1f',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+      }
+
   return (
     <>
       {/* Main panel */}
-      <div
-        style={{
-          position: 'fixed',
-          right: 0,
-          top: 0,
-          height: '100dvh',
-          width: effectiveWidth,
-          zIndex: 200,
-          background: '#111',
-          borderLeft: '1px solid #1f1f1f',
-          display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
-        }}
-      >
+      <div data-layout={overlayMode ? 'overlay' : 'inline'} style={panelShellStyle}>
         {/* Resize handle (mouse + touch) — hidden when maximized */}
         {!isMaximized && (
           <div

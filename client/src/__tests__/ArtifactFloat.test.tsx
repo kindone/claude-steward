@@ -3,6 +3,7 @@
 
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { Artifact } from '../lib/api'
 import { ArtifactFloat } from '../components/ArtifactFloat'
 
@@ -76,5 +77,53 @@ describe('ArtifactFloat', () => {
       expect(screen.queryByTitle('Restore size')).not.toBeInTheDocument()
     })
     expect(screen.getByTitle('Maximize')).toBeInTheDocument()
+  })
+
+  it('uses inline flex layout on wide viewport until maximized', async () => {
+    setupMatchMedia(false)
+    const props = {
+      openArtifacts: [{ artifact: mockArtifact, content: '# Hi', minimized: false }],
+      activeArtifactId: 'a1' as const,
+      projectId: 'p1' as const,
+      onActivate: vi.fn(),
+      onClose: vi.fn(),
+      onMinimize: vi.fn(),
+      onRestore: vi.fn(),
+      onContentChange: vi.fn(),
+      onSave: vi.fn().mockResolvedValue(undefined),
+    }
+    render(<ArtifactFloat {...props} />)
+    const shell = document.querySelector('[data-layout]')
+    expect(shell).toHaveAttribute('data-layout', 'inline')
+
+    await userEvent.click(screen.getByTitle('Maximize'))
+    expect(shell).toHaveAttribute('data-layout', 'overlay')
+
+    await userEvent.click(screen.getByTitle('Restore size'))
+    expect(shell).toHaveAttribute('data-layout', 'inline')
+  })
+
+  it('keeps overlay layout on narrow viewport even after restore from maximized', async () => {
+    setupMatchMedia(true)
+    const props = {
+      openArtifacts: [{ artifact: mockArtifact, content: '# Hi', minimized: false }],
+      activeArtifactId: 'a1' as const,
+      projectId: 'p1' as const,
+      mobileExpandTick: 1,
+      onActivate: vi.fn(),
+      onClose: vi.fn(),
+      onMinimize: vi.fn(),
+      onRestore: vi.fn(),
+      onContentChange: vi.fn(),
+      onSave: vi.fn().mockResolvedValue(undefined),
+    }
+    render(<ArtifactFloat {...props} />)
+    const shell = document.querySelector('[data-layout]')
+    await waitFor(() => {
+      expect(shell).toHaveAttribute('data-layout', 'overlay')
+    })
+
+    await userEvent.click(screen.getByTitle('Restore size'))
+    expect(shell).toHaveAttribute('data-layout', 'overlay')
   })
 })
