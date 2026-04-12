@@ -123,11 +123,13 @@ function ChartView({ content }: { content: string }) {
 
 function ReportView({ content, projectId }: { content: string; projectId: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const wrapperRef = useRef<HTMLDivElement>(null)
-  const marginRef = useRef<HTMLElement>(null)
+  const wrapperRef    = useRef<HTMLDivElement>(null)
+  const marginRef     = useRef<HTMLElement>(null)
+  const connectorSvgRef = useRef<SVGSVGElement>(null)
   const pikchrCache = useRef<Map<string, string>>(new Map())
   const mdartCache = useRef<Map<string, string>>(new Map())
-  const [layout, setLayout] = useState<'compact' | 'narrow' | 'rich'>('compact')
+  const [layout, setLayout]           = useState<'compact' | 'narrow' | 'rich'>('compact')
+  const [wrapperWidth, setWrapperWidth] = useState(0)
   const [hoveredLink, setHoveredLink] = useState<{ href: string; title: string; anchorRect: DOMRect } | null>(null)
   const hoveredLinkRef = useRef(hoveredLink)   // readable inside stale event-listener closures
   const hoverTimer     = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -143,6 +145,7 @@ function ReportView({ content, projectId }: { content: string; projectId: string
     if (!el) return
     const ro = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width ?? 0
+      setWrapperWidth(width)
       if (width >= 680) setLayout('rich')
       else if (width >= 480) setLayout('narrow')
       else setLayout('compact')
@@ -329,11 +332,14 @@ function ReportView({ content, projectId }: { content: string; projectId: string
     const fnItems = fnSection.querySelectorAll<HTMLElement>('li[id^="footnote-"]')
     const marginRect = margin.getBoundingClientRect()
 
+    const placed:  HTMLElement[] = []
+    const anchors: HTMLElement[] = []
+
     fnItems.forEach((li, index) => {
       const refAnchor = container.querySelector<HTMLElement>(`a[href="#${li.id}"]`)
       if (!refAnchor) return
 
-      const top = Math.max(0, refAnchor.getBoundingClientRect().top - marginRect.top)
+      const idealTop = Math.max(0, refAnchor.getBoundingClientRect().top - marginRect.top)
 
       // Clone content, remove back-reference arrow
       const clone = li.cloneNode(true) as HTMLElement
@@ -341,18 +347,130 @@ function ReportView({ content, projectId }: { content: string; projectId: string
 
       const note = document.createElement('div')
       note.className = 'sidenote'
-      note.style.top = `${top}px`
+      note.style.top = `${idealTop}px`
+      note.dataset.idealTop = String(idealTop)
 
       // Prepend the footnote number
-      const marker = document.createElement('sup')
+      const marker = document.createElement('span')
       marker.className = 'sidenote-marker'
       marker.textContent = String(index + 1)
       note.appendChild(marker)
       note.insertAdjacentHTML('beforeend', clone.innerHTML)
 
       margin.appendChild(note)
+      placed.push(note)
+      anchors.push(refAnchor)
     })
-  }, [layout, html])
+
+    // Second pass: nudge overlapping notes and draw SVG connector lines.
+    // rAF gives the browser one frame to compute offsetHeight and rects.
+    let rafId: number
+    rafId = requestAnimationFrame(() => {
+      const GAP = 6
+      let minTop = 0
+      const svg = connectorSvgRef.current
+      const wrapperRect = wrapperRef.current?.getBoundingClientRect()
+
+      // Clear previous connectors
+      if (svg) { while (svg.firstChild) svg.removeChild(svg.firstChild) }
+
+      const STROKE      = '#707070'
+      const W           = '0.75'
+      const BASE_X_OFFSET = 5   // px left of margin border for the first connector
+      const STEP          = 5   // additional px left per stacked connector
+      let   connectorIdx  = 0   // counts nudged notes to stagger x positions
+
+      placed.forEach((note, i) => {
+        const ideal  = parseFloat(note.dataset.idealTop ?? '0')
+        const actual = Math.max(ideal, minTop)
+        note.style.top = `${actual}px`
+        note.style.removeProperty('--nudge')
+
+        const nudge = actual - ideal
+        if (nudge > 0 && svg && wrapperRect) {
+          const anchor     = anchors[i]
+          const anchorRect = anchor.getBoundingClientRect()
+          const mRect      = margin.getBoundingClientRect()
+
+          // Stagger each connector's x so verticals sit side by side, not on top of each other.
+          // Notes with earlier anchors (lower index) sit closest to the margin.
+          const x2 = mRect.left - wrapperRect.left - BASE_X_OFFSET - connectorIdx * STEP
+
+          // Place the horizontal arm in the interline gap below the text line
+          // containing the anchor. Walk up to the nearest block ancestor to read
+          // its line-height, then find the bottom of the line at the anchor's y.
+          let yH: number
+          {
+            let block: Element | null = anchor.parentElement
+            while (block) {
+              const disp = window.getComputedStyle(block).display
+              if (!disp.startsWith('inline') && disp !== 'contents') break
+              block = block.parentElement
+            }
+            if (block) {
+              const st   = window.getComputedStyle(block)
+              const lhRaw = st.lineHeight
+              const lineH = lhRaw === 'normal'
+                ? parseFloat(st.fontSize) * 1.5
+                : parseFloat(lhRaw)
+              const blockTop = block.getBoundingClientRect().top
+              const lineIdx  = Math.floor((anchorRect.top - blockTop) / lineH)
+              yH = blockTop + (lineIdx + 1) * lineH - wrapperRect.top + 2
+            } else {
+              yH = anchorRect.bottom - wrapperRect.top + 4
+            }
+          }
+          const x1            = anchorRect.left + anchorRect.width / 2 - wrapperRect.left
+          const yAnchorBottom = anchorRect.bottom - wrapperRect.top
+          // Entry tick ends 3px short of the sidenote's left content edge (small breathing gap)
+          const xSidenoteEdge = mRect.left - wrapperRect.left - 3
+          // Vertical target: midpoint of the sidenote marker number
+          const markerEl   = note.firstElementChild as HTMLElement | null
+          const markerRect = markerEl?.getBoundingClientRect()
+          const yV         = markerRect
+            ? (markerRect.top + markerRect.bottom) / 2 - wrapperRect.top
+            : mRect.top - wrapperRect.top + actual + 9
+
+          // Single continuous path with rounded corners so the dash pattern
+          // flows smoothly around each bend without restarting.
+          // dy1: direction of segment 1 (anchor → yH), always downward
+          // dy3: direction of segment 3 (yH → yV), down (+1) or up (-1)
+          const dy1 = yH >= yAnchorBottom ? 1 : -1
+          const dy3 = yV >= yH           ? 1 : -1
+          const r = Math.min(
+            4,
+            Math.abs(yH - yAnchorBottom) / 2,
+            Math.abs(x1 - x2) / 2,
+            Math.abs(yV - yH) / 2,
+            Math.abs(xSidenoteEdge - x2) / 2,
+          )
+          const d = [
+            `M ${x1},${yAnchorBottom}`,
+            `L ${x1},${yH - dy1 * r}`,
+            `Q ${x1},${yH} ${x1 - r},${yH}`,
+            `L ${x2 + r},${yH}`,
+            `Q ${x2},${yH} ${x2},${yH + dy3 * r}`,
+            `L ${x2},${yV - dy3 * r}`,
+            `Q ${x2},${yV} ${x2 + r},${yV}`,
+            `L ${xSidenoteEdge},${yV}`,
+          ].join(' ')
+          const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+          path.setAttribute('d', d)
+          path.setAttribute('stroke', STROKE)
+          path.setAttribute('stroke-width', W)
+          path.setAttribute('stroke-dasharray', '2 3')
+          path.setAttribute('fill', 'none')
+          svg!.appendChild(path)
+
+          connectorIdx++
+        }
+
+        minTop = actual + note.offsetHeight + GAP
+      })
+    })
+
+    return () => cancelAnimationFrame(rafId)
+  }, [layout, html, wrapperWidth])
 
   return (
     <>
@@ -365,6 +483,7 @@ function ReportView({ content, projectId }: { content: string; projectId: string
           />
         </div>
         <aside ref={marginRef} className="report-margin" aria-label="Sidenotes" />
+        <svg ref={connectorSvgRef} className="sidenote-connectors" aria-hidden="true" />
       </div>
       {hoveredLink && (
         <>
