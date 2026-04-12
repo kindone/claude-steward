@@ -276,7 +276,7 @@ function ReportView({ content, projectId }: { content: string; projectId: string
       // fires within ~50ms and cancels this timer before it fires (no fade shown,
       // clean swap). Only triggers if cursor truly leaves all link areas.
       hoverTimer.current = setTimeout(() => {
-        cardRef.current?.fadeNow()
+        cardRef.current?.startTimer()
       }, 100)
     }
 

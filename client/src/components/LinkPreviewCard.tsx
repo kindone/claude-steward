@@ -41,6 +41,8 @@ interface Props {
 export interface LinkPreviewCardHandle {
   /** Immediately start the fade-out animation then call onDismiss. */
   fadeNow(): void
+  /** Start the auto-dismiss countdown (called when cursor leaves the triggering link). */
+  startTimer(): void
 }
 
 const CARD_W         = 288
@@ -94,11 +96,11 @@ export const LinkPreviewCard = forwardRef<LinkPreviewCardHandle, Props>(function
     }, AUTO_DISMISS_MS - FADE_MS)
   }
 
-  useImperativeHandle(ref, () => ({ fadeNow }))
+  useImperativeHandle(ref, () => ({ fadeNow, startTimer: startAutoTimer }))
 
-  // Start auto-dismiss on mount; clean up on unmount.
+  // Clean up timers on unmount; do NOT start auto-timer on mount —
+  // the parent calls startTimer() when the cursor leaves the link.
   useEffect(() => {
-    startAutoTimer()
     return () => {
       clearTimeout(timerRef.current!)
       clearTimeout(fadeRef.current!)
