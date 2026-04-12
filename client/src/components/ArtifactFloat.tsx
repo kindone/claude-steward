@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { Artifact } from '../lib/api'
+import { isBelowTailwindMd } from '../lib/viewport'
 import { ArtifactEditor } from './ArtifactEditor'
 
 export interface OpenArtifact {
@@ -12,6 +13,8 @@ interface Props {
   openArtifacts: OpenArtifact[]
   activeArtifactId: string | null
   projectId: string | null
+  /** Incremented (from App) when an artifact is opened below the `md` breakpoint — panel goes full width. */
+  mobileExpandTick?: number
   onActivate: (id: string) => void
   onClose: (id: string) => void
   onMinimize: (id: string) => void
@@ -44,6 +47,7 @@ export function ArtifactFloat({
   openArtifacts,
   activeArtifactId,
   projectId,
+  mobileExpandTick = 0,
   onActivate,
   onClose,
   onMinimize,
@@ -71,6 +75,14 @@ export function ArtifactFloat({
   useEffect(() => {
     if (hasPanel) setPanelHidden(false)
   }, [nonMinimized.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Narrow screens: each artifact open (from App) maximizes the float and keeps the panel visible.
+  useEffect(() => {
+    if (mobileExpandTick < 1) return
+    if (!isBelowTailwindMd()) return
+    setIsMaximized(true)
+    setPanelHidden(false)
+  }, [mobileExpandTick])
 
   const effectiveWidth = isMaximized ? window.innerWidth : panelWidth
 

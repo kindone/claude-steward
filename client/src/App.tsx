@@ -14,6 +14,7 @@ import AuthPage from './components/AuthPage'
 import { ErrorConsole } from './components/ErrorConsole'
 import { useAppConnection, type ConnState } from './hooks/useAppConnection'
 import { ArtifactFloat, type OpenArtifact } from './components/ArtifactFloat'
+import { isBelowTailwindMd } from './lib/viewport'
 
 type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
 
@@ -115,6 +116,8 @@ export default function App() {
   // ── Artifact float panel ──────────────────────────────────────────────────────
   const [openArtifacts, setOpenArtifacts] = useState<OpenArtifact[]>([])
   const [activeArtifactId, setActiveArtifactId] = useState<string | null>(null)
+  /** Bumped on narrow viewports when an artifact is opened so ArtifactFloat can auto-maximize. */
+  const [artifactMobileExpandTick, setArtifactMobileExpandTick] = useState(0)
   // Ref so SSE handler always sees the latest openArtifacts without re-registering
   const openArtifactsRef = useRef<OpenArtifact[]>([])
   useEffect(() => { openArtifactsRef.current = openArtifacts }, [openArtifacts])
@@ -425,18 +428,26 @@ export default function App() {
   }
 
   const handleOpenArtifact = useCallback(async (artifact: Artifact) => {
+    const narrow = isBelowTailwindMd()
+    const expandMobileArtifact = () => {
+      if (!narrow) return
+      setSidebarOpen(false)
+      setArtifactMobileExpandTick((t) => t + 1)
+    }
     // If already open, just activate (and restore if minimized)
     if (openArtifactsRef.current.some((a) => a.artifact.id === artifact.id)) {
       setActiveArtifactId(artifact.id)
       setOpenArtifacts((prev) =>
         prev.map((a) => a.artifact.id === artifact.id ? { ...a, minimized: false } : a)
       )
+      expandMobileArtifact()
       return
     }
     // Load content then add to open list
     const content = await getArtifactContent(artifact.id)
     setOpenArtifacts((prev) => [...prev, { artifact, content, minimized: false }])
     setActiveArtifactId(artifact.id)
+    expandMobileArtifact()
   }, [])
 
   const handleCloseArtifact = useCallback((id: string) => {
@@ -456,6 +467,10 @@ export default function App() {
       prev.map((a) => a.artifact.id === id ? { ...a, minimized: false } : a)
     )
     setActiveArtifactId(id)
+    if (isBelowTailwindMd()) {
+      setSidebarOpen(false)
+      setArtifactMobileExpandTick((t) => t + 1)
+    }
   }, [])
 
   const handleArtifactContentChange = useCallback((id: string, newContent: string) => {
@@ -702,6 +717,7 @@ export default function App() {
           openArtifacts={openArtifacts}
           activeArtifactId={activeArtifactId}
           projectId={activeProjectId}
+          mobileExpandTick={artifactMobileExpandTick}
           onActivate={setActiveArtifactId}
           onClose={handleCloseArtifact}
           onMinimize={handleMinimizeArtifact}
