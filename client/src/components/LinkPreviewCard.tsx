@@ -41,8 +41,10 @@ interface Props {
 export interface LinkPreviewCardHandle {
   /** Immediately start the fade-out animation then call onDismiss. */
   fadeNow(): void
-  /** Start the auto-dismiss countdown (called when cursor leaves the triggering link). */
+  /** Start (or restart) the auto-dismiss countdown — called when cursor leaves the link. */
   startTimer(): void
+  /** Pause auto-dismiss — called while cursor is confirmed over the triggering link. */
+  cancelTimer(): void
 }
 
 const CARD_W         = 288
@@ -96,11 +98,16 @@ export const LinkPreviewCard = forwardRef<LinkPreviewCardHandle, Props>(function
     }, AUTO_DISMISS_MS - FADE_MS)
   }
 
-  useImperativeHandle(ref, () => ({ fadeNow, startTimer: startAutoTimer }))
+  useImperativeHandle(ref, () => ({ fadeNow, startTimer: startAutoTimer, cancelTimer: cancelDismissTimer }))
 
-  // Clean up timers on unmount; do NOT start auto-timer on mount —
-  // the parent calls startTimer() when the cursor leaves the link.
+  // Always start the auto-dismiss timer on mount as a safety net — covers
+  // touch devices (no mouseout) and edge cases where startTimer() is never
+  // called (e.g. card appears under a stationary cursor, or link→card
+  // transition clears the parent's hoverTimer before startTimer fires).
+  // The parent calls cancelTimer() via onMouseOver while the cursor stays
+  // on the link, and startTimer() via onMouseOut to restart the countdown.
   useEffect(() => {
+    startAutoTimer()
     return () => {
       clearTimeout(timerRef.current!)
       clearTimeout(fadeRef.current!)

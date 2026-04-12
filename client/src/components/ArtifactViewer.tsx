@@ -256,6 +256,12 @@ function ReportView({ content, projectId }: { content: string; projectId: string
       if (!href) return
       // Cancel any pending fade-on-mouseout — we're moving to another link.
       clearTimeout(hoverTimer.current!)
+      // If cursor is on the same link whose card is already showing, pause
+      // the auto-dismiss timer so the card stays open while hovering.
+      if (href === hoveredLinkRef.current?.href) {
+        cardRef.current?.cancelTimer()
+        return
+      }
       const link = (e.target as Element).closest<HTMLAnchorElement>('a[href]')!
       const title = link.getAttribute('title') ?? ''
       // Capture rect synchronously during the event — before any React batching,
