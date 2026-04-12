@@ -439,21 +439,25 @@ function ReportView({ content, projectId }: { content: string; projectId: string
           // dy3: direction of segment 3 (yH → yV), down (+1) or up (-1)
           const dy1 = yH >= yAnchorBottom ? 1 : -1
           const dy3 = yV >= yH           ? 1 : -1
-          const r = Math.min(
-            4,
-            Math.abs(yH - yAnchorBottom) / 2,
-            Math.abs(x1 - x2) / 2,
-            Math.abs(yV - yH) / 2,
-            Math.abs(xSidenoteEdge - x2) / 2,
-          )
+          // Each corner's radius is capped only by its two adjacent segment
+          // half-lengths — not a global min — so a short anchor tick doesn't
+          // suppress roundness on the larger bends B and C.
+          const MAX_R = 8
+          const seg1 = Math.abs(yH - yAnchorBottom)
+          const seg2 = Math.abs(x1 - x2)
+          const seg3 = Math.abs(yV - yH)
+          const seg4 = Math.abs(xSidenoteEdge - x2)
+          const rA = Math.min(MAX_R, seg1 / 2, seg2 / 2)
+          const rB = Math.min(MAX_R, seg2 / 2, seg3 / 2)
+          const rC = Math.min(MAX_R, seg3 / 2, seg4 / 2)
           const d = [
             `M ${x1},${yAnchorBottom}`,
-            `L ${x1},${yH - dy1 * r}`,
-            `Q ${x1},${yH} ${x1 - r},${yH}`,
-            `L ${x2 + r},${yH}`,
-            `Q ${x2},${yH} ${x2},${yH + dy3 * r}`,
-            `L ${x2},${yV - dy3 * r}`,
-            `Q ${x2},${yV} ${x2 + r},${yV}`,
+            `L ${x1},${yH - dy1 * rA}`,
+            `Q ${x1},${yH} ${x1 + rA},${yH}`,
+            `L ${x2 - rB},${yH}`,
+            `Q ${x2},${yH} ${x2},${yH + dy3 * rB}`,
+            `L ${x2},${yV - dy3 * rC}`,
+            `Q ${x2},${yV} ${x2 + rC},${yV}`,
             `L ${xSidenoteEdge},${yV}`,
           ].join(' ')
           const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
