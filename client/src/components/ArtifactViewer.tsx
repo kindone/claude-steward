@@ -321,7 +321,9 @@ function ReportView({ content, projectId }: { content: string; projectId: string
     const fnSection = container.querySelector<HTMLElement>('section[data-footnotes]')
 
     if (layout === 'compact' || !fnSection) {
-      // Restore footnote section in compact mode
+      // Clear connector lines and restore footnote section
+      const svg = connectorSvgRef.current
+      if (svg) { while (svg.firstChild) svg.removeChild(svg.firstChild) }
       if (fnSection) fnSection.style.display = ''
       return
     }
