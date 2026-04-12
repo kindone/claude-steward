@@ -286,9 +286,20 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
       const atBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 50
       wasAtBottomRef.current = atBottom
     }
+    // On orientation change / window resize, re-snap to bottom if the user
+    // was already there — the viewport flip changes clientHeight which shifts
+    // the effective scroll position away from the bottom.
+    const onResize = () => {
+      if (wasAtBottomRef.current && !userIsScrollingRef.current) {
+        skipNextScrollRef.current = true
+        container.scrollTop = 1e9
+      }
+    }
     container.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onResize)
     return () => {
       container.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onResize)
       if (scrollSettleTimerRef.current) clearTimeout(scrollSettleTimerRef.current)
     }
   }, [])
