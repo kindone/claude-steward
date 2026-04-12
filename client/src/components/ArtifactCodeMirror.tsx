@@ -1,5 +1,5 @@
 import { memo, useEffect, useRef } from 'react'
-import { EditorState } from '@codemirror/state'
+import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, lineNumbers } from '@codemirror/view'
 import { defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { keymap } from '@codemirror/view'
@@ -21,6 +21,7 @@ interface Props {
   language: string
   readOnly?: boolean
   className?: string
+  wrapLines?: boolean
 }
 
 function langExtension(language: string): Extension {
@@ -55,9 +56,10 @@ function langExtension(language: string): Extension {
   }
 }
 
-export const ArtifactCodeMirror = memo(function ArtifactCodeMirror({ value, onChange, language, readOnly = false, className }: Props) {
+export const ArtifactCodeMirror = memo(function ArtifactCodeMirror({ value, onChange, language, readOnly = false, className, wrapLines = false }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
+  const wrapCompartment = useRef(new Compartment())
 
   // Keep onChange stable inside editor via ref
   const onChangeRef = useRef(onChange)
@@ -121,6 +123,8 @@ export const ArtifactCodeMirror = memo(function ArtifactCodeMirror({ value, onCh
       }),
     ]
 
+    extensions.push(wrapCompartment.current.of(wrapLines ? EditorView.lineWrapping : []))
+
     if (readOnly) {
       extensions.push(EditorState.readOnly.of(true))
     }
@@ -141,6 +145,13 @@ export const ArtifactCodeMirror = memo(function ArtifactCodeMirror({ value, onCh
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language, readOnly])
+
+  // Reconfigure line-wrapping without recreating the editor
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: wrapCompartment.current.reconfigure(wrapLines ? EditorView.lineWrapping : []),
+    })
+  }, [wrapLines])
 
   // Sync external value changes (e.g. SSE refresh) without resetting cursor.
   // Skip when the value is our own round-trip from the debounced notification —

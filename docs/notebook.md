@@ -140,3 +140,27 @@ Changes are confined to `MessageBubble` and supporting components:
 - A special Claude API for reading or writing cell content — Claude uses its existing file tools directly.
 - A custom diff or merge tool — rename detection via delete+create is sufficient.
 - A separate ordering field in the DB — filename prefix is the single source of truth for order.
+
+---
+
+## Notebook Mini-App Cell Editor (`apps/notebook/`)
+
+Code cells in the notebook mini-app use CodeMirror 6 via `CodeMirrorEditor.tsx`. Each cell is an independent editor instance.
+
+### Cell header controls (right-aligned)
+
+| Control | Shown when | Action |
+|---|---|---|
+| ⛶ Fullscreen | Markdown cells | Side-by-side fullscreen editor/preview |
+| Preview / Edit | Markdown cells | Toggle crossfade preview |
+| Save | Cell is dirty | Save cell to disk |
+| `↵` wrap toggle | Code cells | Toggle line wrapping (default OFF) |
+| ▶ Run / ■ Stop | Code cells | Execute / abort kernel run |
+| ✕ | Always | Show delete confirmation |
+
+### Line-wrap toggle (`↵`)
+
+- Per-cell state, not persisted (resets to OFF on page reload).
+- Default OFF — code cells rarely benefit from wrapping.
+- Same `Compartment`-based approach as the artifact editor: no editor recreation on toggle.
+- `.cm-scroller { overflow: auto }` is explicitly set in the cell editor theme so horizontal scroll works when wrap is OFF. The outer cell card uses `overflow: hidden` (not `overflow-x: hidden`) to correctly clip content at the rounded corners without blocking the scroller's internal scroll.

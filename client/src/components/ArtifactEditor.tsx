@@ -40,6 +40,21 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
   const [refreshCmd, setRefreshCmd] = useState('')
   const [refreshSched, setRefreshSched] = useState('')
   const [metaSaving, setMetaSaving] = useState(false)
+  // Line-wrap toggle — default ON for report, OFF for everything else; persisted per type
+  const [wrapLines, setWrapLines] = useState<boolean>(() => {
+    const stored = localStorage.getItem(`artifact-wrap:${artifact.type}`)
+    if (stored !== null) return stored === '1'
+    return artifact.type === 'report'
+  })
+
+  function toggleWrap() {
+    setWrapLines(prev => {
+      const next = !prev
+      localStorage.setItem(`artifact-wrap:${artifact.type}`, next ? '1' : '0')
+      return next
+    })
+  }
+
   // Kernel run state for code artifacts
   const [runState, setRunState] = useState<OutputPanelState | null>(null)
   const runAbortRef = useRef<(() => void) | undefined>(undefined)
@@ -187,6 +202,7 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
       value={localContent}
       onChange={handleChange}
       language={editorLanguage}
+      wrapLines={wrapLines}
       className="w-full h-full"
     />
   )
@@ -240,6 +256,14 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
             {runState?.status === 'running' ? '⏳ Running…' : '▶ Run'}
           </button>
         )}
+        <button
+          onClick={toggleWrap}
+          className={`text-[11px] px-2 py-1 rounded border cursor-pointer transition-colors flex-shrink-0
+            ${wrapLines ? 'text-[#ccc] border-[#444] bg-[#222]' : 'text-[#555] border-[#2a2a2a] bg-[#1a1a1a] hover:text-[#aaa]'}`}
+          title={wrapLines ? 'Line wrap on — click to disable' : 'Line wrap off — click to enable'}
+        >
+          ↵
+        </button>
         <button
           onClick={() => setSettingsOpen(o => !o)}
           className={`text-[11px] px-2 py-1 rounded border cursor-pointer transition-colors flex-shrink-0

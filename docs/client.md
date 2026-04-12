@@ -288,6 +288,48 @@ Completed assistant messages show a copy-to-clipboard button (⎘) on hover, pos
 
 ---
 
+## Artifact Editor (`ArtifactEditor.tsx` + `ArtifactCodeMirror.tsx`)
+
+The artifact panel (Art tab in the sidebar) uses a dedicated CodeMirror 6 editor that opens alongside the preview pane.
+
+### Layout modes (desktop)
+
+| Mode | Icon | Description |
+|---|---|---|
+| Split | ⬛⬛ | Editor left, preview right (50/50) |
+| Source | ≡ | Editor full-width, no preview |
+| Preview | ◻ | Preview full-width, no editor |
+
+Mobile uses a single-pane **Edit / Preview** tab toggle instead.
+
+### Header toolbar (left → right)
+
+1. **Artifact name** (truncated, flex-1)
+2. **Type badge** (color-coded: purple=chart, blue=report, amber=code, …)
+3. **View mode toggle** (desktop only, non-code artifacts)
+4. **`↵` line-wrap toggle** — see below
+5. **`▶ Run` button** (code artifacts only; runs in the project kernel)
+6. **`⚙` settings** — refresh command + cron schedule (wired to `steward-schedules` MCP)
+7. **Save button** — `Saving… / Saved ✓ / Error ✗ / Save`
+
+### Line-wrap toggle (`↵`)
+
+- Available on **all** artifact types.
+- **Default ON** for `report` (markdown prose); **default OFF** for `code`, `chart`, `html`, `data`, `mdart`, `pikchr`.
+- Preference is **persisted in `localStorage`** as `artifact-wrap:<type>`, shared across all artifacts of the same type.
+- Implemented via a CodeMirror `Compartment` — toggling reconfigures the running editor without destroying and recreating the view (no cursor jump, no scroll reset).
+
+### `ArtifactCodeMirror` (internal)
+
+Thin CodeMirror 6 wrapper used exclusively by `ArtifactEditor`. Key design choices:
+
+- **Debounced React notification** (150 ms typing pause) — CodeMirror updates its own rope immediately but React state only gets the new string after the user pauses. Eliminates per-keystroke React re-renders.
+- **`lastNotifiedRef`** tracks the last value pushed to React, so the value-sync `useEffect` can skip round-tripping our own edits back into the editor (prevents cursor jumping on fast typing).
+- **Language compartment** — the editor is *recreated* only when `language` or `readOnly` changes (they are the `useEffect` deps). Other config changes (line-wrap) use a separate `Compartment` that dispatches a `reconfigure` effect without destroying the view.
+- **External value sync** — the second `useEffect` handles server-push updates (e.g. SSE refresh after a `refresh_command` run). It dispatches a `changes` transaction that replaces the full document content without moving the cursor to position 0.
+
+---
+
 ## Vite Configuration
 
 ```ts

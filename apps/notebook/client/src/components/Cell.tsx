@@ -211,6 +211,7 @@ export function Cell({ cell, onUpdate, onDelete, onMoveUp, onMoveDown, canMoveUp
   const [outputs, setOutputs] = useState<OutputLine[]>([])
   const [compileResult, setCompileResult] = useState<CompileResult | null>(null)
   const [showDelete, setShowDelete] = useState(false)
+  const [wrapLines, setWrapLines] = useState(false)
   const [mdPreview, setMdPreview] = useState(cell.type === 'markdown')
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [livePreview, setLivePreview] = useState(cell.source)
@@ -372,7 +373,7 @@ export function Cell({ cell, onUpdate, onDelete, onMoveUp, onMoveDown, canMoveUp
   return (
     <>
       {/* ── Normal cell card ── */}
-      <div className={`rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] overflow-x-hidden ${highlight}`}>
+      <div className={`rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] overflow-hidden ${highlight}`}>
         {/* Header */}
         <div className="flex items-center gap-2 px-3 py-1.5 border-b border-[var(--color-border)] bg-black/20">
 
@@ -426,6 +427,17 @@ export function Cell({ cell, onUpdate, onDelete, onMoveUp, onMoveDown, canMoveUp
               >
                 Save
               </button>
+            )}
+            {!isMarkdown && (
+              <button
+                onClick={() => setWrapLines(w => !w)}
+                className={`text-xs px-1.5 py-0.5 rounded transition-colors ${
+                  wrapLines
+                    ? 'text-white bg-white/15'
+                    : 'text-[var(--color-muted)] hover:text-white hover:bg-white/10'
+                }`}
+                title={wrapLines ? 'Line wrap on — click to disable' : 'Line wrap off — click to enable'}
+              >↵</button>
             )}
             {!isMarkdown && (
               <button
@@ -491,6 +503,7 @@ export function Cell({ cell, onUpdate, onDelete, onMoveUp, onMoveDown, canMoveUp
             onChange={handleSourceChange}
             onRun={handleRun}
             onBlur={handleSave}
+            wrapLines={wrapLines}
           />
         )}
 

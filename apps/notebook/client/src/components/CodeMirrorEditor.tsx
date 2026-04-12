@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { EditorState } from '@codemirror/state'
+import { EditorState, Compartment } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { defaultKeymap, indentWithTab } from '@codemirror/commands'
 import { oneDark } from '@codemirror/theme-one-dark'
@@ -27,11 +27,13 @@ interface Props {
   onChange: (val: string) => void
   onRun: () => void
   onBlur: () => void
+  wrapLines?: boolean
 }
 
-export function CodeMirrorEditor({ value, language, onChange, onRun, onBlur }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const viewRef      = useRef<EditorView | null>(null)
+export function CodeMirrorEditor({ value, language, onChange, onRun, onBlur, wrapLines = false }: Props) {
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const viewRef       = useRef<EditorView | null>(null)
+  const wrapCompartment = useRef(new Compartment())
 
   // Keep callbacks stable inside the editor via refs
   const onChangeRef = useRef(onChange)
@@ -65,13 +67,14 @@ export function CodeMirrorEditor({ value, language, onChange, onRun, onBlur }: P
           EditorView.theme({
             '&':                       { background: 'transparent !important' },
             '.cm-editor':              { background: 'transparent !important' },
-            '.cm-scroller':            { fontFamily: 'var(--font-mono, "Cascadia Code", "Fira Code", monospace)' },
+            '.cm-scroller':            { fontFamily: 'var(--font-mono, "Cascadia Code", "Fira Code", monospace)', overflow: 'auto' },
             '.cm-content':             { padding: '12px', minHeight: '80px' },
             '.cm-focused':             { outline: 'none' },
             '.cm-gutters':             { background: 'rgba(0,0,0,0.2)', borderRight: '1px solid rgba(255,255,255,0.06)' },
             '.cm-activeLine':          { background: 'rgba(255,255,255,0.03)' },
             '.cm-activeLineGutter':    { background: 'rgba(255,255,255,0.05)' },
           }),
+          wrapCompartment.current.of(wrapLines ? EditorView.lineWrapping : []),
         ],
       }),
       parent: containerRef.current,
@@ -81,6 +84,13 @@ export function CodeMirrorEditor({ value, language, onChange, onRun, onBlur }: P
     return () => { view.destroy(); viewRef.current = null }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [language])
+
+  // Reconfigure line-wrapping without recreating the editor
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: wrapCompartment.current.reconfigure(wrapLines ? EditorView.lineWrapping : []),
+    })
+  }, [wrapLines])
 
   // Sync external value changes (file watcher / AI edits)
   useEffect(() => {
