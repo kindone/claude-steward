@@ -740,14 +740,16 @@ function renderLoop(spec: MdArtSpec, theme: MdArtTheme): string {
       const t = (idxOffset + i) / (n - 1 || 1)
       const fill = lerpColor(theme.primary, theme.secondary, t)
       parts.push(`<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${nodeR}" fill="${fill}" stroke="${theme.bg}" stroke-width="2"/>`)
+      // Use theme.text (not bg): labels are centered on nodes but overflow onto the
+      // canvas; bg-colored text on the same bg was invisible outside the node disk.
       const words = item.label.split(' ')
       if (words.length <= 1) {
-        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.bg}" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 9)}</text>`)
+        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.text}" stroke="${theme.bg}" stroke-width="0.35" paint-order="stroke fill" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 9)}</text>`)
       } else {
         const mid = Math.ceil(words.length / 2)
         const l1 = words.slice(0, mid).join(' '), l2 = words.slice(mid).join(' ')
-        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny - 1).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-family="system-ui,sans-serif" font-weight="700">${tt(l1, 9)}</text>`)
-        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 9).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-family="system-ui,sans-serif" font-weight="700">${tt(l2, 9)}</text>`)
+        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny - 1).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.text}" stroke="${theme.bg}" stroke-width="0.35" paint-order="stroke fill" font-family="system-ui,sans-serif" font-weight="700">${tt(l1, 9)}</text>`)
+        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 9).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.text}" stroke="${theme.bg}" stroke-width="0.35" paint-order="stroke fill" font-family="system-ui,sans-serif" font-weight="700">${tt(l2, 9)}</text>`)
       }
     })
   }

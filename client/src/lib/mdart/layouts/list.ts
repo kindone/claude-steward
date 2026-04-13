@@ -169,9 +169,12 @@ function renderChecklist(spec: MdArtSpec, theme: MdArtTheme): string {
       svgContent += `<polyline points="${PAD + 4},${cy} ${PAD + 8},${cy + 4} ${PAD + 14},${cy - 4}" fill="none" stroke="${theme.accent}" stroke-width="2" stroke-linecap="round" />`
     }
 
-    // Label
-    const labelFill = done ? theme.textMuted : theme.text
-    svgContent += `<text x="${PAD + 26}" y="${cy + 4}" font-size="12" fill="${labelFill}" font-family="system-ui,sans-serif"${done ? ' text-decoration="line-through"' : ''}>${escapeXml(item.label)}</text>`
+    // Label — done: avoid line-through (hard to read on dark themes); checkmark + softer italic suffices
+    if (done) {
+      svgContent += `<text x="${PAD + 26}" y="${cy + 4}" font-size="12" fill="${theme.text}" fill-opacity="0.62" font-family="system-ui,sans-serif" font-style="italic">${escapeXml(item.label)}</text>`
+    } else {
+      svgContent += `<text x="${PAD + 26}" y="${cy + 4}" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(item.label)}</text>`
+    }
 
     // Attrs (badges)
     const extraAttrs = item.attrs.filter(a => !['done', '✓', 'complete'].includes(a))
@@ -573,7 +576,7 @@ function renderTabList(spec: MdArtSpec, theme: MdArtTheme): string {
 
   const panelY = titleH + TAB_H
   parts.push(
-    `<rect class="mdart-tab-content-bg" x="0" y="${panelY}" width="${W}" height="${CONTENT_H}" rx="0 6 6 6" ` +
+    `<rect class="mdart-tab-content-bg" x="0" y="${panelY}" width="${W}" height="${CONTENT_H}" rx="6" ` +
     `fill="${activeFill}11" stroke="${activeFill}44" stroke-width="1.2"/>`,
   )
 
