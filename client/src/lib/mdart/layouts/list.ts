@@ -77,7 +77,7 @@ function renderBulletList(spec: MdArtSpec, theme: MdArtTheme): string {
     if (item.children.length > 0 && i < items.length) {
       // We'll just list first child inline for compactness
       const childText = item.children.map(c => c.label).join(', ')
-      svgContent += `<text x="${PAD + 22}" y="${cy + 16}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(childText.slice(0, 60))}</text>`
+      svgContent += `<text x="${PAD + 22}" y="${cy + 16}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(childText, 60)}</text>`
     }
 
     // Separator line
@@ -318,10 +318,10 @@ function renderBlockList(spec: MdArtSpec, theme: MdArtTheme): string {
     const fill = lerpColor(theme.primary, theme.secondary, t)
     parts.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${CELL_W.toFixed(1)}" height="${CELL_H}" rx="8" fill="${fill}33" stroke="${fill}88" stroke-width="1.5"/>`)
     parts.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="6" height="${CELL_H}" rx="3" fill="${fill}"/>`)
-    parts.push(`<text x="${(x+16).toFixed(1)}" y="${(y+26).toFixed(1)}" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, 28))}</text>`)
-    if (item.value) parts.push(`<text x="${(x+16).toFixed(1)}" y="${(y+44).toFixed(1)}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 34))}</text>`)
+    parts.push(`<text x="${(x+16).toFixed(1)}" y="${(y+26).toFixed(1)}" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 28)}</text>`)
+    if (item.value) parts.push(`<text x="${(x+16).toFixed(1)}" y="${(y+44).toFixed(1)}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 34)}</text>`)
     const sub = item.children.map(c => c.label).join(' · ')
-    if (sub) parts.push(`<text x="${(x+16).toFixed(1)}" y="${(y+58).toFixed(1)}" font-size="9" fill="${theme.muted}" font-family="system-ui,sans-serif">${escapeXml(truncate(sub, 38))}</text>`)
+    if (sub) parts.push(`<text x="${(x+16).toFixed(1)}" y="${(y+58).toFixed(1)}" font-size="9" fill="${theme.muted}" font-family="system-ui,sans-serif">${tt(sub, 38)}</text>`)
   })
   return svg(W, H, theme, parts)
 }
@@ -348,7 +348,7 @@ function renderChevronList(spec: MdArtSpec, theme: MdArtTheme): string {
       ? `M0,${y} L${x1},${y} L${W},${mid} L${x1},${y+ROW_H} L0,${y+ROW_H} Z`
       : `M0,${y} L${x1},${y} L${W},${mid} L${x1},${y+ROW_H} L0,${y+ROW_H} L${NOTCH},${mid} Z`
     parts.push(`<path d="${d}" fill="${fill}33" stroke="${fill}" stroke-width="1"/>`)
-    parts.push(`<text x="${(x0 + x1) / 2 + NOTCH/2}" y="${(mid + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 40))}</text>`)
+    parts.push(`<text x="${(x0 + x1) / 2 + NOTCH/2}" y="${(mid + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 40)}</text>`)
     if (item.value) parts.push(`<text x="${W - NOTCH - 6}" y="${(mid + 4).toFixed(1)}" text-anchor="end" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(item.value)}</text>`)
   })
   return svg(W, H, theme, parts)
@@ -377,10 +377,10 @@ function renderCardList(spec: MdArtSpec, theme: MdArtTheme): string {
     parts.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${CARD_W.toFixed(1)}" height="${CARD_H}" rx="7" fill="${theme.surface}" stroke="${fill}66" stroke-width="1.2"/>`)
     // Rounded-top header path
     parts.push(`<path d="M${(x+7).toFixed(1)},${y.toFixed(1)} Q${x.toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${(y+7).toFixed(1)} L${x.toFixed(1)},${(y+HEADER_H).toFixed(1)} L${(x+CARD_W).toFixed(1)},${(y+HEADER_H).toFixed(1)} L${(x+CARD_W).toFixed(1)},${(y+7).toFixed(1)} Q${(x+CARD_W).toFixed(1)},${y.toFixed(1)} ${(x+CARD_W-7).toFixed(1)},${y.toFixed(1)} Z" fill="${fill}"/>`)
-    parts.push(`<text x="${(x+CARD_W/2).toFixed(1)}" y="${(y+HEADER_H/2+4).toFixed(1)}" text-anchor="middle" font-size="11" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, 14))}</text>`)
+    parts.push(`<text x="${(x+CARD_W/2).toFixed(1)}" y="${(y+HEADER_H/2+4).toFixed(1)}" text-anchor="middle" font-size="11" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 14)}</text>`)
     item.children.slice(0, maxChildren).forEach((child, ci) => {
       const cy = y + HEADER_H + ci * ROW_H + ROW_H
-      parts.push(`<text x="${(x+CARD_W/2).toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(child.label, 14))}</text>`)
+      parts.push(`<text x="${(x+CARD_W/2).toFixed(1)}" y="${cy.toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(child.label, 14)}</text>`)
     })
   })
   return svg(W, H, theme, parts)
@@ -407,8 +407,8 @@ function renderZigzagList(spec: MdArtSpec, theme: MdArtTheme): string {
     const fill = lerpColor(theme.primary, theme.secondary, t)
     const bx = left ? SPINE_X - 8 - BOX_W : SPINE_X + 8
     parts.push(`<rect x="${bx.toFixed(1)}" y="${(cy - BOX_H/2).toFixed(1)}" width="${BOX_W}" height="${BOX_H}" rx="6" fill="${fill}22" stroke="${fill}" stroke-width="1.2"/>`)
-    parts.push(`<text x="${(bx + BOX_W/2).toFixed(1)}" y="${(cy + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 22))}</text>`)
-    if (item.value) parts.push(`<text x="${(bx + BOX_W/2).toFixed(1)}" y="${(cy + 16).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 26))}</text>`)
+    parts.push(`<text x="${(bx + BOX_W/2).toFixed(1)}" y="${(cy + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 22)}</text>`)
+    if (item.value) parts.push(`<text x="${(bx + BOX_W/2).toFixed(1)}" y="${(cy + 16).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 26)}</text>`)
     // connector dot
     parts.push(`<circle cx="${SPINE_X}" cy="${cy}" r="4" fill="${fill}"/>`)
     const lineX = left ? SPINE_X - 8 : SPINE_X + 8
@@ -444,8 +444,8 @@ function renderRibbonList(spec: MdArtSpec, theme: MdArtTheme): string {
     parts.push(`<polygon points="${W-TAIL},${y} ${W},${y} ${W-TAIL/2},${mid} ${W},${y+RIB_H} ${W-TAIL},${y+RIB_H}" fill="${fill}"/>`)
     parts.push(`<polygon points="${W-TAIL/2},${mid} ${W},${y} ${W},${y+RIB_H}" fill="${dark}"/>`)
     // Label + value
-    parts.push(`<text x="${FOLD + 10}" y="${(mid + 4).toFixed(1)}" font-size="11" fill="#fff" font-family="system-ui,sans-serif" font-weight="700" letter-spacing="0.06em">${escapeXml(truncate(item.label.toUpperCase(), 30))}</text>`)
-    if (item.value) parts.push(`<text x="${W/2}" y="${(y + RIB_H + 12).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 60))}</text>`)
+    parts.push(`<text x="${FOLD + 10}" y="${(mid + 4).toFixed(1)}" font-size="11" fill="#fff" font-family="system-ui,sans-serif" font-weight="700" letter-spacing="0.06em">${tt(item.label.toUpperCase(), 30)}</text>`)
+    if (item.value) parts.push(`<text x="${W/2}" y="${(y + RIB_H + 12).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 60)}</text>`)
   })
   return svg(W, H, theme, parts)
 }
@@ -483,8 +483,8 @@ function renderHexagonList(spec: MdArtSpec, theme: MdArtTheme): string {
     const t = items.length > 1 ? i / (items.length - 1) : 0
     const fill = lerpColor(theme.primary, theme.secondary, t)
     parts.push(`<polygon points="${hexPoints(cx, cy)}" fill="${fill}33" stroke="${fill}" stroke-width="1.5"/>`)
-    parts.push(`<text x="${cx.toFixed(1)}" y="${(cy - 6).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, 9))}</text>`)
-    if (item.value) parts.push(`<text x="${cx.toFixed(1)}" y="${(cy + 8).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 9))}</text>`)
+    parts.push(`<text x="${cx.toFixed(1)}" y="${(cy - 6).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 9)}</text>`)
+    if (item.value) parts.push(`<text x="${cx.toFixed(1)}" y="${(cy + 8).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 9)}</text>`)
   })
   return svg(W, H, theme, parts)
 }
@@ -511,7 +511,7 @@ function renderTrapezoidList(spec: MdArtSpec, theme: MdArtTheme): string {
     const clampedBotInset = Math.max(0, botInset)
     const d = `M${topInset.toFixed(1)},${y} L${(W-topInset).toFixed(1)},${y} L${(W-clampedBotInset).toFixed(1)},${(y+BAND_H)} L${clampedBotInset.toFixed(1)},${(y+BAND_H)} Z`
     parts.push(`<path d="${d}" fill="${fill}33" stroke="${fill}" stroke-width="1"/>`)
-    parts.push(`<text x="${W/2}" y="${(y + BAND_H/2 + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 40))}</text>`)
+    parts.push(`<text x="${W/2}" y="${(y + BAND_H/2 + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 40)}</text>`)
     if (item.value) parts.push(`<text x="${(W - topInset - 8).toFixed(1)}" y="${(y + BAND_H/2 + 4).toFixed(1)}" text-anchor="end" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(item.value)}</text>`)
   })
   return svg(W, H, theme, parts)
@@ -540,10 +540,10 @@ function renderTabList(spec: MdArtSpec, theme: MdArtTheme): string {
     const fill = lerpColor(theme.primary, theme.secondary, t)
     if (i === 0) {
       parts.push(`<rect x="${tx}" y="${ty}" width="${TAB_W}" height="${TAB_H}" rx="5" fill="${fill}"/>`)
-      parts.push(`<text x="${(tx + TAB_W/2).toFixed(1)}" y="${(ty + TAB_H/2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, 12))}</text>`)
+      parts.push(`<text x="${(tx + TAB_W/2).toFixed(1)}" y="${(ty + TAB_H/2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 12)}</text>`)
     } else {
       parts.push(`<rect x="${tx}" y="${ty + 4}" width="${TAB_W}" height="${TAB_H - 4}" rx="4" fill="${fill}22" stroke="${fill}55" stroke-width="1"/>`)
-      parts.push(`<text x="${(tx + TAB_W/2).toFixed(1)}" y="${(ty + TAB_H/2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, 12))}</text>`)
+      parts.push(`<text x="${(tx + TAB_W/2).toFixed(1)}" y="${(ty + TAB_H/2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.label, 12)}</text>`)
     }
   })
 
@@ -559,11 +559,11 @@ function renderTabList(spec: MdArtSpec, theme: MdArtTheme): string {
   }
   const childRow = active.children.map(c => c.label).join('  ·  ')
   if (childRow) {
-    parts.push(`<text x="${cx}" y="${panelY + 62}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(childRow, 55))}</text>`)
+    parts.push(`<text x="${cx}" y="${panelY + 62}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(childRow, 55)}</text>`)
   }
   const subRow = active.children.flatMap(c => c.children).map(c => c.label).join('  ·  ')
   if (subRow) {
-    parts.push(`<text x="${cx}" y="${panelY + 78}" text-anchor="middle" font-size="9" fill="${theme.muted}" font-family="system-ui,sans-serif">${escapeXml(truncate(subRow, 60))}</text>`)
+    parts.push(`<text x="${cx}" y="${panelY + 78}" text-anchor="middle" font-size="9" fill="${theme.muted}" font-family="system-ui,sans-serif">${tt(subRow, 60)}</text>`)
   }
   return svg(W, H, theme, parts)
 }
@@ -587,8 +587,8 @@ function renderCircleList(spec: MdArtSpec, theme: MdArtTheme): string {
     const fill = lerpColor(theme.primary, theme.secondary, t)
     parts.push(`<circle cx="${LEFT}" cy="${cy}" r="${R}" fill="${fill}"/>`)
     parts.push(`<text x="${LEFT}" y="${(cy + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${i + 1}</text>`)
-    parts.push(`<text x="${LEFT + R + 10}" y="${(cy - 4).toFixed(1)}" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 36))}</text>`)
-    if (item.value) parts.push(`<text x="${LEFT + R + 10}" y="${(cy + 12).toFixed(1)}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 44))}</text>`)
+    parts.push(`<text x="${LEFT + R + 10}" y="${(cy - 4).toFixed(1)}" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 36)}</text>`)
+    if (item.value) parts.push(`<text x="${LEFT + R + 10}" y="${(cy + 12).toFixed(1)}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 44)}</text>`)
   })
   return svg(W, H, theme, parts)
 }
@@ -614,8 +614,8 @@ function renderIconList(spec: MdArtSpec, theme: MdArtTheme): string {
     if (icon) {
       parts.push(`<text x="${LEFT}" y="${(cy + 5).toFixed(1)}" text-anchor="middle" font-size="14" font-family="system-ui,sans-serif">${escapeXml(icon)}</text>`)
     }
-    parts.push(`<text x="${LEFT + CIRCLE_R + 10}" y="${(cy - 4).toFixed(1)}" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 30))}</text>`)
-    if (item.value) parts.push(`<text x="${LEFT + CIRCLE_R + 10}" y="${(cy + 12).toFixed(1)}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 44))}</text>`)
+    parts.push(`<text x="${LEFT + CIRCLE_R + 10}" y="${(cy - 4).toFixed(1)}" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 30)}</text>`)
+    if (item.value) parts.push(`<text x="${LEFT + CIRCLE_R + 10}" y="${(cy + 12).toFixed(1)}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 44)}</text>`)
     if (i < items.length - 1) parts.push(`<line x1="${LEFT + CIRCLE_R + 10}" y1="${cy + ROW_H/2}" x2="${W - 16}" y2="${cy + ROW_H/2}" stroke="${theme.border}" stroke-width="0.5"/>`)
   })
   return svg(W, H, theme, parts)
@@ -625,6 +625,12 @@ function renderIconList(spec: MdArtSpec, theme: MdArtTheme): string {
 
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
+}
+
+function tt(s: string, max: number): string {
+  const tr = truncate(s, max)
+  if (tr === s) return escapeXml(s)
+  return `<title>${escapeXml(s)}</title>${escapeXml(tr)}`
 }
 
 function svg(W: number, H: number, theme: MdArtTheme, parts: string[]): string {

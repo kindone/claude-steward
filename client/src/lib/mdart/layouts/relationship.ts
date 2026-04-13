@@ -11,6 +11,12 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
+function tt(s: string, max: number): string {
+  const tr = truncate(s, max)
+  if (tr === s) return escapeXml(s)
+  return `<title>${escapeXml(s)}</title>${escapeXml(tr)}`
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export function renderRelationship(spec: MdArtSpec, theme: MdArtTheme): string {
@@ -63,20 +69,20 @@ function renderVenn2(spec: MdArtSpec, theme: MdArtTheme): string {
   // Circle labels
   if (c1) {
     parts.push(
-      `<text x="${(cx1 - R / 3.5).toFixed(1)}" y="${(cy - 10).toFixed(1)}" text-anchor="middle" font-size="13" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(c1.label, 14))}</text>`,
+      `<text x="${(cx1 - R / 3.5).toFixed(1)}" y="${(cy - 10).toFixed(1)}" text-anchor="middle" font-size="13" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(c1.label, 14)}</text>`,
     )
     // Child items
     c1.children.slice(0, 4).forEach((ch, idx) => {
-      parts.push(`<text x="${(cx1 - R / 3.5).toFixed(1)}" y="${(cy + 12 + idx * 16).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(ch.label, 13))}</text>`)
+      parts.push(`<text x="${(cx1 - R / 3.5).toFixed(1)}" y="${(cy + 12 + idx * 16).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(ch.label, 13)}</text>`)
     })
   }
 
   if (c2) {
     parts.push(
-      `<text x="${(cx2 + R / 3.5).toFixed(1)}" y="${(cy - 10).toFixed(1)}" text-anchor="middle" font-size="13" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(c2.label, 14))}</text>`,
+      `<text x="${(cx2 + R / 3.5).toFixed(1)}" y="${(cy - 10).toFixed(1)}" text-anchor="middle" font-size="13" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(c2.label, 14)}</text>`,
     )
     c2.children.slice(0, 4).forEach((ch, idx) => {
-      parts.push(`<text x="${(cx2 + R / 3.5).toFixed(1)}" y="${(cy + 12 + idx * 16).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(ch.label, 13))}</text>`)
+      parts.push(`<text x="${(cx2 + R / 3.5).toFixed(1)}" y="${(cy + 12 + idx * 16).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(ch.label, 13)}</text>`)
     })
   }
 
@@ -84,10 +90,10 @@ function renderVenn2(spec: MdArtSpec, theme: MdArtTheme): string {
   const ixLabel = intersects[0]?.label ?? ''
   if (ixLabel) {
     parts.push(
-      `<text x="${(W / 2).toFixed(1)}" y="${(cy - 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.accent}" font-family="system-ui,sans-serif" font-weight="500">${escapeXml(truncate(ixLabel, 12))}</text>`,
+      `<text x="${(W / 2).toFixed(1)}" y="${(cy - 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.accent}" font-family="system-ui,sans-serif" font-weight="500">${tt(ixLabel, 12)}</text>`,
     )
     intersects[0].children.slice(0, 3).forEach((ch, idx) => {
-      parts.push(`<text x="${(W / 2).toFixed(1)}" y="${(cy + 14 + idx * 15).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.accent}" font-family="system-ui,sans-serif" opacity="0.8">${escapeXml(truncate(ch.label, 10))}</text>`)
+      parts.push(`<text x="${(W / 2).toFixed(1)}" y="${(cy + 14 + idx * 15).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.accent}" font-family="system-ui,sans-serif" opacity="0.8">${tt(ch.label, 10)}</text>`)
     })
   }
 
@@ -128,9 +134,9 @@ function renderVenn3(spec: MdArtSpec, theme: MdArtTheme): string {
   circles.slice(0, 3).forEach((c, i) => {
     const lx = cx[i] + labelOff[i][0]
     const ly = cy3[i] + labelOff[i][1]
-    parts.push(`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(c.label, 13))}</text>`)
+    parts.push(`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(c.label, 13)}</text>`)
     c.children.slice(0, 2).forEach((ch, j) => {
-      parts.push(`<text x="${lx.toFixed(1)}" y="${(ly + 15 + j * 14).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(ch.label, 10))}</text>`)
+      parts.push(`<text x="${lx.toFixed(1)}" y="${(ly + 15 + j * 14).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(ch.label, 10)}</text>`)
     })
   })
 
@@ -139,7 +145,7 @@ function renderVenn3(spec: MdArtSpec, theme: MdArtTheme): string {
   if (centerIx) {
     const icx = (c1x + c2x + c3x) / 3
     const icy = (c1y + c2y + c3y) / 3
-    parts.push(`<text x="${icx.toFixed(1)}" y="${(icy + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.accent}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(centerIx.label, 10))}</text>`)
+    parts.push(`<text x="${icx.toFixed(1)}" y="${(icy + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.accent}" font-family="system-ui,sans-serif" font-weight="600">${tt(centerIx.label, 10)}</text>`)
   }
 
   return svg(W, H, theme, spec.title, parts)
@@ -175,7 +181,7 @@ function renderConcentric(spec: MdArtSpec, theme: MdArtTheme): string {
     // Label arced near the top of each ring band
     const labelY = cyPos - (r - MAX_R / n / 2) + 14
     parts.push(
-      `<text x="${cxPos.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, 18))}</text>`,
+      `<text x="${cxPos.toFixed(1)}" y="${labelY.toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(item.label, 18)}</text>`,
     )
   }
 
@@ -203,12 +209,12 @@ function renderVenn4(spec: MdArtSpec, theme: MdArtTheme): string {
   items.slice(0, 4).forEach((item, i) => {
     const [x, y] = centers[i]
     const lx = x + labelOff[i][0], ly = y + labelOff[i][1]
-    parts.push(`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 12))}</text>`)
+    parts.push(`<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 12)}</text>`)
     item.children.slice(0, 2).forEach((ch, j) => {
-      parts.push(`<text x="${lx.toFixed(1)}" y="${(ly + 14 + j * 13).toFixed(1)}" text-anchor="middle" font-size="8.5" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(ch.label, 10))}</text>`)
+      parts.push(`<text x="${lx.toFixed(1)}" y="${(ly + 14 + j * 13).toFixed(1)}" text-anchor="middle" font-size="8.5" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(ch.label, 10)}</text>`)
     })
   })
-  if (ixItem) parts.push(`<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="9" fill="${theme.accent}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(ixItem.label, 10))}</text>`)
+  if (ixItem) parts.push(`<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="9" fill="${theme.accent}" font-family="system-ui,sans-serif" font-weight="600">${tt(ixItem.label, 10)}</text>`)
   return svg(W, H, theme, spec.title, parts)
 }
 
@@ -232,7 +238,7 @@ function renderTarget(spec: MdArtSpec, theme: MdArtTheme): string {
     const fillAlpha = Math.round(14 + (1 - t) * 36).toString(16).padStart(2, '0')
     parts.push(`<circle cx="${cx}" cy="${cy}" r="${r.toFixed(1)}" fill="${theme.primary}${fillAlpha}" stroke="${theme.primary}66" stroke-width="1.5"/>`)
     const bandR = r - MAX_R / n / 2
-    parts.push(`<text x="${cx}" y="${(cy - bandR + 5).toFixed(1)}" text-anchor="middle" font-size="10.5" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="${i === n - 1 ? '700' : '400'}">${escapeXml(truncate(items[i].label, 18))}</text>`)
+    parts.push(`<text x="${cx}" y="${(cy - bandR + 5).toFixed(1)}" text-anchor="middle" font-size="10.5" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="${i === n - 1 ? '700' : '400'}">${tt(items[i].label, 18)}</text>`)
   }
   return svg(W, H, theme, spec.title, parts)
 }
@@ -254,21 +260,21 @@ function renderRadial(spec: MdArtSpec, theme: MdArtTheme): string {
     parts.push(`<line x1="${cx}" y1="${cy}" x2="${sx.toFixed(1)}" y2="${sy.toFixed(1)}" stroke="${theme.border}44" stroke-width="1.5"/>`)
     if (item) {
       parts.push(`<rect x="${(sx - 52).toFixed(1)}" y="${(sy - 18).toFixed(1)}" width="104" height="36" rx="5" fill="${theme.surface}" stroke="${theme.primary}66" stroke-width="1.2"/>`)
-      parts.push(`<text x="${sx.toFixed(1)}" y="${(sy + 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 12))}</text>`)
+      parts.push(`<text x="${sx.toFixed(1)}" y="${(sy + 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 12)}</text>`)
       item.children.slice(0, 2).forEach((ch, j) => {
         const offY = sy + 26 + j * 13
-        parts.push(`<text x="${sx.toFixed(1)}" y="${offY.toFixed(1)}" text-anchor="middle" font-size="8.5" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(ch.label, 12))}</text>`)
+        parts.push(`<text x="${sx.toFixed(1)}" y="${offY.toFixed(1)}" text-anchor="middle" font-size="8.5" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(ch.label, 12)}</text>`)
       })
     }
   }
   parts.push(`<circle cx="${cx}" cy="${cy}" r="38" fill="${theme.accent}33" stroke="${theme.accent}" stroke-width="1.5"/>`)
   const cw = centerLabel.split(' ')
   if (cw.length === 1) {
-    parts.push(`<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(centerLabel, 12))}</text>`)
+    parts.push(`<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(centerLabel, 12)}</text>`)
   } else {
     const m = Math.ceil(cw.length / 2)
-    parts.push(`<text x="${cx}" y="${cy - 3}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(cw.slice(0, m).join(' '), 12))}</text>`)
-    parts.push(`<text x="${cx}" y="${cy + 11}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(cw.slice(m).join(' '), 12))}</text>`)
+    parts.push(`<text x="${cx}" y="${cy - 3}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(cw.slice(0, m).join(' '), 12)}</text>`)
+    parts.push(`<text x="${cx}" y="${cy + 11}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(cw.slice(m).join(' '), 12)}</text>`)
   }
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:${theme.bg};border-radius:8px">
   ${parts.join('\n  ')}
@@ -295,13 +301,13 @@ function renderConverging(spec: MdArtSpec, theme: MdArtTheme): string {
   const tBH = Math.min(64, n * 18 + 20)
   parts.push(`<rect x="${TGT_X}" y="${(cy - tBH / 2).toFixed(1)}" width="116" height="${tBH}" rx="6" fill="${theme.accent}28" stroke="${theme.accent}" stroke-width="1.5"/>`)
   const tw = target.label.split(' '), tm = Math.ceil(tw.length / 2)
-  parts.push(`<text x="${(TGT_X + 58).toFixed(1)}" y="${tw.length > 1 ? (cy - 2).toFixed(1) : (cy + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(tw.slice(0, tm).join(' '), 13))}</text>`)
-  if (tw.length > 1) parts.push(`<text x="${(TGT_X + 58).toFixed(1)}" y="${(cy + 12).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(tw.slice(tm).join(' '), 13))}</text>`)
+  parts.push(`<text x="${(TGT_X + 58).toFixed(1)}" y="${tw.length > 1 ? (cy - 2).toFixed(1) : (cy + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(tw.slice(0, tm).join(' '), 13)}</text>`)
+  if (tw.length > 1) parts.push(`<text x="${(TGT_X + 58).toFixed(1)}" y="${(cy + 12).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(tw.slice(tm).join(' '), 13)}</text>`)
   // Sources + arrows
   sources.forEach((item, i) => {
     const sy = n === 1 ? cy : TITLE_H + 20 + i * (H - TITLE_H - 40) / (n - 1)
     parts.push(`<rect x="${SRC_X}" y="${(sy - 16).toFixed(1)}" width="112" height="32" rx="5" fill="${theme.surface}" stroke="${theme.primary}66" stroke-width="1.2"/>`)
-    parts.push(`<text x="${(SRC_X + 56).toFixed(1)}" y="${(sy + 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, 13))}</text>`)
+    parts.push(`<text x="${(SRC_X + 56).toFixed(1)}" y="${(sy + 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(item.label, 13)}</text>`)
     const x1 = SRC_X + 112, x2 = TGT_X - 4
     const mid = (x1 + x2) / 2
     parts.push(`<path d="M${x1},${sy.toFixed(1)} C${mid},${sy.toFixed(1)} ${mid},${cy.toFixed(1)} ${x2},${cy.toFixed(1)}" fill="none" stroke="${theme.primary}66" stroke-width="1.5" marker-end="url(#arr-c)"/>`)
@@ -329,13 +335,13 @@ function renderDiverging(spec: MdArtSpec, theme: MdArtTheme): string {
   const sBH = Math.min(64, n * 18 + 20)
   parts.push(`<rect x="${SRC_X}" y="${(cy - sBH / 2).toFixed(1)}" width="116" height="${sBH}" rx="6" fill="${theme.primary}28" stroke="${theme.primary}" stroke-width="1.5"/>`)
   const sw = source.label.split(' '), sm2 = Math.ceil(sw.length / 2)
-  parts.push(`<text x="${(SRC_X + 58).toFixed(1)}" y="${sw.length > 1 ? (cy - 2).toFixed(1) : (cy + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(sw.slice(0, sm2).join(' '), 13))}</text>`)
-  if (sw.length > 1) parts.push(`<text x="${(SRC_X + 58).toFixed(1)}" y="${(cy + 12).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(sw.slice(sm2).join(' '), 13))}</text>`)
+  parts.push(`<text x="${(SRC_X + 58).toFixed(1)}" y="${sw.length > 1 ? (cy - 2).toFixed(1) : (cy + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(sw.slice(0, sm2).join(' '), 13)}</text>`)
+  if (sw.length > 1) parts.push(`<text x="${(SRC_X + 58).toFixed(1)}" y="${(cy + 12).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(sw.slice(sm2).join(' '), 13)}</text>`)
   // Targets + arrows
   targets.forEach((item, i) => {
     const ty = n === 1 ? cy : TITLE_H + 20 + i * (H - TITLE_H - 40) / (n - 1)
     parts.push(`<rect x="${TGT_X}" y="${(ty - 16).toFixed(1)}" width="112" height="32" rx="5" fill="${theme.surface}" stroke="${theme.secondary}66" stroke-width="1.2"/>`)
-    parts.push(`<text x="${(TGT_X + 56).toFixed(1)}" y="${(ty + 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, 13))}</text>`)
+    parts.push(`<text x="${(TGT_X + 56).toFixed(1)}" y="${(ty + 5).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(item.label, 13)}</text>`)
     const x1 = SRC_X + 116 + 4, x2 = TGT_X
     const mid = (x1 + x2) / 2
     parts.push(`<path d="M${x1},${cy.toFixed(1)} C${mid},${cy.toFixed(1)} ${mid},${ty.toFixed(1)} ${x2},${ty.toFixed(1)}" fill="none" stroke="${theme.secondary}66" stroke-width="1.5" marker-end="url(#arr-d)"/>`)
@@ -356,15 +362,15 @@ function renderOpposingArrows(spec: MdArtSpec, theme: MdArtTheme): string {
   const parts: string[] = []
   // Left arrow → pointing right
   parts.push(`<polygon points="${lx1},${cy - AH/2} ${lx2 - 32},${cy - AH/2} ${lx2},${cy} ${lx2 - 32},${cy + AH/2} ${lx1},${cy + AH/2}" fill="${theme.primary}2a" stroke="${theme.primary}77" stroke-width="1.5"/>`)
-  parts.push(`<text x="${((lx1 + lx2) / 2 - 14).toFixed(1)}" y="${(cy - 10).toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(left.label, 15))}</text>`)
+  parts.push(`<text x="${((lx1 + lx2) / 2 - 14).toFixed(1)}" y="${(cy - 10).toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(left.label, 15)}</text>`)
   left.children.slice(0, 3).forEach((ch, i) => {
-    parts.push(`<text x="${((lx1 + lx2) / 2 - 14).toFixed(1)}" y="${(cy + 8 + i * 13).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(ch.label, 13))}</text>`)
+    parts.push(`<text x="${((lx1 + lx2) / 2 - 14).toFixed(1)}" y="${(cy + 8 + i * 13).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(ch.label, 13)}</text>`)
   })
   // Right arrow ← pointing left
   parts.push(`<polygon points="${rx2},${cy - AH/2} ${rx1 + 32},${cy - AH/2} ${rx1},${cy} ${rx1 + 32},${cy + AH/2} ${rx2},${cy + AH/2}" fill="${theme.secondary}2a" stroke="${theme.secondary}77" stroke-width="1.5"/>`)
-  parts.push(`<text x="${((rx1 + rx2) / 2 + 14).toFixed(1)}" y="${(cy - 10).toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(right.label, 15))}</text>`)
+  parts.push(`<text x="${((rx1 + rx2) / 2 + 14).toFixed(1)}" y="${(cy - 10).toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(right.label, 15)}</text>`)
   right.children.slice(0, 3).forEach((ch, i) => {
-    parts.push(`<text x="${((rx1 + rx2) / 2 + 14).toFixed(1)}" y="${(cy + 8 + i * 13).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(ch.label, 13))}</text>`)
+    parts.push(`<text x="${((rx1 + rx2) / 2 + 14).toFixed(1)}" y="${(cy + 8 + i * 13).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(ch.label, 13)}</text>`)
   })
   return svg(W, H, theme, spec.title, parts)
 }
@@ -386,17 +392,17 @@ function renderCounterbalance(spec: MdArtSpec, theme: MdArtTheme): string {
   const lx = bx - beamW / 2 + plateW / 2 - 6
   parts.push(`<line x1="${lx}" y1="${beamY}" x2="${lx}" y2="${beamY + 38}" stroke="${theme.border}66" stroke-width="1.5"/>`)
   parts.push(`<rect x="${(lx - plateW / 2).toFixed(1)}" y="${(beamY + 38).toFixed(1)}" width="${plateW}" height="${plateH}" rx="4" fill="${theme.primary}30" stroke="${theme.primary}77" stroke-width="1.2"/>`)
-  parts.push(`<text x="${lx.toFixed(1)}" y="${(beamY + 38 + 12).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(left.label, 16))}</text>`)
+  parts.push(`<text x="${lx.toFixed(1)}" y="${(beamY + 38 + 12).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(left.label, 16)}</text>`)
   left.children.slice(0, 4).forEach((ch, i) => {
-    parts.push(`<text x="${lx.toFixed(1)}" y="${(beamY + 66 + i * 14).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(ch.label, 16))}</text>`)
+    parts.push(`<text x="${lx.toFixed(1)}" y="${(beamY + 66 + i * 14).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(ch.label, 16)}</text>`)
   })
   // Right side
   const rx = bx + beamW / 2 - plateW / 2 + 6
   parts.push(`<line x1="${rx}" y1="${beamY}" x2="${rx}" y2="${beamY + 38}" stroke="${theme.border}66" stroke-width="1.5"/>`)
   parts.push(`<rect x="${(rx - plateW / 2).toFixed(1)}" y="${(beamY + 38).toFixed(1)}" width="${plateW}" height="${plateH}" rx="4" fill="${theme.secondary}30" stroke="${theme.secondary}77" stroke-width="1.2"/>`)
-  parts.push(`<text x="${rx.toFixed(1)}" y="${(beamY + 38 + 12).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(right.label, 16))}</text>`)
+  parts.push(`<text x="${rx.toFixed(1)}" y="${(beamY + 38 + 12).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(right.label, 16)}</text>`)
   right.children.slice(0, 4).forEach((ch, i) => {
-    parts.push(`<text x="${rx.toFixed(1)}" y="${(beamY + 66 + i * 14).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(ch.label, 16))}</text>`)
+    parts.push(`<text x="${rx.toFixed(1)}" y="${(beamY + 66 + i * 14).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(ch.label, 16)}</text>`)
   })
   return svg(W, H, theme, spec.title, parts)
 }
@@ -420,14 +426,14 @@ function renderPlus(spec: MdArtSpec, theme: MdArtTheme): string {
   // Center
   const centerItem = items[4]
   parts.push(`<circle cx="${cx}" cy="${cy}" r="${CR}" fill="${theme.accent}33" stroke="${theme.accent}" stroke-width="1.5"/>`)
-  if (centerItem) parts.push(`<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="9" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(centerItem.label, 9))}</text>`)
+  if (centerItem) parts.push(`<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="9" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(centerItem.label, 9)}</text>`)
   // 4 directional items
   items.slice(0, 4).forEach((item, i) => {
     const [px, py] = pos[i]
     parts.push(`<rect x="${(px - BW / 2).toFixed(1)}" y="${(py - BH / 2).toFixed(1)}" width="${BW}" height="${BH}" rx="6" fill="${theme.surface}" stroke="${colors[i]}88" stroke-width="1.5"/>`)
-    parts.push(`<text x="${px.toFixed(1)}" y="${(py - 7).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, 13))}</text>`)
+    parts.push(`<text x="${px.toFixed(1)}" y="${(py - 7).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 13)}</text>`)
     item.children.slice(0, 2).forEach((ch, j) => {
-      parts.push(`<text x="${px.toFixed(1)}" y="${(py + 9 + j * 12).toFixed(1)}" text-anchor="middle" font-size="8.5" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(ch.label, 14))}</text>`)
+      parts.push(`<text x="${px.toFixed(1)}" y="${(py + 9 + j * 12).toFixed(1)}" text-anchor="middle" font-size="8.5" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(ch.label, 14)}</text>`)
     })
   })
   return svg(W, H, theme, spec.title, parts)
@@ -464,7 +470,7 @@ function renderWeb(spec: MdArtSpec, theme: MdArtTheme): string {
   items.forEach((item, i) => {
     const [nx, ny] = pos[i]
     parts.push(`<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${nodeR}" fill="${theme.primary}22" stroke="${theme.primary}99" stroke-width="1.8"/>`)
-    parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 4).toFixed(1)}" text-anchor="middle" font-size="${Math.max(8, Math.min(10, nodeR * 0.5)).toFixed(0)}" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 9))}</text>`)
+    parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 4).toFixed(1)}" text-anchor="middle" font-size="${Math.max(8, Math.min(10, nodeR * 0.5)).toFixed(0)}" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 9)}</text>`)
   })
   return svg(W, H, theme, spec.title, parts)
 }
@@ -487,7 +493,7 @@ function renderCluster(spec: MdArtSpec, theme: MdArtTheme): string {
     const gy = TITLE_H + 10 + row * (clH + 10) + clH / 2
     const color = colors[i % colors.length]
     parts.push(`<ellipse cx="${gx.toFixed(1)}" cy="${gy.toFixed(1)}" rx="${(clW / 2).toFixed(1)}" ry="${(clH / 2).toFixed(1)}" fill="${color}14" stroke="${color}55" stroke-width="1.5"/>`)
-    parts.push(`<text x="${gx.toFixed(1)}" y="${(gy - clH / 2 + 16).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(group.label, 16))}</text>`)
+    parts.push(`<text x="${gx.toFixed(1)}" y="${(gy - clH / 2 + 16).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(group.label, 16)}</text>`)
     const members = group.children, mR = 22
     const mCols = 3, spacing = clW / (mCols + 1)
     const nRows = Math.ceil(Math.min(members.length, 6) / mCols)
@@ -502,7 +508,7 @@ function renderCluster(spec: MdArtSpec, theme: MdArtTheme): string {
       const mx = gx - clW / 2 + spacing * (mc + 1)
       const my = firstRowY + mr * rowSpacing
       parts.push(`<circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="${mR}" fill="${color}2a" stroke="${color}66" stroke-width="1"/>`)
-      parts.push(`<text x="${mx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(m.label, 8))}</text>`)
+      parts.push(`<text x="${mx.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(m.label, 8)}</text>`)
     })
   })
   return svg(W, H, theme, spec.title, parts)

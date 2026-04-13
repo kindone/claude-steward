@@ -21,6 +21,12 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
+function tt(s: string, max: number): string {
+  const tr = truncate(s, max)
+  if (tr === s) return escapeXml(s)
+  return `<title>${escapeXml(s)}</title>${escapeXml(tr)}`
+}
+
 function titleEl(W: number, title: string, theme: MdArtTheme): string {
   return `<text x="${W / 2}" y="20" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(title)}</text>`
 }
@@ -126,11 +132,7 @@ function renderCircleCycle(spec: MdArtSpec, theme: MdArtTheme): string {
 
     svgContent += `<rect x="${nx - NODE_W / 2}" y="${ny - NODE_H / 2}" width="${NODE_W}" height="${NODE_H}" rx="6" fill="${fill}" />`
 
-    const lines = item.label.length > 14 ? [item.label.slice(0, 12) + '…'] : [item.label]
-    lines.forEach((line, li) => {
-      const ly = ny + (li - (lines.length - 1) / 2) * 14 + 5
-      svgContent += `<text x="${nx}" y="${ly}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(line)}</text>`
-    })
+    svgContent += `<text x="${nx}" y="${ny + 5}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 14)}</text>`
   }
 
   // Title in center
@@ -187,8 +189,7 @@ function renderDonutCycle(spec: MdArtSpec, theme: MdArtTheme): string {
     const labelR = (outerR + innerR) / 2
     const lx = cx + labelR * Math.cos(midAngle)
     const ly = cy + labelR * Math.sin(midAngle)
-    const truncated = item.label.length > 10 ? item.label.slice(0, 9) + '…' : item.label
-    svgContent += `<text x="${lx}" y="${ly + 4}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncated)}</text>`
+    svgContent += `<text x="${lx}" y="${ly + 4}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 10)}</text>`
   }
 
   // Center label
@@ -234,9 +235,9 @@ function renderGearCycle(spec: MdArtSpec, theme: MdArtTheme): string {
     const fill = theme.primary
     parts.push(`<path d="${gearPath(cx, cy, 90, 68, 12, 0)}" fill="${fill}" opacity="0.8"/>`)
     parts.push(`<circle cx="${cx}" cy="${cy}" r="52" fill="${theme.bg}"/>`)
-    parts.push(`<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 12))}</text>`)
+    parts.push(`<text x="${cx}" y="${cy + 5}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 12)}</text>`)
     if (item.value) {
-      parts.push(`<text x="${cx}" y="${cy + 20}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 12))}</text>`)
+      parts.push(`<text x="${cx}" y="${cy + 20}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 12)}</text>`)
     }
   } else if (n === 2) {
     const outerR = 90, innerR = 68, teeth = 12
@@ -249,9 +250,9 @@ function renderGearCycle(spec: MdArtSpec, theme: MdArtTheme): string {
       const phase = i * (Math.PI / teeth) // alternate phase so teeth interlock visually
       parts.push(`<path d="${gearPath(gx, cy, outerR, innerR, teeth, phase)}" fill="${fill}" opacity="0.8"/>`)
       parts.push(`<circle cx="${gx}" cy="${cy}" r="52" fill="${theme.bg}"/>`)
-      parts.push(`<text x="${gx}" y="${cy + (item.value ? -3 : 5)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 12))}</text>`)
+      parts.push(`<text x="${gx}" y="${cy + (item.value ? -3 : 5)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 12)}</text>`)
       if (item.value) {
-        parts.push(`<text x="${gx}" y="${cy + 13}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 12))}</text>`)
+        parts.push(`<text x="${gx}" y="${cy + 13}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 12)}</text>`)
       }
     })
   } else if (n === 3) {
@@ -259,9 +260,9 @@ function renderGearCycle(spec: MdArtSpec, theme: MdArtTheme): string {
     const centerFill = theme.primary
     parts.push(`<path d="${gearPath(cx, cy, 80, 60, 12, 0)}" fill="${centerFill}" opacity="0.8"/>`)
     parts.push(`<circle cx="${cx}" cy="${cy}" r="46" fill="${theme.bg}"/>`)
-    parts.push(`<text x="${cx}" y="${cy + (items[0].value ? -3 : 5)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(items[0].label, 12))}</text>`)
+    parts.push(`<text x="${cx}" y="${cy + (items[0].value ? -3 : 5)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(items[0].label, 12)}</text>`)
     if (items[0].value) {
-      parts.push(`<text x="${cx}" y="${cy + 13}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(items[0].value, 12))}</text>`)
+      parts.push(`<text x="${cx}" y="${cy + 13}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(items[0].value, 12)}</text>`)
     }
     const sideAngles = [-Math.PI / 3, Math.PI / 3] // 60° left and right
     // distance between center of large and small gear so they nearly touch
@@ -276,9 +277,9 @@ function renderGearCycle(spec: MdArtSpec, theme: MdArtTheme): string {
       const phase = Math.PI / 8 // offset phase
       parts.push(`<path d="${gearPath(gx, gy, 55, 40, 8, phase)}" fill="${fill}" opacity="0.8"/>`)
       parts.push(`<circle cx="${gx}" cy="${gy}" r="32" fill="${theme.bg}"/>`)
-      parts.push(`<text x="${gx}" y="${gy + (item.value ? -3 : 5)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 10))}</text>`)
+      parts.push(`<text x="${gx}" y="${gy + (item.value ? -3 : 5)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 10)}</text>`)
       if (item.value) {
-        parts.push(`<text x="${gx}" y="${gy + 12}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 10))}</text>`)
+        parts.push(`<text x="${gx}" y="${gy + 12}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 10)}</text>`)
       }
     })
   } else {
@@ -295,9 +296,9 @@ function renderGearCycle(spec: MdArtSpec, theme: MdArtTheme): string {
       const phase = i * (Math.PI / (teeth * n))
       parts.push(`<path d="${gearPath(gx, gy, outerR, innerR, teeth, phase)}" fill="${fill}" opacity="0.8"/>`)
       parts.push(`<circle cx="${gx}" cy="${gy}" r="24" fill="${theme.bg}"/>`)
-      parts.push(`<text x="${gx}" y="${gy + (item.value ? -3 : 5)}" text-anchor="middle" font-size="9" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 10))}</text>`)
+      parts.push(`<text x="${gx}" y="${gy + (item.value ? -3 : 5)}" text-anchor="middle" font-size="9" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 10)}</text>`)
       if (item.value) {
-        parts.push(`<text x="${gx}" y="${gy + 11}" text-anchor="middle" font-size="8" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 10))}</text>`)
+        parts.push(`<text x="${gx}" y="${gy + 11}" text-anchor="middle" font-size="8" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 10)}</text>`)
       }
     }
   }
@@ -364,7 +365,7 @@ function renderBlockCycle(spec: MdArtSpec, theme: MdArtTheme): string {
     // Colored header (top corners rounded)
     parts.push(`<path d="M ${x + 5} ${y} L ${x + BOX_W - 5} ${y} Q ${x + BOX_W} ${y} ${x + BOX_W} ${y + 5} L ${x + BOX_W} ${y + HEADER_H} L ${x} ${y + HEADER_H} L ${x} ${y + 5} Q ${x} ${y} ${x + 5} ${y} Z" fill="${headerFill}"/>`)
     // Header text
-    parts.push(`<text x="${x + BOX_W / 2}" y="${y + HEADER_H - 5}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 16))}</text>`)
+    parts.push(`<text x="${x + BOX_W / 2}" y="${y + HEADER_H - 5}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 16)}</text>`)
 
     // Body content: children or value
     const bodyLines: string[] = item.children.length > 0
@@ -513,9 +514,9 @@ function renderNondirectionalCycle(spec: MdArtSpec, theme: MdArtTheme): string {
     const fill = lerpColor(theme.primary, theme.secondary, t)
 
     parts.push(`<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${nodeR}" fill="${fill}"/>`)
-    parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + (item.value ? -3 : 4)).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 10))}</text>`)
+    parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + (item.value ? -3 : 4)).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 10)}</text>`)
     if (item.value) {
-      parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 9).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 10))}</text>`)
+      parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 9).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-family="system-ui,sans-serif">${tt(item.value, 10)}</text>`)
     }
   }
 
@@ -564,7 +565,7 @@ function renderMultidirectionalCycle(spec: MdArtSpec, theme: MdArtTheme): string
     const fill = lerpColor(theme.primary, theme.secondary, t)
 
     parts.push(`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${nodeR}" fill="${fill}" stroke="${theme.bg}" stroke-width="2"/>`)
-    parts.push(`<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 10))}</text>`)
+    parts.push(`<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 10)}</text>`)
   }
 
   return svgWrap(W, H, theme, parts)
@@ -618,7 +619,7 @@ function renderSpiral(spec: MdArtSpec, theme: MdArtTheme): string {
     const cosTheta = Math.cos(theta)
     const labelX = cosTheta >= 0 ? mx + dotR + 4 : mx - dotR - 4
     const anchor = cosTheta >= 0 ? 'start' : 'end'
-    parts.push(`<text x="${labelX.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="${anchor}" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(items[k].label, 14))}</text>`)
+    parts.push(`<text x="${labelX.toFixed(1)}" y="${(my + 4).toFixed(1)}" text-anchor="${anchor}" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(items[k].label, 14)}</text>`)
   }
 
   return svgWrap(W, H, theme, parts)
@@ -741,12 +742,12 @@ function renderLoop(spec: MdArtSpec, theme: MdArtTheme): string {
       parts.push(`<circle cx="${nx.toFixed(1)}" cy="${ny.toFixed(1)}" r="${nodeR}" fill="${fill}" stroke="${theme.bg}" stroke-width="2"/>`)
       const words = item.label.split(' ')
       if (words.length <= 1) {
-        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.bg}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, 9))}</text>`)
+        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.bg}" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 9)}</text>`)
       } else {
         const mid = Math.ceil(words.length / 2)
         const l1 = words.slice(0, mid).join(' '), l2 = words.slice(mid).join(' ')
-        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny - 1).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(l1, 9))}</text>`)
-        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 9).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(l2, 9))}</text>`)
+        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny - 1).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-family="system-ui,sans-serif" font-weight="700">${tt(l1, 9)}</text>`)
+        parts.push(`<text x="${nx.toFixed(1)}" y="${(ny + 9).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-family="system-ui,sans-serif" font-weight="700">${tt(l2, 9)}</text>`)
       }
     })
   }

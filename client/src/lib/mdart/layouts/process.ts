@@ -292,8 +292,8 @@ function renderStaircase(spec: MdArtSpec, theme: MdArtTheme, ascending: boolean)
     const fill = lerpColor(theme.primary, theme.secondary, t)
 
     parts.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${BOX_W}" height="${BOX_H}" rx="5" fill="${fill}33" stroke="${fill}" stroke-width="1.2"/>`)
-    parts.push(`<text x="${(x + BOX_W / 2).toFixed(1)}" y="${(y + BOX_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, Math.floor(BOX_W / 6)))}</text>`)
-    if (item.value) parts.push(`<text x="${(x + BOX_W / 2).toFixed(1)}" y="${(y + BOX_H / 2 + 16).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, Math.floor(BOX_W / 5)))}</text>`)
+    parts.push(`<text x="${(x + BOX_W / 2).toFixed(1)}" y="${(y + BOX_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, Math.floor(BOX_W / 6))}</text>`)
+    if (item.value) parts.push(`<text x="${(x + BOX_W / 2).toFixed(1)}" y="${(y + BOX_H / 2 + 16).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, Math.floor(BOX_W / 5))}</text>`)
 
     // Tiny L-shaped connector to next box
     if (i < n - 1) {
@@ -333,8 +333,8 @@ function renderCircleProcess(spec: MdArtSpec, theme: MdArtTheme): string {
     const t = n > 1 ? i / (n - 1) : 0
     const fill = lerpColor(theme.primary, theme.secondary, t)
     parts.push(`<circle cx="${cx.toFixed(1)}" cy="${cy.toFixed(1)}" r="${R}" fill="${fill}33" stroke="${fill}" stroke-width="1.5"/>`)
-    parts.push(`<text x="${cx.toFixed(1)}" y="${(cy - (item.value ? 5 : 0)).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, Math.floor(R / 4)))}</text>`)
-    if (item.value) parts.push(`<text x="${cx.toFixed(1)}" y="${(cy + 10).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, Math.floor(R / 3.5)))}</text>`)
+    parts.push(`<text x="${cx.toFixed(1)}" y="${(cy - (item.value ? 5 : 0)).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, Math.floor(R / 4))}</text>`)
+    if (item.value) parts.push(`<text x="${cx.toFixed(1)}" y="${(cy + 10).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, Math.floor(R / 3.5))}</text>`)
     if (i < n - 1) {
       const x1 = cx + R + 2, x2 = cx + spacing - R - 6
       parts.push(`<line x1="${x1.toFixed(1)}" y1="${cy.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${cy.toFixed(1)}" stroke="${theme.muted}" stroke-width="1.5" marker-end="url(#cp-arr)"/>`)
@@ -374,11 +374,11 @@ function renderEquation(spec: MdArtSpec, theme: MdArtTheme): string {
     // Colored header bar
     parts.push(`<rect x="${x.toFixed(1)}" y="${cardY.toFixed(1)}" width="${CARD_W.toFixed(1)}" height="22" rx="7 7 0 0" fill="${fill}"/>`)
     parts.push(`<rect x="${x.toFixed(1)}" y="${(cardY + 14).toFixed(1)}" width="${CARD_W.toFixed(1)}" height="8" fill="${fill}"/>`)
-    parts.push(`<text x="${(x + CARD_W / 2).toFixed(1)}" y="${(cardY + 14).toFixed(1)}" text-anchor="middle" font-size="10" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, 14))}</text>`)
+    parts.push(`<text x="${(x + CARD_W / 2).toFixed(1)}" y="${(cardY + 14).toFixed(1)}" text-anchor="middle" font-size="10" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 14)}</text>`)
     // Children / value as sub-lines
     const subs = item.children.length ? item.children.map(c => c.label) : item.value ? [item.value] : []
     subs.slice(0, 3).forEach((s, si) => {
-      parts.push(`<text x="${(x + CARD_W / 2).toFixed(1)}" y="${(cardY + 40 + si * 16).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(s, 14))}</text>`)
+      parts.push(`<text x="${(x + CARD_W / 2).toFixed(1)}" y="${(cardY + 40 + si * 16).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(s, 14)}</text>`)
     })
     // Operator between cards
     if (i < n - 1) {
@@ -424,7 +424,7 @@ function renderBendingProcess(spec: MdArtSpec, theme: MdArtTheme): string {
     const fill = lerpColor(theme.primary, theme.secondary, t)
     const isLast = i === n - 1
     parts.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${BOX_W.toFixed(1)}" height="${BOX_H}" rx="5" fill="${isLast ? theme.accent + '33' : fill + '33'}" stroke="${isLast ? theme.accent : fill}" stroke-width="1.2"/>`)
-    parts.push(`<text x="${(x + BOX_W / 2).toFixed(1)}" y="${(y + BOX_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, Math.floor(BOX_W / 6)))}</text>`)
+    parts.push(`<text x="${(x + BOX_W / 2).toFixed(1)}" y="${(y + BOX_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, Math.floor(BOX_W / 6))}</text>`)
 
     if (i < n - 1) {
       const next = positions[i + 1]
@@ -476,7 +476,7 @@ function renderSegmentedBar(spec: MdArtSpec, theme: MdArtTheme): string {
     const rx = isFirst ? '5 0 0 5' : isLast ? '0 5 5 0' : '0'
     parts.push(`<rect x="${curX.toFixed(1)}" y="${BAR_Y}" width="${segW.toFixed(1)}" height="${BAR_H}" rx="${rx}" fill="${fill}"/>`)
     const lx = curX + segW / 2
-    parts.push(`<text x="${lx.toFixed(1)}" y="${(BAR_Y + BAR_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, Math.floor(segW / 7)))}</text>`)
+    parts.push(`<text x="${lx.toFixed(1)}" y="${(BAR_Y + BAR_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, Math.floor(segW / 7))}</text>`)
     // Percentage below
     parts.push(`<text x="${lx.toFixed(1)}" y="${(BAR_Y + BAR_H + 14).toFixed(1)}" text-anchor="middle" font-size="9" fill="${fill}" font-family="system-ui,sans-serif">${item.value ?? Math.round(weights[i] / total * 100) + '%'}</text>`)
     curX += segW
@@ -508,12 +508,12 @@ function renderPhaseProcess(spec: MdArtSpec, theme: MdArtTheme): string {
     // Header
     parts.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${COL_W.toFixed(1)}" height="${HEADER_H}" rx="6 6 0 0" fill="${fill}"/>`)
     parts.push(`<rect x="${x.toFixed(1)}" y="${(y + HEADER_H - 6).toFixed(1)}" width="${COL_W.toFixed(1)}" height="6" fill="${fill}"/>`)
-    parts.push(`<text x="${(x + COL_W / 2).toFixed(1)}" y="${(y + HEADER_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, Math.floor(COL_W / 6)))}</text>`)
+    parts.push(`<text x="${(x + COL_W / 2).toFixed(1)}" y="${(y + HEADER_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, Math.floor(COL_W / 6))}</text>`)
     // Task rows
     item.children.slice(0, maxChildren).forEach((child, ci) => {
       const ry = y + HEADER_H + ci * ROW_H + 6
       parts.push(`<rect x="${(x + 4).toFixed(1)}" y="${ry.toFixed(1)}" width="${(COL_W - 8).toFixed(1)}" height="${ROW_H - 2}" rx="3" fill="${fill}22"/>`)
-      parts.push(`<text x="${(x + COL_W / 2).toFixed(1)}" y="${(ry + ROW_H / 2 + 3).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(child.label, Math.floor(COL_W / 5.5)))}</text>`)
+      parts.push(`<text x="${(x + COL_W / 2).toFixed(1)}" y="${(ry + ROW_H / 2 + 3).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(child.label, Math.floor(COL_W / 5.5))}</text>`)
     })
   })
   return svgWrap(W, H, theme, parts)
@@ -545,12 +545,12 @@ function renderTimelineH(spec: MdArtSpec, theme: MdArtTheme): string {
     parts.push(`<circle cx="${x.toFixed(1)}" cy="${sy}" r="6" fill="${fill}"/>`)
     if (above) {
       parts.push(`<line x1="${x.toFixed(1)}" y1="${(sy - 6).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(sy - 18).toFixed(1)}" stroke="${fill}" stroke-width="1"/>`)
-      parts.push(`<text x="${x.toFixed(1)}" y="${(sy - 22).toFixed(1)}" text-anchor="middle" font-size="9" fill="${fill}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, 10))}</text>`)
-      if (item.value) parts.push(`<text x="${x.toFixed(1)}" y="${(sy - 34).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 12))}</text>`)
+      parts.push(`<text x="${x.toFixed(1)}" y="${(sy - 22).toFixed(1)}" text-anchor="middle" font-size="9" fill="${fill}" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 10)}</text>`)
+      if (item.value) parts.push(`<text x="${x.toFixed(1)}" y="${(sy - 34).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 12)}</text>`)
     } else {
       parts.push(`<line x1="${x.toFixed(1)}" y1="${(sy + 6).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(sy + 18).toFixed(1)}" stroke="${fill}" stroke-width="1"/>`)
-      parts.push(`<text x="${x.toFixed(1)}" y="${(sy + 30).toFixed(1)}" text-anchor="middle" font-size="9" fill="${fill}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, 10))}</text>`)
-      if (item.value) parts.push(`<text x="${x.toFixed(1)}" y="${(sy + 42).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.value, 12))}</text>`)
+      parts.push(`<text x="${x.toFixed(1)}" y="${(sy + 30).toFixed(1)}" text-anchor="middle" font-size="9" fill="${fill}" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 10)}</text>`)
+      if (item.value) parts.push(`<text x="${x.toFixed(1)}" y="${(sy + 42).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.value, 12)}</text>`)
     }
   })
   return svgWrap(W, H, theme, parts)
@@ -579,10 +579,10 @@ function renderTimelineV(spec: MdArtSpec, theme: MdArtTheme): string {
     // Date label (value) on left
     if (item.value) parts.push(`<text x="${(SPINE_X - DOT_R - 4).toFixed(1)}" y="${(cy + 3).toFixed(1)}" text-anchor="end" font-size="8" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(item.value)}</text>`)
     // Title on right
-    parts.push(`<text x="${(SPINE_X + DOT_R + 8).toFixed(1)}" y="${(cy - 4).toFixed(1)}" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 36))}</text>`)
+    parts.push(`<text x="${(SPINE_X + DOT_R + 8).toFixed(1)}" y="${(cy - 4).toFixed(1)}" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 36)}</text>`)
     // Children as detail lines
     const detail = item.children.map(c => c.label).join(' · ')
-    if (detail) parts.push(`<text x="${(SPINE_X + DOT_R + 8).toFixed(1)}" y="${(cy + 11).toFixed(1)}" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(detail, 48))}</text>`)
+    if (detail) parts.push(`<text x="${(SPINE_X + DOT_R + 8).toFixed(1)}" y="${(cy + 11).toFixed(1)}" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(detail, 48)}</text>`)
   })
   return svgWrap(W, H, theme, parts)
 }
@@ -610,7 +610,7 @@ function renderSwimlane(spec: MdArtSpec, theme: MdArtTheme): string {
     if (i > 0) parts.push(`<line x1="0" y1="${y.toFixed(1)}" x2="${W}" y2="${y.toFixed(1)}" stroke="${theme.border}" stroke-width="0.5"/>`)
     // Lane label
     parts.push(`<rect x="2" y="${(y + 2).toFixed(1)}" width="${LABEL_W - 4}" height="${LANE_H - 4}" rx="4" fill="${fill}33" stroke="${fill}66" stroke-width="1"/>`)
-    parts.push(`<text x="${(LABEL_W / 2).toFixed(1)}" y="${(y + LANE_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, 9))}</text>`)
+    parts.push(`<text x="${(LABEL_W / 2).toFixed(1)}" y="${(y + LANE_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 9)}</text>`)
     // Steps (children)
     const steps = item.children
     const stepW = steps.length > 0 ? Math.min(90, (W - LABEL_W - 8) / steps.length - 6) : 0
@@ -621,7 +621,7 @@ function renderSwimlane(spec: MdArtSpec, theme: MdArtTheme): string {
       const isDone = step.attrs.includes('done')
       const stepFill = isDone ? theme.accent : fill
       parts.push(`<rect x="${sx.toFixed(1)}" y="${sy.toFixed(1)}" width="${stepW.toFixed(1)}" height="28" rx="4" fill="${stepFill}${isDone ? '44' : '22'}" stroke="${stepFill}${isDone ? '99' : '66'}" stroke-width="1"/>`)
-      parts.push(`<text x="${(sx + stepW / 2).toFixed(1)}" y="${(sy + 17).toFixed(1)}" text-anchor="middle" font-size="9" fill="${isDone ? theme.text : theme.textMuted}" font-family="system-ui,sans-serif" font-weight="${isDone ? '600' : '400'}">${escapeXml(truncate(step.label, Math.floor(stepW / 5)))}</text>`)
+      parts.push(`<text x="${(sx + stepW / 2).toFixed(1)}" y="${(sy + 17).toFixed(1)}" text-anchor="middle" font-size="9" fill="${isDone ? theme.text : theme.textMuted}" font-family="system-ui,sans-serif" font-weight="${isDone ? '600' : '400'}">${tt(step.label, Math.floor(stepW / 5))}</text>`)
       if (si < steps.length - 1) {
         const ax1 = sx + stepW + 2, ax2 = sx + stepW + stepGap - 4
         parts.push(`<line x1="${ax1.toFixed(1)}" y1="${(sy + 14).toFixed(1)}" x2="${ax2.toFixed(1)}" y2="${(sy + 14).toFixed(1)}" stroke="${theme.muted}" stroke-width="1" marker-end="url(#sl-arr)"/>`)
@@ -635,6 +635,12 @@ function renderSwimlane(spec: MdArtSpec, theme: MdArtTheme): string {
 
 function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
+}
+
+function tt(s: string, max: number): string {
+  const tr = truncate(s, max)
+  if (tr === s) return escapeXml(s)
+  return `<title>${escapeXml(s)}</title>${escapeXml(tr)}`
 }
 
 function titleEl(W: number, title: string, theme: MdArtTheme): string {

@@ -9,6 +9,12 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
+function tt(s: string, max: number): string {
+  const tr = truncate(s, max)
+  if (tr === s) return escapeXml(s)
+  return `<title>${escapeXml(s)}</title>${escapeXml(tr)}`
+}
+
 export function renderMatrix(spec: MdArtSpec, theme: MdArtTheme): string {
   switch (spec.type) {
     case 'pros-cons':    return renderProsCons(spec, theme)
@@ -90,8 +96,7 @@ function renderSwot(spec: MdArtSpec, theme: MdArtTheme): string {
     const maxItems = Math.min(q.items.length, 5)
     for (let i = 0; i < maxItems; i++) {
       const itemY = y + 38 + i * 16
-      const label = q.items[i].length > 28 ? q.items[i].slice(0, 26) + '…' : q.items[i]
-      svgContent += `<text x="${x + 10}" y="${itemY}" font-size="10" fill="${q.textColor}" font-family="system-ui,sans-serif" opacity="0.85">• ${escapeXml(label)}</text>`
+      svgContent += `<text x="${x + 10}" y="${itemY}" font-size="10" fill="${q.textColor}" font-family="system-ui,sans-serif" opacity="0.85">• ${tt(q.items[i], 28)}</text>`
     }
 
     if (q.items.length > 5) {
@@ -162,12 +167,10 @@ function renderProsCons(spec: MdArtSpec, theme: MdArtTheme): string {
     svgContent += `<rect x="${HALF}" y="${rowY}" width="${HALF}" height="${ROW_H}" fill="${rowBg}" />`
 
     if (i < pros.length) {
-      const label = pros[i].label.length > 26 ? pros[i].label.slice(0, 24) + '…' : pros[i].label
-      svgContent += `<text x="${PAD}" y="${rowY + 23}" font-size="11" fill="#6ee7b7" font-family="system-ui,sans-serif">✓ ${escapeXml(label)}</text>`
+      svgContent += `<text x="${PAD}" y="${rowY + 23}" font-size="11" fill="#6ee7b7" font-family="system-ui,sans-serif">✓ ${tt(pros[i].label, 26)}</text>`
     }
     if (i < cons.length) {
-      const label = cons[i].label.length > 26 ? cons[i].label.slice(0, 24) + '…' : cons[i].label
-      svgContent += `<text x="${HALF + PAD}" y="${rowY + 23}" font-size="11" fill="#fda4af" font-family="system-ui,sans-serif">✗ ${escapeXml(label)}</text>`
+      svgContent += `<text x="${HALF + PAD}" y="${rowY + 23}" font-size="11" fill="#fda4af" font-family="system-ui,sans-serif">✗ ${tt(cons[i].label, 26)}</text>`
     }
 
     if (i < maxRows - 1) {
@@ -218,7 +221,7 @@ function renderComparison(spec: MdArtSpec, theme: MdArtTheme): string {
     const t = cols.length > 1 ? ci / (cols.length - 1) : 0.5
     const fill = lerpColorLocal('#1e3a8a', '#1d4ed8', t)
     svgContent += `<rect x="${colX}" y="${baseY}" width="${COL_W}" height="${HEADER_H}" fill="${fill}" />`
-    svgContent += `<text x="${colX + COL_W / 2}" y="${baseY + 27}" text-anchor="middle" font-size="12" fill="#bfdbfe" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(col.label)}</text>`
+    svgContent += `<text x="${colX + COL_W / 2}" y="${baseY + 27}" text-anchor="middle" font-size="12" fill="#bfdbfe" font-family="system-ui,sans-serif" font-weight="700">${tt(col.label, Math.floor(COL_W / 7))}</text>`
   }
 
   // Row label column header
@@ -232,15 +235,14 @@ function renderComparison(spec: MdArtSpec, theme: MdArtTheme): string {
     const rowBg = ri % 2 === 0 ? theme.surface : theme.bg
 
     svgContent += `<rect x="0" y="${rowY}" width="${W}" height="${ROW_H}" fill="${rowBg}" />`
-    const shortLabel = rowLabel.length > 16 ? rowLabel.slice(0, 14) + '…' : rowLabel
-    svgContent += `<text x="${PAD}" y="${rowY + 22}" font-size="11" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(shortLabel)}</text>`
+    svgContent += `<text x="${PAD}" y="${rowY + 22}" font-size="11" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(rowLabel, 16)}</text>`
 
     for (let ci = 0; ci < cols.length; ci++) {
       const col = cols[ci]
       const colX = LABEL_W + ci * COL_W
       const child = col.children.find(ch => ch.label === rowLabel)
       const val = child?.value ?? (col.children.some(ch => ch.label === rowLabel) ? '✓' : '—')
-      svgContent += `<text x="${colX + COL_W / 2}" y="${rowY + 22}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(val)}</text>`
+      svgContent += `<text x="${colX + COL_W / 2}" y="${rowY + 22}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(val, Math.floor(COL_W / 7))}</text>`
     }
 
     svgContent += `<line x1="0" y1="${rowY + ROW_H}" x2="${W}" y2="${rowY + ROW_H}" stroke="${theme.border}" stroke-width="0.5" />`
@@ -280,9 +282,9 @@ function renderMatrix2x2(spec: MdArtSpec, theme: MdArtTheme): string {
     const [col, row] = positions[i]
     const x = col * CELL_W, y = TITLE_H + row * CELL_H
     svgContent += `<rect x="${x}" y="${y}" width="${CELL_W}" height="${CELL_H}" fill="${fills[i]}" stroke="${theme.border}" stroke-width="0.5"/>`
-    svgContent += `<text x="${x + CELL_W / 2}" y="${y + 26}" text-anchor="middle" font-size="12" fill="${strokes[i]}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(item.label, 20))}</text>`
+    svgContent += `<text x="${x + CELL_W / 2}" y="${y + 26}" text-anchor="middle" font-size="12" fill="${strokes[i]}" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 20)}</text>`
     item.children.slice(0, 5).forEach((ch, j) => {
-      svgContent += `<text x="${x + 12}" y="${y + 46 + j * 19}" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" opacity="0.85">• ${escapeXml(truncate(ch.label, 22))}</text>`
+      svgContent += `<text x="${x + 12}" y="${y + 46 + j * 19}" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif" opacity="0.85">• ${tt(ch.label, 22)}</text>`
     })
   })
   // Center axis lines
@@ -335,7 +337,7 @@ function renderBcg(spec: MdArtSpec, theme: MdArtTheme): string {
     svgContent += `<text x="${x + CELL_W / 2}" y="${y + 24}" text-anchor="middle" font-size="12" fill="${q.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(q.label)}</text>`
     svgContent += `<text x="${x + CELL_W / 2}" y="${y + 38}" text-anchor="middle" font-size="8" fill="${q.text}" font-family="system-ui,sans-serif" opacity="0.65">${q.sub}</text>`
     buckets[q.key].slice(0, 4).forEach((label, j) => {
-      svgContent += `<text x="${x + 10}" y="${y + 56 + j * 18}" font-size="10" fill="${q.text}" font-family="system-ui,sans-serif" opacity="0.9">• ${escapeXml(truncate(label, 22))}</text>`
+      svgContent += `<text x="${x + 10}" y="${y + 56 + j * 18}" font-size="10" fill="${q.text}" font-family="system-ui,sans-serif" opacity="0.9">• ${tt(label, 22)}</text>`
     })
   })
   // Grid lines
@@ -391,7 +393,7 @@ function renderAnsoff(spec: MdArtSpec, theme: MdArtTheme): string {
     svgContent += `<text x="${x + CELL_W / 2}" y="${y + 24}" text-anchor="middle" font-size="11.5" fill="${q.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(q.label)}</text>`
     svgContent += `<text x="${x + CELL_W / 2}" y="${y + 38}" text-anchor="middle" font-size="7.5" fill="${q.text}" font-family="system-ui,sans-serif" opacity="0.65">${q.sub}</text>`
     buckets[q.key].slice(0, 4).forEach((label, j) => {
-      svgContent += `<text x="${x + 10}" y="${y + 56 + j * 18}" font-size="10" fill="${q.text}" font-family="system-ui,sans-serif" opacity="0.9">• ${escapeXml(truncate(label, 22))}</text>`
+      svgContent += `<text x="${x + 10}" y="${y + 56 + j * 18}" font-size="10" fill="${q.text}" font-family="system-ui,sans-serif" opacity="0.9">• ${tt(label, 22)}</text>`
     })
   })
   // Grid lines
@@ -437,13 +439,13 @@ function renderMatrixNxM(spec: MdArtSpec, theme: MdArtTheme): string {
     const rowY = TITLE_H + HEADER_H + r * ROW_H
     const rowBg = r % 2 === 0 ? theme.surface : theme.bg
     svgContent += `<rect x="0" y="${rowY}" width="${LABEL_W}" height="${ROW_H}" fill="${rowBg}" stroke="${theme.border}" stroke-width="0.5"/>`
-    svgContent += `<text x="8" y="${rowY + 23}" font-size="10.5" fill="${theme.textMuted}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(row.label, 13))}</text>`
+    svgContent += `<text x="8" y="${rowY + 23}" font-size="10.5" fill="${theme.textMuted}" font-family="system-ui,sans-serif" font-weight="600">${tt(row.label, 13)}</text>`
     for (let c = 0; c < numCols; c++) {
       const colX = LABEL_W + c * COL_W
       const cell = row.children[c]
       svgContent += `<rect x="${colX}" y="${rowY}" width="${COL_W}" height="${ROW_H}" fill="${rowBg}" stroke="${theme.border}" stroke-width="0.5"/>`
       if (cell) {
-        svgContent += `<text x="${colX + COL_W / 2}" y="${rowY + 23}" text-anchor="middle" font-size="10.5" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(cell.label, 16))}</text>`
+        svgContent += `<text x="${colX + COL_W / 2}" y="${rowY + 23}" text-anchor="middle" font-size="10.5" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(cell.label, 16)}</text>`
       }
     }
   }

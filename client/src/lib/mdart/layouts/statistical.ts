@@ -11,6 +11,12 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
+function tt(s: string, max: number): string {
+  const tr = truncate(s, max)
+  if (tr === s) return escapeXml(s)
+  return `<title>${escapeXml(s)}</title>${escapeXml(tr)}`
+}
+
 // ── Entry point ───────────────────────────────────────────────────────────────
 
 export function renderStatistical(spec: MdArtSpec, theme: MdArtTheme): string {
@@ -64,7 +70,7 @@ function renderProgressList(spec: MdArtSpec, theme: MdArtTheme): string {
       // Fill
       `<rect x="${BAR_X}" y="${barY}" width="${fillW.toFixed(1)}" height="16" rx="8" fill="${barColor}"/>`,
       // Label
-      `<text x="${LABEL_W}" y="${barY + 11}" text-anchor="end" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, 20))}</text>`,
+      `<text x="${LABEL_W}" y="${barY + 11}" text-anchor="end" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(item.label, 20)}</text>`,
       // Value
       `<text x="${BAR_X + BAR_W + 8}" y="${barY + 11}" font-size="11" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${pct % 1 === 0 ? pct : pct.toFixed(1)}%</text>`,
     )
@@ -103,7 +109,7 @@ function renderScorecard(spec: MdArtSpec, theme: MdArtTheme): string {
     cards.push(
       `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${CARD_W.toFixed(1)}" height="${CARD_H}" rx="8" fill="${theme.surface}" stroke="${theme.border}" stroke-width="1"/>`,
       `<text x="${(x + CARD_W / 2).toFixed(1)}" y="${(y + 32).toFixed(1)}" text-anchor="middle" font-size="22" fill="${theme.accent}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(value)}</text>`,
-      `<text x="${(x + CARD_W / 2).toFixed(1)}" y="${(y + 50).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, 20))}</text>`,
+      `<text x="${(x + CARD_W / 2).toFixed(1)}" y="${(y + 50).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.label, 20)}</text>`,
     )
     if (change) {
       cards.push(`<text x="${(x + CARD_W / 2).toFixed(1)}" y="${(y + 65).toFixed(1)}" text-anchor="middle" font-size="10" fill="${changeColor}" font-family="system-ui,sans-serif">${escapeXml(change)}</text>`)
@@ -147,7 +153,7 @@ function renderTreemap(spec: MdArtSpec, theme: MdArtTheme): string {
 
     cells.push(
       `<rect x="${(x + 2).toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${(cellW - 4).toFixed(1)}" height="${(cellH - 4).toFixed(1)}" rx="6" fill="${fill}55" stroke="${fill}99" stroke-width="1"/>`,
-      `<text x="${(x + cellW / 2).toFixed(1)}" y="${(y + cellH / 2).toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, Math.floor(cellW / 8)))}</text>`,
+      `<text x="${(x + cellW / 2).toFixed(1)}" y="${(y + cellH / 2).toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, Math.floor(cellW / 8))}</text>`,
     )
     if (item.value) {
       cells.push(`<text x="${(x + cellW / 2).toFixed(1)}" y="${(y + cellH / 2 + 16).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(item.value)}</text>`)
@@ -197,7 +203,7 @@ function renderBulletChart(spec: MdArtSpec, theme: MdArtTheme): string {
       parts.push(`<rect x="${(tx - 1.5).toFixed(1)}" y="${barY}" width="3" height="${BAR_H}" rx="1" fill="${theme.text}cc"/>`)
     }
 
-    parts.push(`<text x="${LABEL_W}" y="${(midY + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, 20))}</text>`)
+    parts.push(`<text x="${LABEL_W}" y="${(midY + 4).toFixed(1)}" text-anchor="end" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(item.label, 20)}</text>`)
     parts.push(`<text x="${BAR_X + BAR_W + 8}" y="${(midY + 4).toFixed(1)}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${Math.round(val * 100)}%</text>`)
   })
 
@@ -283,14 +289,14 @@ function renderSankey(spec: MdArtSpec, theme: MdArtTheme): string {
   srcNodes.forEach((n, i) => {
     const col = colors[i % colors.length]
     parts.push(`<rect x="0" y="${n.y.toFixed(1)}" width="${BOX_W - 8}" height="${n.h.toFixed(1)}" rx="4" fill="${col}44" stroke="${col}99" stroke-width="1"/>`)
-    if (n.h >= 14) parts.push(`<text x="${(BOX_W - 8) / 2}" y="${(n.y + n.h / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(items[i].label, 13))}</text>`)
+    if (n.h >= 14) parts.push(`<text x="${(BOX_W - 8) / 2}" y="${(n.y + n.h / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(items[i].label, 13)}</text>`)
   })
 
   // Destination boxes
   dstNames.forEach(name => {
     const n = dstNodes.get(name)!
     parts.push(`<rect x="${W - BOX_W + 8}" y="${n.y.toFixed(1)}" width="${BOX_W - 8}" height="${n.h.toFixed(1)}" rx="4" fill="${theme.surface}" stroke="${theme.border}" stroke-width="1"/>`)
-    if (n.h >= 14) parts.push(`<text x="${W - (BOX_W - 8) / 2}" y="${(n.y + n.h / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(name, 13))}</text>`)
+    if (n.h >= 14) parts.push(`<text x="${W - (BOX_W - 8) / 2}" y="${(n.y + n.h / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(name, 13)}</text>`)
   })
 
   return svg(W, H, theme, spec.title, parts)
@@ -336,7 +342,7 @@ function renderWaffle(spec: MdArtSpec, theme: MdArtTheme): string {
   items.forEach((item, i) => {
     const ly = legY + i * 22
     parts.push(`<rect x="${PAD}" y="${ly}" width="12" height="12" rx="2" fill="${colors[i % colors.length]}"/>`)
-    parts.push(`<text x="${PAD + 16}" y="${ly + 10}" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, 22))} (${squares[i]}%)</text>`)
+    parts.push(`<text x="${PAD + 16}" y="${ly + 10}" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(item.label, 22)} (${squares[i]}%)</text>`)
   })
 
   return svg(W, H, theme, spec.title, parts)
@@ -380,7 +386,7 @@ function renderGauge(spec: MdArtSpec, theme: MdArtTheme): string {
     // Value label
     const fs = Math.max(16, Math.round(GW * 0.15))
     parts.push(`<text x="${cx}" y="${(cy - 6).toFixed(1)}" text-anchor="middle" font-size="${fs}" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${Math.round(val * 100)}%</text>`)
-    parts.push(`<text x="${cx}" y="${(cy + 16).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, 16))}</text>`)
+    parts.push(`<text x="${cx}" y="${(cy + 16).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.label, 16)}</text>`)
   })
 
   return svg(W, H, theme, spec.title, parts)
@@ -437,7 +443,7 @@ function renderRadar(spec: MdArtSpec, theme: MdArtTheme): string {
     const la = R + 26
     const lx = cx + la * Math.cos(a), ly = cy + la * Math.sin(a)
     const anchor = Math.cos(a) > 0.15 ? 'start' : Math.cos(a) < -0.15 ? 'end' : 'middle'
-    parts.push(`<text x="${lx.toFixed(1)}" y="${(ly + 4).toFixed(1)}" text-anchor="${anchor}" font-size="10.5" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(item.label, 12))}</text>`)
+    parts.push(`<text x="${lx.toFixed(1)}" y="${(ly + 4).toFixed(1)}" text-anchor="${anchor}" font-size="10.5" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(item.label, 12)}</text>`)
   })
 
   return svg(W, H, theme, spec.title, parts)
@@ -479,7 +485,7 @@ function renderHeatmap(spec: MdArtSpec, theme: MdArtTheme): string {
   rows.forEach((row, r) => {
     const rowY = TITLE_H + HEADER_H + r * CELL_H
     parts.push(`<rect x="0" y="${rowY}" width="${LABEL_W}" height="${CELL_H}" fill="${theme.surface}" stroke="${theme.border}" stroke-width="0.5"/>`)
-    parts.push(`<text x="8" y="${(rowY + 25).toFixed(1)}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(row.label, 12))}</text>`)
+    parts.push(`<text x="8" y="${(rowY + 25).toFixed(1)}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(row.label, 12)}</text>`)
     row.children.slice(0, numCols).forEach((cell, c) => {
       const colX = LABEL_W + c * CELL_W
       const raw = (cell.value ?? cell.attrs[0] ?? cell.label.match(/[\d.]+/)?.[0] ?? '0').replace('%', '')
@@ -487,7 +493,7 @@ function renderHeatmap(spec: MdArtSpec, theme: MdArtTheme): string {
       const alpha = Math.round(18 + v * 210).toString(16).padStart(2, '0')
       parts.push(`<rect x="${colX}" y="${rowY}" width="${CELL_W}" height="${CELL_H}" fill="${theme.primary}${alpha}" stroke="${theme.border}55" stroke-width="0.5"/>`)
       const textFill = v > 0.55 ? theme.bg : theme.text
-      parts.push(`<text x="${(colX + CELL_W / 2).toFixed(1)}" y="${(rowY + 25).toFixed(1)}" text-anchor="middle" font-size="10" fill="${textFill}" font-family="system-ui,sans-serif">${escapeXml(truncate(cell.label, 9))}</text>`)
+      parts.push(`<text x="${(colX + CELL_W / 2).toFixed(1)}" y="${(rowY + 25).toFixed(1)}" text-anchor="middle" font-size="10" fill="${textFill}" font-family="system-ui,sans-serif">${tt(cell.label, 9)}</text>`)
     })
   })
 

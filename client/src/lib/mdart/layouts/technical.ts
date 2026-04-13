@@ -11,6 +11,12 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
+function tt(s: string, max: number): string {
+  const tr = truncate(s, max)
+  if (tr === s) return escapeXml(s)
+  return `<title>${escapeXml(s)}</title>${escapeXml(tr)}`
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.replace('#', '').slice(0, 6), 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
@@ -64,25 +70,31 @@ function renderLayeredArch(spec: MdArtSpec, theme: MdArtTheme): string {
     // Layer band
     parts.push(`<rect x="8" y="${y.toFixed(1)}" width="${W - 16}" height="${LAYER_H}" rx="8" fill="${fill}22" stroke="${fill}66" stroke-width="1.2"/>`)
 
-    // Layer name (left column)
-    parts.push(`<text x="24" y="${(y + LAYER_H / 2 + 4).toFixed(1)}" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(layer.label, 15))}</text>`)
+    if (layer.children.length === 0) {
+      // No children — use full-width label, no separator
+      const mid = (y + LAYER_H / 2 + 4).toFixed(1)
+      parts.push(`<text x="24" y="${mid}" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(layer.label, 72)}</text>`)
+    } else {
+      // Split layout: truncated label in left column + separator + chips
+      parts.push(`<text x="24" y="${(y + LAYER_H / 2 + 4).toFixed(1)}" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(layer.label, 15)}</text>`)
 
-    // Vertical separator
-    parts.push(`<line x1="128" y1="${(y + 10).toFixed(1)}" x2="128" y2="${(y + LAYER_H - 10).toFixed(1)}" stroke="${fill}55" stroke-width="1"/>`)
+      // Vertical separator
+      parts.push(`<line x1="128" y1="${(y + 10).toFixed(1)}" x2="128" y2="${(y + LAYER_H - 10).toFixed(1)}" stroke="${fill}55" stroke-width="1"/>`)
 
-    // Component chips
-    let chipX = 140
-    const chipY = y + (LAYER_H - 26) / 2
-    layer.children.slice(0, 7).forEach(child => {
-      const label = truncate(child.label, 13)
-      const chipW = label.length * 7 + 18
-      if (chipX + chipW > W - 16) return
-      parts.push(
-        `<rect x="${chipX.toFixed(1)}" y="${chipY.toFixed(1)}" width="${chipW}" height="26" rx="5" fill="${theme.surface}" stroke="${fill}66" stroke-width="1"/>`,
-        `<text x="${(chipX + chipW / 2).toFixed(1)}" y="${(chipY + 16).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(label)}</text>`,
-      )
-      chipX += chipW + 8
-    })
+      // Component chips
+      let chipX = 140
+      const chipY = y + (LAYER_H - 26) / 2
+      layer.children.slice(0, 7).forEach(child => {
+        const label = truncate(child.label, 13)
+        const chipW = label.length * 7 + 18
+        if (chipX + chipW > W - 16) return
+        parts.push(
+          `<rect x="${chipX.toFixed(1)}" y="${chipY.toFixed(1)}" width="${chipW}" height="26" rx="5" fill="${theme.surface}" stroke="${fill}66" stroke-width="1"/>`,
+          `<text x="${(chipX + chipW / 2).toFixed(1)}" y="${(chipY + 16).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(label)}</text>`,
+        )
+        chipX += chipW + 8
+      })
+    }
 
     // Connector arrow to next layer
     if (i < layers.length - 1) {
@@ -128,7 +140,7 @@ function renderEntity(spec: MdArtSpec, theme: MdArtTheme): string {
     // Header — rounded top via path
     parts.push(
       `<path d="M${(x + 6).toFixed(1)},${y.toFixed(1)} Q${x.toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${(y + 6).toFixed(1)} L${x.toFixed(1)},${(y + HEADER_H).toFixed(1)} L${(x + ENT_W).toFixed(1)},${(y + HEADER_H).toFixed(1)} L${(x + ENT_W).toFixed(1)},${(y + 6).toFixed(1)} Q${(x + ENT_W).toFixed(1)},${y.toFixed(1)} ${(x + ENT_W - 6).toFixed(1)},${y.toFixed(1)} Z" fill="${theme.accent}33"/>`,
-      `<text x="${(x + ENT_W / 2).toFixed(1)}" y="${(y + 19).toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(truncate(entity.label, 14))}</text>`,
+      `<text x="${(x + ENT_W / 2).toFixed(1)}" y="${(y + 19).toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${tt(entity.label, 14)}</text>`,
     )
 
     // Divider
@@ -141,7 +153,7 @@ function renderEntity(spec: MdArtSpec, theme: MdArtTheme): string {
       const isFK = field.attrs.includes('FK')
       const textColor = isPK ? theme.accent : isFK ? '#c4b5fd' : theme.textMuted
 
-      parts.push(`<text x="${(x + 10).toFixed(1)}" y="${fy.toFixed(1)}" font-size="10" fill="${textColor}" font-family="ui-monospace,monospace">${escapeXml(truncate(field.label, 16))}</text>`)
+      parts.push(`<text x="${(x + 10).toFixed(1)}" y="${fy.toFixed(1)}" font-size="10" fill="${textColor}" font-family="ui-monospace,monospace">${tt(field.label, 16)}</text>`)
 
       if (isPK || isFK) {
         const badge = isPK ? 'PK' : 'FK'
@@ -226,7 +238,7 @@ function renderNetwork(spec: MdArtSpec, theme: MdArtTheme): string {
     const fill = isTop ? theme.surface : `${theme.surface}cc`
     nodes.push(
       `<rect x="${(x - NODE_W / 2).toFixed(1)}" y="${(y - NODE_H / 2).toFixed(1)}" width="${NODE_W}" height="${NODE_H}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="1.2"/>`,
-      `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(label, 13))}</text>`,
+      `<text x="${x.toFixed(1)}" y="${(y + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(label, 13)}</text>`,
     )
   })
 
@@ -259,7 +271,7 @@ function renderPipeline(spec: MdArtSpec, theme: MdArtTheme): string {
 
     parts.push(
       `<rect x="${x.toFixed(1)}" y="${stageY.toFixed(1)}" width="${STAGE_W.toFixed(1)}" height="${STAGE_H}" rx="6" fill="${fill}33" stroke="${fill}99" stroke-width="1.5"/>`,
-      `<text x="${(x + STAGE_W / 2).toFixed(1)}" y="${(stageY + STAGE_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, Math.floor(STAGE_W / 7)))}</text>`,
+      `<text x="${(x + STAGE_W / 2).toFixed(1)}" y="${(stageY + STAGE_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(item.label, Math.floor(STAGE_W / 7))}</text>`,
     )
 
     // Chevron arrow
@@ -324,7 +336,7 @@ function renderSequence(spec: MdArtSpec, theme: MdArtTheme): string {
     const bw = Math.min(COL_W - 16, 96)
     parts.push(
       `<rect x="${(x - bw/2).toFixed(1)}" y="${actorBoxY.toFixed(1)}" width="${bw.toFixed(1)}" height="${ACTOR_H}" rx="5" fill="${theme.accent}22" stroke="${theme.accent}77" stroke-width="1.5"/>`,
-      `<text x="${x.toFixed(1)}" y="${(actorBoxY + 18).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(actor, 11))}</text>`,
+      `<text x="${x.toFixed(1)}" y="${(actorBoxY + 18).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(actor, 11)}</text>`,
     )
   })
 
@@ -349,7 +361,7 @@ function renderSequence(spec: MdArtSpec, theme: MdArtTheme): string {
       const lx = x1 + COL_W * 0.28
       parts.push(
         `<path d="M${x1.toFixed(1)},${y.toFixed(1)} C${lx.toFixed(1)},${(y - 10).toFixed(1)} ${lx.toFixed(1)},${(y + 10).toFixed(1)} ${x1.toFixed(1)},${(y + MSG_GAP * 0.55).toFixed(1)}" fill="none" stroke="${theme.accent}99" stroke-width="1.5" marker-end="url(#sq-a)"/>`,
-        msg.msg ? `<text x="${(lx + 4).toFixed(1)}" y="${(y - 1).toFixed(1)}" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(msg.msg, 11))}</text>` : '',
+        msg.msg ? `<text x="${(lx + 4).toFixed(1)}" y="${(y - 1).toFixed(1)}" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(msg.msg, 11)}</text>` : '',
       )
     } else {
       const isRet = ti < fi
@@ -360,7 +372,7 @@ function renderSequence(spec: MdArtSpec, theme: MdArtTheme): string {
       const maxChars = Math.max(8, Math.floor(Math.abs(ex2 - ex1) / 7))
       parts.push(
         `<line x1="${ex1.toFixed(1)}" y1="${y.toFixed(1)}" x2="${ex2.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${isRet ? theme.muted + 'bb' : theme.accent}" stroke-width="1.5"${isRet ? ' stroke-dasharray="5,3"' : ''} marker-end="${isRet ? 'url(#sq-b)' : 'url(#sq-a)'}"/>`,
-        msg.msg ? `<text x="${midX.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(msg.msg, maxChars))}</text>` : '',
+        msg.msg ? `<text x="${midX.toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(msg.msg, maxChars)}</text>` : '',
       )
     }
   })
@@ -413,7 +425,7 @@ function renderStateMachine(spec: MdArtSpec, theme: MdArtTheme): string {
         const by = src.y - STATE_H / 2
         parts.push(
           `<path d="M${(bx - 4).toFixed(1)},${by.toFixed(1)} C${(bx + 26).toFixed(1)},${(by - 28).toFixed(1)} ${(bx + 26).toFixed(1)},${(by + 12).toFixed(1)} ${(bx - 4).toFixed(1)},${(by + STATE_H).toFixed(1)}" fill="none" stroke="${theme.accent}66" stroke-width="1.5" marker-end="url(#sm-a)"/>`,
-          fc.value ? `<text x="${(bx + 32).toFixed(1)}" y="${(by - 6).toFixed(1)}" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(fc.value, 12))}</text>` : '',
+          fc.value ? `<text x="${(bx + 32).toFixed(1)}" y="${(by - 6).toFixed(1)}" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(fc.value, 12)}</text>` : '',
         )
       } else {
         const dx = dst.x - src.x, dy = dst.y - src.y
@@ -430,7 +442,7 @@ function renderStateMachine(spec: MdArtSpec, theme: MdArtTheme): string {
         const ty = (y1 + y2) / 2 + nx * 12 * sign
         parts.push(
           `<path d="M${x1.toFixed(1)},${y1.toFixed(1)} Q${cpx.toFixed(1)},${cpy.toFixed(1)} ${x2.toFixed(1)},${y2.toFixed(1)}" fill="none" stroke="${theme.accent}66" stroke-width="1.5" marker-end="url(#sm-a)"/>`,
-          fc.value ? `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(fc.value, 14))}</text>` : '',
+          fc.value ? `<text x="${tx.toFixed(1)}" y="${ty.toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(fc.value, 14)}</text>` : '',
         )
       }
     })
@@ -457,7 +469,7 @@ function renderStateMachine(spec: MdArtSpec, theme: MdArtTheme): string {
     }
     parts.push(
       `<rect x="${(x - STATE_W/2).toFixed(1)}" y="${(y - STATE_H/2).toFixed(1)}" width="${STATE_W}" height="${STATE_H}" rx="6" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>`,
-      `<text x="${x.toFixed(1)}" y="${(y + 5).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(state.label, 12))}</text>`,
+      `<text x="${x.toFixed(1)}" y="${(y + 5).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(state.label, 12)}</text>`,
     )
   })
 
@@ -525,7 +537,7 @@ function renderClass(spec: MdArtSpec, theme: MdArtTheme): string {
     }
     const nameY = isSpecial ? y + 24 : y + 19
     parts.push(
-      `<text x="${(x + CLASS_W/2).toFixed(1)}" y="${nameY.toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="ui-monospace,monospace" font-weight="700"${isSpecial ? ' font-style="italic"' : ''}>${escapeXml(truncate(cls.label, Math.floor(CLASS_W / 7)))}</text>`,
+      `<text x="${(x + CLASS_W/2).toFixed(1)}" y="${nameY.toFixed(1)}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="ui-monospace,monospace" font-weight="700"${isSpecial ? ' font-style="italic"' : ''}>${tt(cls.label, Math.floor(CLASS_W / 7))}</text>`,
       `<line x1="${x.toFixed(1)}" y1="${(y + HEADER_H).toFixed(1)}" x2="${(x + CLASS_W).toFixed(1)}" y2="${(y + HEADER_H).toFixed(1)}" stroke="${theme.accent}44" stroke-width="1"/>`,
     )
 

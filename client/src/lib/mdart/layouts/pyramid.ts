@@ -11,6 +11,12 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
+function tt(s: string, max: number): string {
+  const tr = truncate(s, max)
+  if (tr === s) return escapeXml(s)
+  return `<title>${escapeXml(s)}</title>${escapeXml(tr)}`
+}
+
 function hexToRgb(hex: string): [number, number, number] {
   const n = parseInt(hex.replace('#', '').slice(0, 6), 16)
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
@@ -78,14 +84,14 @@ export function renderPyramid(spec: MdArtSpec, theme: MdArtTheme): string {
     const textY = y + LAYER_H / 2 + fontSize / 3
     const maxChars = Math.max(4, Math.floor(midW / 7))
     labels.push(
-      `<text x="${cxPos.toFixed(1)}" y="${textY.toFixed(1)}" text-anchor="middle" font-size="${fontSize}" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, maxChars))}</text>`,
+      `<text x="${cxPos.toFixed(1)}" y="${textY.toFixed(1)}" text-anchor="middle" font-size="${fontSize}" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(item.label, maxChars)}</text>`,
     )
 
     // Optional side label when layer is too narrow to hold text
     if (midW < 60 && item.label) {
       const sideX = cxPos + Math.max(topW, botW) / 2 + 8
       labels.push(
-        `<text x="${sideX.toFixed(1)}" y="${textY.toFixed(1)}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(item.label, 20))}</text>`,
+        `<text x="${sideX.toFixed(1)}" y="${textY.toFixed(1)}" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.label, 20)}</text>`,
       )
     }
   }

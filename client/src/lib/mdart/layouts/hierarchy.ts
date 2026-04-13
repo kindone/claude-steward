@@ -11,6 +11,12 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s
 }
 
+function tt(s: string, max: number): string {
+  const tr = truncate(s, max)
+  if (tr === s) return escapeXml(s)
+  return `<title>${escapeXml(s)}</title>${escapeXml(tr)}`
+}
+
 function countLeaves(item: MdArtItem): number {
   if (item.children.length === 0) return 1
   return item.children.reduce((s, c) => s + countLeaves(c), 0)
@@ -114,7 +120,7 @@ function renderOrgChart(spec: MdArtSpec, theme: MdArtTheme): string {
     const by = n.y - BOX_H / 2
     boxes.push(
       `<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${BOX_W}" height="${BOX_H}" rx="6" fill="${theme.surface}" stroke="${theme.accent}88" stroke-width="1.2"/>`,
-      `<text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(n.label, 15))}</text>`,
+      `<text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle" font-size="11" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(n.label, 15)}</text>`,
     )
   }
 
@@ -155,7 +161,7 @@ function renderMindMap(spec: MdArtSpec, theme: MdArtTheme): string {
   // Center node
   parts.push(
     `<ellipse cx="${cx}" cy="${cy}" rx="64" ry="24" fill="${theme.accent}44" stroke="${theme.accent}" stroke-width="1.5"/>`,
-    `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(centerLabel, 14))}</text>`,
+    `<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="12" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(centerLabel, 14)}</text>`,
   )
 
   for (let i = 0; i < n; i++) {
@@ -172,7 +178,7 @@ function renderMindMap(spec: MdArtSpec, theme: MdArtTheme): string {
     // Branch node (ellipse)
     parts.push(
       `<ellipse cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" rx="50" ry="20" fill="${theme.surface}" stroke="${theme.accent}88" stroke-width="1"/>`,
-      `<text x="${bx.toFixed(1)}" y="${(by + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(branch.label, 13))}</text>`,
+      `<text x="${bx.toFixed(1)}" y="${(by + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(branch.label, 13)}</text>`,
     )
 
     // Sub-branches
@@ -188,7 +194,7 @@ function renderMindMap(spec: MdArtSpec, theme: MdArtTheme): string {
 
       parts.push(
         `<line x1="${bx.toFixed(1)}" y1="${by.toFixed(1)}" x2="${sx.toFixed(1)}" y2="${sy.toFixed(1)}" stroke="${theme.muted}" stroke-width="1" opacity="0.8"/>`,
-        `<text x="${sx.toFixed(1)}" y="${(sy + 3).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(truncate(subs[j].label, 11))}</text>`,
+        `<text x="${sx.toFixed(1)}" y="${(sy + 3).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(subs[j].label, 11)}</text>`,
       )
     }
   }
@@ -235,7 +241,7 @@ function renderHOrgChart(spec: MdArtSpec, theme: MdArtTheme): string {
     }
     const bx = n.x - NODE_W / 2, by = n.y - NODE_H / 2
     boxes.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${NODE_W}" height="${NODE_H}" rx="5" fill="${theme.surface}" stroke="${theme.accent}88" stroke-width="1.2"/>`)
-    boxes.push(`<text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle" font-size="10.5" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(n.label, 14))}</text>`)
+    boxes.push(`<text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle" font-size="10.5" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(n.label, 14)}</text>`)
   }
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:${theme.bg};border-radius:8px">
   ${spec.title ? `<text x="${(W/2).toFixed(1)}" y="18" text-anchor="middle" font-size="13" fill="${theme.textMuted}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(spec.title)}</text>` : ''}
@@ -292,7 +298,7 @@ function renderHierarchyList(spec: MdArtSpec, theme: MdArtTheme): string {
     const fs = row.depth === 0 ? 12 : row.depth === 1 ? 11 : 10
     const fw = row.depth === 0 ? '700' : '400'
     const tf = row.depth === 0 ? theme.text : row.depth === 1 ? theme.text : theme.textMuted
-    parts.push(`<text x="${textX.toFixed(1)}" y="${(y + 4).toFixed(1)}" font-size="${fs}" fill="${tf}" font-family="system-ui,sans-serif" font-weight="${fw}">${escapeXml(truncate(row.label, 40))}</text>`)
+    parts.push(`<text x="${textX.toFixed(1)}" y="${(y + 4).toFixed(1)}" font-size="${fs}" fill="${tf}" font-family="system-ui,sans-serif" font-weight="${fw}">${tt(row.label, 40)}</text>`)
   })
 
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:${theme.bg};border-radius:8px">
@@ -331,26 +337,26 @@ function renderRadialTree(spec: MdArtSpec, theme: MdArtTheme): string {
       const sx = bx + R2 * Math.cos(sa), sy = by + R2 * Math.sin(sa)
       parts.push(`<line x1="${bx.toFixed(1)}" y1="${by.toFixed(1)}" x2="${sx.toFixed(1)}" y2="${sy.toFixed(1)}" stroke="${theme.border}88" stroke-width="1.5"/>`)
       parts.push(`<circle cx="${sx.toFixed(1)}" cy="${sy.toFixed(1)}" r="14" fill="${theme.surface}" stroke="${theme.border}" stroke-width="1"/>`)
-      parts.push(`<text x="${sx.toFixed(1)}" y="${(sy + 3.5).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(subs[j].label, 9))}</text>`)
+      parts.push(`<text x="${sx.toFixed(1)}" y="${(sy + 3.5).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(subs[j].label, 9)}</text>`)
     }
     parts.push(`<circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="22" fill="${theme.primary}" stroke="${theme.bg}" stroke-width="2"/>`)
     const ws = branch.label.split(' ')
     if (ws.length === 1) {
-      parts.push(`<text x="${bx.toFixed(1)}" y="${(by + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${escapeXml(truncate(branch.label, 9))}</text>`)
+      parts.push(`<text x="${bx.toFixed(1)}" y="${(by + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${tt(branch.label, 9)}</text>`)
     } else {
       const m = Math.ceil(ws.length / 2)
-      parts.push(`<text x="${bx.toFixed(1)}" y="${(by - 1).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${escapeXml(truncate(ws.slice(0,m).join(' '), 9))}</text>`)
-      parts.push(`<text x="${bx.toFixed(1)}" y="${(by + 9).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${escapeXml(truncate(ws.slice(m).join(' '), 9))}</text>`)
+      parts.push(`<text x="${bx.toFixed(1)}" y="${(by - 1).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${tt(ws.slice(0,m).join(' '), 9)}</text>`)
+      parts.push(`<text x="${bx.toFixed(1)}" y="${(by + 9).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${tt(ws.slice(m).join(' '), 9)}</text>`)
     }
   }
   parts.push(`<circle cx="${cx}" cy="${cy}" r="32" fill="${theme.accent}" stroke="${theme.bg}" stroke-width="2"/>`)
   const cw = centerLabel.split(' ')
   if (cw.length === 1) {
-    parts.push(`<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="11" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${escapeXml(truncate(centerLabel, 12))}</text>`)
+    parts.push(`<text x="${cx}" y="${cy + 4}" text-anchor="middle" font-size="11" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${tt(centerLabel, 12)}</text>`)
   } else {
     const m = Math.ceil(cw.length / 2)
-    parts.push(`<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="10" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${escapeXml(truncate(cw.slice(0,m).join(' '), 12))}</text>`)
-    parts.push(`<text x="${cx}" y="${cy + 11}" text-anchor="middle" font-size="10" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${escapeXml(truncate(cw.slice(m).join(' '), 12))}</text>`)
+    parts.push(`<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="10" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${tt(cw.slice(0,m).join(' '), 12)}</text>`)
+    parts.push(`<text x="${cx}" y="${cy + 11}" text-anchor="middle" font-size="10" fill="${theme.bg}" font-weight="700" font-family="system-ui,sans-serif">${tt(cw.slice(m).join(' '), 12)}</text>`)
   }
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:${theme.bg};border-radius:8px">
   ${parts.join('\n  ')}
@@ -396,11 +402,11 @@ function renderDecisionTree(spec: MdArtSpec, theme: MdArtTheme): string {
     const { x, y } = n
     if (n.children.length > 0) {
       shapes.push(`<polygon points="${x},${(y-DH).toFixed(1)} ${(x+DW).toFixed(1)},${y} ${x},${(y+DH).toFixed(1)} ${(x-DW).toFixed(1)},${y}" fill="${theme.surface}" stroke="${theme.primary}aa" stroke-width="1.5"/>`)
-      shapes.push(`<text x="${x}" y="${(y+4).toFixed(1)}" text-anchor="middle" font-size="9.5" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(n.label, 10))}</text>`)
+      shapes.push(`<text x="${x}" y="${(y+4).toFixed(1)}" text-anchor="middle" font-size="9.5" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${tt(n.label, 10)}</text>`)
     } else {
       const bx = x - LW / 2, by = y - LH / 2
       shapes.push(`<rect x="${bx.toFixed(1)}" y="${by.toFixed(1)}" width="${LW}" height="${LH}" rx="5" fill="${theme.surface}" stroke="${theme.accent}88" stroke-width="1.2"/>`)
-      shapes.push(`<text x="${x.toFixed(1)}" y="${(y+4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${escapeXml(truncate(n.label, 13))}</text>`)
+      shapes.push(`<text x="${x.toFixed(1)}" y="${(y+4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.text}" font-family="system-ui,sans-serif">${tt(n.label, 13)}</text>`)
     }
   }
 
@@ -450,7 +456,7 @@ function renderSitemap(spec: MdArtSpec, theme: MdArtTheme): string {
     const fill = n.level === 0 ? theme.accent : n.level === 1 ? theme.primary : theme.secondary
     boxes.push(`<rect x="${(n.x - bw(n.level)/2).toFixed(1)}" y="${(n.y - bh(n.level)/2).toFixed(1)}" width="${bw(n.level)}" height="${bh(n.level)}" rx="4" fill="${fill}" stroke="${theme.bg}" stroke-width="1.5"/>`)
     const fs = n.level === 0 ? 10 : n.level === 1 ? 9 : 8
-    boxes.push(`<text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle" font-size="${fs}" fill="${theme.bg}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(truncate(n.label, 12))}</text>`)
+    boxes.push(`<text x="${n.x.toFixed(1)}" y="${(n.y + 4).toFixed(1)}" text-anchor="middle" font-size="${fs}" fill="${theme.bg}" font-family="system-ui,sans-serif" font-weight="600">${tt(n.label, 12)}</text>`)
   }
 
   return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;background:${theme.bg};border-radius:8px">
@@ -500,7 +506,7 @@ function renderBracketTree(spec: MdArtSpec, theme: MdArtTheme): string {
         const stroke = isWinner ? theme.accent : theme.border
         const fw = isWinner ? '700' : r === 0 ? '400' : '600'
         parts.push(`<rect x="${x}" y="${boxY.toFixed(1)}" width="${BOX_W}" height="${BOX_H}" rx="3" fill="${fill}" stroke="${stroke}88" stroke-width="1.2"/>`)
-        parts.push(`<text x="${(x + BOX_W/2).toFixed(1)}" y="${(nodeY + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${isWinner ? theme.bg : theme.text}" font-family="system-ui,sans-serif" font-weight="${fw}">${escapeXml(truncate(label, 13))}</text>`)
+        parts.push(`<text x="${(x + BOX_W/2).toFixed(1)}" y="${(nodeY + 4).toFixed(1)}" text-anchor="middle" font-size="9" fill="${isWinner ? theme.bg : theme.text}" font-family="system-ui,sans-serif" font-weight="${fw}">${tt(label, 13)}</text>`)
       } else {
         parts.push(`<rect x="${x}" y="${boxY.toFixed(1)}" width="${BOX_W}" height="${BOX_H}" rx="3" fill="none" stroke="${theme.border}28" stroke-width="1" stroke-dasharray="3,2"/>`)
         parts.push(`<text x="${(x + BOX_W/2).toFixed(1)}" y="${(nodeY + 4).toFixed(1)}" text-anchor="middle" font-size="8" fill="${theme.border}44" font-family="system-ui,sans-serif">bye</text>`)
