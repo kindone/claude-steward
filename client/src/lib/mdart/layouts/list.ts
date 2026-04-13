@@ -1,4 +1,4 @@
-import type { MdArtSpec } from '../parser'
+import type { MdArtItem, MdArtSpec } from '../parser'
 import type { MdArtTheme } from '../theme'
 
 function escapeXml(s: string): string {
@@ -518,7 +518,26 @@ function renderTrapezoidList(spec: MdArtSpec, theme: MdArtTheme): string {
 }
 
 // ── Tab list ──────────────────────────────────────────────────────────────────
-// Tabbed panel: top-level items = tabs; first item's children shown in content panel
+// Tabbed panel: top-level items = tabs; each tab's children in a panel (click to switch).
+// Interaction: `tabListInteract.ts` + click delegation in MdArtView / MessageBubble / ArtifactViewer.
+
+function tabPanelContentParts(item: MdArtItem, theme: MdArtTheme, panelY: number, W: number): string[] {
+  const cx = W / 2
+  const parts: string[] = []
+  parts.push(`<text x="${cx}" y="${panelY + 26}" text-anchor="middle" font-size="13" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(item.label)}</text>`)
+  if (item.value) {
+    parts.push(`<text x="${cx}" y="${panelY + 44}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(item.value)}</text>`)
+  }
+  const childRow = item.children.map(c => c.label).join('  ·  ')
+  if (childRow) {
+    parts.push(`<text x="${cx}" y="${panelY + 62}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(childRow, 55)}</text>`)
+  }
+  const subRow = item.children.flatMap(c => c.children).map(c => c.label).join('  ·  ')
+  if (subRow) {
+    parts.push(`<text x="${cx}" y="${panelY + 78}" text-anchor="middle" font-size="9" fill="${theme.muted}" font-family="system-ui,sans-serif">${tt(subRow, 60)}</text>`)
+  }
+  return parts
+}
 
 function renderTabList(spec: MdArtSpec, theme: MdArtTheme): string {
   const items = spec.items
@@ -526,45 +545,47 @@ function renderTabList(spec: MdArtSpec, theme: MdArtTheme): string {
   const W = 500, TAB_H = 28, CONTENT_H = 100, TAB_W = Math.min(110, (W - 8) / items.length)
   const titleH = spec.title ? 30 : 8
   const H = titleH + TAB_H + CONTENT_H + 8
-  const t0 = items.length > 1 ? 0 : 0
-  const activeFill = lerpColor(theme.primary, theme.secondary, t0)
-  const active = items[0]
+  const activeFill = lerpColor(theme.primary, theme.secondary, 0)
   const parts: string[] = []
-  if (spec.title) parts.push(`<text x="${W/2}" y="22" text-anchor="middle" font-size="13" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(spec.title)}</text>`)
+  if (spec.title) {
+    parts.push(`<text x="${W / 2}" y="22" text-anchor="middle" font-size="13" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="700">${escapeXml(spec.title)}</text>`)
+  }
 
-  // Tabs
+  parts.push(`<g class="mdart-tab-root" data-text-muted="${escapeXml(theme.textMuted)}">`)
+
+  // Tabs (uniform row; active vs inactive styled via fill/stroke — toggled on click)
   items.forEach((item, i) => {
     const tx = 4 + i * (TAB_W + 2)
     const ty = titleH
     const t = items.length > 1 ? i / (items.length - 1) : 0
     const fill = lerpColor(theme.primary, theme.secondary, t)
-    if (i === 0) {
-      parts.push(`<rect x="${tx}" y="${ty}" width="${TAB_W}" height="${TAB_H}" rx="5" fill="${fill}"/>`)
-      parts.push(`<text x="${(tx + TAB_W/2).toFixed(1)}" y="${(ty + TAB_H/2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${tt(item.label, 12)}</text>`)
-    } else {
-      parts.push(`<rect x="${tx}" y="${ty + 4}" width="${TAB_W}" height="${TAB_H - 4}" rx="4" fill="${fill}22" stroke="${fill}55" stroke-width="1"/>`)
-      parts.push(`<text x="${(tx + TAB_W/2).toFixed(1)}" y="${(ty + TAB_H/2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(item.label, 12)}</text>`)
-    }
+    const isActive = i === 0
+    parts.push(
+      `<g class="mdart-tab-hit" data-tab="${i}" data-color="${fill}" style="cursor:pointer">` +
+        `<rect class="mdart-tab-rect" x="${tx}" y="${ty}" width="${TAB_W}" height="${TAB_H}" rx="5" ` +
+        `fill="${isActive ? fill : `${fill}22`}" ` +
+        `${isActive ? '' : `stroke="${fill}55" stroke-width="1"`}/>` +
+        `<text class="mdart-tab-label" x="${(tx + TAB_W / 2).toFixed(1)}" y="${(ty + TAB_H / 2 + 4).toFixed(1)}" text-anchor="middle" font-size="10" ` +
+        `fill="${isActive ? '#ffffff' : theme.textMuted}" font-family="system-ui,sans-serif" font-weight="${isActive ? '700' : '400'}">${tt(item.label, 12)}</text>` +
+      `</g>`,
+    )
   })
 
-  // Content panel
   const panelY = titleH + TAB_H
-  parts.push(`<rect x="0" y="${panelY}" width="${W}" height="${CONTENT_H}" rx="0 6 6 6" fill="${activeFill}11" stroke="${activeFill}44" stroke-width="1.2"/>`)
+  parts.push(
+    `<rect class="mdart-tab-content-bg" x="0" y="${panelY}" width="${W}" height="${CONTENT_H}" rx="0 6 6 6" ` +
+    `fill="${activeFill}11" stroke="${activeFill}44" stroke-width="1.2"/>`,
+  )
 
-  // Active tab content: title + children
-  const cx = W / 2
-  parts.push(`<text x="${cx}" y="${panelY + 26}" text-anchor="middle" font-size="13" fill="${theme.text}" font-family="system-ui,sans-serif" font-weight="600">${escapeXml(active.label)}</text>`)
-  if (active.value) {
-    parts.push(`<text x="${cx}" y="${panelY + 44}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${escapeXml(active.value)}</text>`)
-  }
-  const childRow = active.children.map(c => c.label).join('  ·  ')
-  if (childRow) {
-    parts.push(`<text x="${cx}" y="${panelY + 62}" text-anchor="middle" font-size="10" fill="${theme.textMuted}" font-family="system-ui,sans-serif">${tt(childRow, 55)}</text>`)
-  }
-  const subRow = active.children.flatMap(c => c.children).map(c => c.label).join('  ·  ')
-  if (subRow) {
-    parts.push(`<text x="${cx}" y="${panelY + 78}" text-anchor="middle" font-size="9" fill="${theme.muted}" font-family="system-ui,sans-serif">${tt(subRow, 60)}</text>`)
-  }
+  items.forEach((item, i) => {
+    const vis = i === 0 ? 'visible' : 'hidden'
+    parts.push(`<g class="mdart-tab-panel" data-tab="${i}" visibility="${vis}">`)
+    parts.push(...tabPanelContentParts(item, theme, panelY, W))
+    parts.push('</g>')
+  })
+
+  parts.push('</g>') // mdart-tab-root
+
   return svg(W, H, theme, parts)
 }
 

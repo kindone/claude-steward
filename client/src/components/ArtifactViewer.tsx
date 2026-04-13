@@ -6,6 +6,7 @@ import type { Artifact } from '../lib/api'
 import { buildMarkedOptions, utf8FromBase64 } from '../lib/markdownRenderer'
 import { renderPikchr } from '../lib/pikchrRenderer'
 import { renderMdArt } from '../lib/mdart/renderer'
+import { tryActivateMdArtTabFromEventTarget } from '../lib/mdart/tabListInteract'
 import { MdArtView } from './MdArtView'
 import { LinkPreviewCard } from './LinkPreviewCard'
 import type { LinkPreviewCardHandle } from './LinkPreviewCard'
@@ -287,6 +288,7 @@ function ReportView({ content, projectId }: { content: string; projectId: string
     }
 
     function onClick(e: MouseEvent) {
+      if (tryActivateMdArtTabFromEventTarget(e.target)) return
       const link = (e.target as Element).closest<HTMLAnchorElement>('a[href]')
       if (!link) return
       const href = link.getAttribute('href') ?? ''

@@ -6,6 +6,7 @@ import hljs from 'highlight.js'
 import mermaid from 'mermaid'
 import { renderPikchr } from '../lib/pikchrRenderer'
 import { renderMdArt } from '../lib/mdart/renderer'
+import { tryActivateMdArtTabFromEventTarget } from '../lib/mdart/tabListInteract'
 import 'highlight.js/styles/github-dark.css'
 import 'katex/dist/katex.min.css'
 import type { ClaudeErrorCode, ToolCall } from '../lib/api'
@@ -421,6 +422,9 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       }
       return
     }
+
+    // MdArt tab-list: switch tab (must run before generic svg → lightbox)
+    if (tryActivateMdArtTabFromEventTarget(target)) return
 
     // mdart save button
     if (target.closest('.mdart-save-btn')) {

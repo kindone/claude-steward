@@ -228,6 +228,7 @@ Named overrides: `theme: amber`, `theme: rose`, `theme: mono-light` (print-frien
    ```
 2. `MessageBubble.tsx` hydration effect — call `renderMdArt(src)` → inject SVG into placeholder
 3. Overlay 📎 button on hover → "Save as Artifact" (saves source text as `mdart` artifact)
+4. **`tab-list`:** tabs are clickable — `tabListInteract.ts` toggles panels; wired from `MessageBubble`, `ArtifactViewer` (markdown artifacts), and `MdArtView`
 
 ### Artifact type `mdart`
 

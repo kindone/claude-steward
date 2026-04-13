@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { renderMdArt } from '../lib/mdart/renderer'
+import { tryActivateMdArtTabFromEventTarget } from '../lib/mdart/tabListInteract'
 
 interface Props {
   content: string
@@ -37,7 +38,16 @@ export function MdArtView({ content }: Props) {
           ↓ SVG
         </button>
       </div>
-      <div className="w-full" dangerouslySetInnerHTML={{ __html: svg }} />
+      <div
+        className="w-full"
+        dangerouslySetInnerHTML={{ __html: svg }}
+        onClick={(e) => {
+          if (tryActivateMdArtTabFromEventTarget(e.target)) {
+            e.preventDefault()
+            e.stopPropagation()
+          }
+        }}
+      />
     </div>
   )
 }
