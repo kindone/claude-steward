@@ -30,6 +30,7 @@
     "dompurify": "^3.3.3",
     "highlight.js": "^11.11.1",
     "katex": "^0.16.44",
+    "mdart": "*",
     "marked": "^15.0.7",
     "marked-footnote": "^1.4.0",
     "mermaid": "^11.13.0",

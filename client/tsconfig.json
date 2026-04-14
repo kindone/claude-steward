@@ -11,7 +11,11 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "noEmit": true
+    "noEmit": true,
+    "paths": {
+      "mdart":         ["../packages/mdart/src/index.ts"],
+      "mdart/preview": ["../packages/mdart/src/tabListInteract.ts"]
+    }
   },
   "include": ["src"]
 }

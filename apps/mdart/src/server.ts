@@ -21,16 +21,13 @@ import express     from 'express'
 import path        from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-// Import mdart core directly from client workspace.
-// tsx resolves .js → .ts automatically; no separate build needed.
-import { renderMdArt } from '../../../client/src/lib/mdart/renderer.js'
-import { parseMdArt }  from '../../../client/src/lib/mdart/parser.js'
+import { renderMdArt, parseMdArt } from 'mdart'
 
-// Ecosystem adapters — real plugin implementations using the local mdart core.
-// In a published package, these would import from '@mdart/core' instead.
-import { renderWithMarked }      from './adapters/marked-adapter.js'
-import { renderWithMarkdownIt }  from './adapters/markdown-it-adapter.js'
-import { renderWithUnified }     from './adapters/remark-adapter.js'
+// Ecosystem adapters — each is a real adapter package (workspace-resolved locally,
+// published to npm when ready).
+import { renderWithMarked }      from 'mdart-marked'
+import { renderWithMarkdownIt }  from 'mdart-markdown-it'
+import { renderWithUnified }     from 'mdart-remark'
 
 type EcosystemAdapter = 'marked' | 'markdown-it' | 'unified'
 

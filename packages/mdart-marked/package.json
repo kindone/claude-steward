@@ -1,0 +1,31 @@
+{
+  "name": "mdart-marked",
+  "version": "0.1.0",
+  "description": "marked v15 extension that renders mdart diagram fences as inline SVG",
+  "type": "module",
+  "exports": {
+    ".": {
+      "development": "./src/index.ts",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && node scripts/build-esm.js",
+    "dev": "tsc -p tsconfig.build.json --watch",
+    "check": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "mdart": ">=0.1.0",
+    "marked": ">=15.0.0"
+  },
+  "devDependencies": {
+    "mdart": "*",
+    "marked": "^15.0.7",
+    "typescript": "^5.9.3",
+    "esbuild": "^0.25.0"
+  }
+}

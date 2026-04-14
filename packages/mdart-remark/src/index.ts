@@ -32,6 +32,7 @@ import { visit }              from 'unist-util-visit'
 import type { Root, Code, Html } from 'mdast'
 import type { Plugin }        from 'unified'
 
+// In a published package this would be:  import { renderMdArt } from '@mdart/core'
 import { renderMdArt } from 'mdart'
 
 // ── Plugin ────────────────────────────────────────────────────────────────────

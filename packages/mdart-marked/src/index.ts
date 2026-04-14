@@ -15,6 +15,7 @@
 
 import { Marked, type TokenizerExtension, type RendererExtension, type Tokens } from 'marked'
 
+// In a published package this would be:  import { renderMdArt } from '@mdart/core'
 import { renderMdArt } from 'mdart'
 
 // ── Token type ────────────────────────────────────────────────────────────────

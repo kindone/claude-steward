@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { renderMdArt } from '../lib/mdart/renderer'
-import { tryActivateMdArtTabFromEventTarget } from '../lib/mdart/tabListInteract'
+import { renderMdArt } from 'mdart'
+import { tryActivateMdArtTabFromEventTarget } from 'mdart/preview'
 
 interface Props {
   content: string

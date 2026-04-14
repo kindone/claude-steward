@@ -4,7 +4,9 @@
   "type": "module",
   "workspaces": [
     "server",
-    "client"
+    "client",
+    "packages/*",
+    "apps/*"
   ],
   "scripts": {
     "dev": "concurrently \"npm run dev --workspace=server\" \"npm run dev --workspace=client\"",

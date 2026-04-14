@@ -19,6 +19,7 @@
 import MarkdownIt from 'markdown-it'
 import type { PluginSimple } from 'markdown-it'
 
+// In a published package this would be:  import { renderMdArt } from '@mdart/core'
 import { renderMdArt } from 'mdart'
 
 // ── Plugin ────────────────────────────────────────────────────────────────────
