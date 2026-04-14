@@ -1017,6 +1017,7 @@ export function sendMessage(
       let buffer = ''
       let activityFired = false
       let pendingEvent = ''
+      let textBlockCount = 0
       let doneFired = false
       let errorFired = false
 
@@ -1085,6 +1086,12 @@ export function sendMessage(
                   if (evt?.type === 'content_block_start' && evt.content_block?.type === 'tool_use') {
                     // Tool is starting to stream its input — show name immediately as live indicator
                     handlers.onToolActivity?.(evt.content_block.name ?? 'tool')
+                  } else if (evt?.type === 'content_block_start' && evt.content_block?.type === 'text') {
+                    // New text block after a tool use — inject paragraph break between segments
+                    if (textBlockCount > 0) {
+                      handlers.onTextDelta('\n\n')
+                    }
+                    textBlockCount++
                   } else if (evt?.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
                     handlers.onToolActivity?.(null)   // clear indicator when text arrives
                     handlers.onTextDelta(evt.delta.text)

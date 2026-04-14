@@ -30,7 +30,12 @@ module.exports = {
       script: './server/dist/index.js',
       // Restart on clean exit (exit code 0) so the reload flow works.
       // PM2 default is to restart on any exit; autorestart: true covers this.
+      // max_restarts + min_uptime: if the process dies within 10s of starting
+      // (OOM signature), count it; if it lives longer (normal reload), reset.
+      // After 5 rapid deaths PM2 stops retrying instead of looping forever.
       autorestart: true,
+      max_restarts: 5,
+      min_uptime: '10s',
       watch: false,
       env: {
         NODE_ENV: 'production',
@@ -43,6 +48,8 @@ module.exports = {
       name: 'steward-worker',
       script: './server/dist/worker/main.js',
       autorestart: true,
+      max_restarts: 5,
+      min_uptime: '10s',
       watch: false,
       env: {
         NODE_ENV: 'production',
@@ -55,6 +62,8 @@ module.exports = {
       name: 'steward-apps',
       script: './server/dist/apps/sidecar.js',
       autorestart: true,
+      max_restarts: 5,
+      min_uptime: '10s',
       watch: false,
       env: {
         NODE_ENV: 'production',

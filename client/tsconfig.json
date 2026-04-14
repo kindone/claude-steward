@@ -13,8 +13,8 @@
     "resolveJsonModule": true,
     "noEmit": true,
     "paths": {
-      "mdart":         ["../packages/mdart/src/index.ts"],
-      "mdart/preview": ["../packages/mdart/src/tabListInteract.ts"]
+      "mdart":         ["../node_modules/mdart/src/index.ts"],
+      "mdart/preview": ["../node_modules/mdart/src/tabListInteract.ts"]
     }
   },
   "include": ["src"]

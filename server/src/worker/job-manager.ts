@@ -157,6 +157,17 @@ export class JobManager {
         this.onEvent({ type: 'session_id', sessionId, claudeSessionId: chunk.session_id as string })
       }
 
+      // New text block starting after a tool use — inject paragraph break
+      if (
+        chunk.type === 'stream_event' &&
+        (chunk.event as Record<string, unknown>)?.type === 'content_block_start' &&
+        ((chunk.event as Record<string, unknown>)?.content_block as Record<string, unknown>)?.type === 'text' &&
+        accumulatedText.length > 0 &&
+        !accumulatedText.endsWith('\n')
+      ) {
+        accumulatedText += '\n\n'
+      }
+
       // Accumulate text deltas
       if (
         chunk.type === 'stream_event' &&

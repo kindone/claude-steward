@@ -13,6 +13,7 @@ type StreamEventChunk = {
   event: {
     type: string
     index?: number
+    content_block?: { type: string; name?: string }
     delta?: { type: string; text: string }
   }
 }
@@ -170,6 +171,17 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
     if (chunk.type === 'system' && chunk.subtype === 'init' && !sessionIdEmitted) {
       sessionIdEmitted = true
       onSessionId(chunk.session_id)
+    }
+
+    // New text block starting after a tool use — inject paragraph break
+    if (
+      chunk.type === 'stream_event' &&
+      chunk.event.type === 'content_block_start' &&
+      chunk.event.content_block?.type === 'text' &&
+      accumulatedText.length > 0 &&
+      !accumulatedText.endsWith('\n')
+    ) {
+      accumulatedText += '\n\n'
     }
 
     if (

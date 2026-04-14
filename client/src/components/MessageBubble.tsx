@@ -183,12 +183,12 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
           pre.appendChild(group)
         }
 
-        // 📎 Artifact-save — leftmost, always shown when callback is available
+        // 🧩 Artifact-save — leftmost, always shown when callback is available
         if (!group.querySelector('.artifact-save-btn') && onSaveAsArtifactRef.current) {
           const btn = document.createElement('button')
           btn.className = 'artifact-save-btn'
           btn.title = 'Save as artifact'
-          btn.textContent = '📎'
+          btn.textContent = '🧩'
           btn.addEventListener('click', (e) => {
             e.stopPropagation()
             const code = pre.querySelector('code')?.textContent ?? ''
@@ -296,7 +296,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
     )
     if (placeholders.length === 0) return
 
-    // Inject a 📎 save-as-artifact button into a rendered pikchr div.
+    // Inject a 🧩 save-as-artifact button into a rendered pikchr div.
     // No native click listener — handleContentClick dispatches the save via
     // React's synthetic event system (avoids stopPropagation/synthetic ordering issues).
     const injectSaveBtn = (el: HTMLDivElement) => {
@@ -304,7 +304,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       const btn = document.createElement('button')
       btn.className = 'pikchr-save-btn'
       btn.title = 'Save as artifact'
-      btn.textContent = '📎'
+      btn.textContent = '🧩'
       el.appendChild(btn)
     }
 
@@ -353,7 +353,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       const btn = document.createElement('button')
       btn.className = 'mdart-save-btn pikchr-save-btn'
       btn.title = 'Save as artifact'
-      btn.textContent = '📎'
+      btn.textContent = '🧩'
       el.appendChild(btn)
     }
 
