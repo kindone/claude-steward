@@ -1,0 +1,1370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MdArt Playground</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d0d10;
+      --surface:   #16161d;
+      --border:    #2a2a38;
+      --text:      #e2e2ea;
+      --muted:     #6b6b80;
+      --accent:    #4f6ef7;
+      --accent-dim:#4f6ef722;
+      --green:     #34d399;
+      --red:       #f87171;
+      --radius:    8px;
+      --mono:      'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+      --vh: 100dvh;
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 13px;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+      height: var(--vh);   /* JS sets this to window.innerHeight on mobile */
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 16px;
+      height: 44px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .logo { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+    .logo span { color: var(--accent); }
+    .badge {
+      font-size: 10px;
+      background: var(--accent-dim);
+      color: var(--accent);
+      border: 1px solid var(--accent)44;
+      padding: 2px 7px;
+      border-radius: 20px;
+      font-weight: 500;
+    }
+    .header-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    #status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--muted); transition: background 0.3s;
+    }
+    #status-dot.ok  { background: var(--green); }
+    #status-dot.err { background: var(--red); }
+    #status-text { color: var(--muted); font-size: 12px; }
+
+    /* ── Mobile tab bar (hidden on desktop) ── */
+    .mobile-tabs {
+      display: none;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .mobile-tab {
+      flex: 1;
+      height: 40px;
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 500;
+      border-bottom: 2px solid transparent;
+    }
+    .mobile-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+      opacity: 1;
+    }
+
+    /* ── Main split ── */
+    .main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      min-height: 0;
+    }
+
+    /* ── Editor pane ── */
+    .editor-pane {
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border);
+    }
+    .pane-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      height: 36px;
+      overflow: hidden;
+    }
+    .pane-bar label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; flex-shrink: 0; }
+
+    #editor {
+      flex: 1;
+      background: transparent;
+      color: var(--text);
+      border: none;
+      outline: none;
+      padding: 16px;
+      font-family: var(--mono);
+      font-size: 13px;
+      line-height: 1.65;
+      resize: none;
+      tab-size: 2;
+      /* Prevent iOS zoom — will override to 16px on mobile */
+    }
+
+    .editor-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+
+    select, button {
+      font-family: inherit;
+      font-size: 12px;
+      padding: 5px 10px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    select:focus, button:focus { outline: 2px solid var(--accent)66; outline-offset: 1px; }
+    button:hover { opacity: 0.8; }
+    button.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+      font-weight: 500;
+      padding: 5px 14px;
+    }
+    button.ghost {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--muted);
+    }
+    button.ghost:hover { color: var(--text); border-color: var(--muted); opacity: 1; }
+
+    select { max-width: 170px; }
+    #example-select { max-width: 130px; }
+
+    /* ── Preview pane ── */
+    .preview-pane {
+      display: flex;
+      flex-direction: column;
+    }
+
+    #preview-area {
+      flex: 1;
+      overflow: auto;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px;
+      -webkit-overflow-scrolling: touch;
+    }
+    #preview-area.empty {
+      align-items: center;
+    }
+    .empty-hint {
+      color: var(--muted);
+      text-align: center;
+      line-height: 2;
+    }
+    .empty-hint kbd {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 11px;
+    }
+
+    #preview-area svg {
+      max-width: 100%;
+      height: auto;
+      cursor: default;
+    }
+
+    /* Tab-list hit areas — pointer cursor */
+    .mdart-tab-hit { cursor: pointer; }
+
+    .preview-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    #type-chip {
+      font-size: 11px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: 20px;
+      color: var(--muted);
+      display: none;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 160px;
+    }
+    #type-chip.visible { display: inline; }
+
+    .preview-footer .right { margin-left: auto; display: flex; gap: 6px; }
+
+    /* ── Error overlay ── */
+    .error-msg {
+      color: var(--red);
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 16px;
+      white-space: pre-wrap;
+    }
+
+    /* ── Mobile styles ── */
+    @media (max-width: 639px) {
+      /* Show mobile tab bar */
+      .mobile-tabs { display: flex; }
+
+      /* Stack panes vertically, each fills all available space */
+      .main {
+        grid-template-columns: 1fr;
+        grid-template-rows: 1fr;
+      }
+
+      /* Both panes fill the grid cell; JS toggles display */
+      .editor-pane, .preview-pane {
+        grid-row: 1;
+        grid-column: 1;
+      }
+      .editor-pane { border-right: none; }
+      /* Default: editor visible, preview hidden — JS takes over after first interaction */
+      .preview-pane { display: none; }
+
+      /* Prevent iOS zoom on focus */
+      #editor { font-size: 16px; }
+      select  { font-size: 16px; }
+
+      /* Bigger touch targets */
+      select, button {
+        min-height: 40px;
+        padding: 8px 12px;
+      }
+      button.primary { padding: 8px 18px; }
+
+      /* Footer: hint select fills row, buttons on second row */
+      .editor-footer {
+        padding: 8px;
+        gap: 6px;
+      }
+      #hint-select {
+        flex: 1;
+        max-width: none;
+        min-width: 0;
+      }
+
+      /* Pane bar: hide the label on mobile to save space */
+      .pane-bar label { display: none; }
+      .pane-bar { height: 40px; }
+      #type-chip { max-width: 220px; }
+
+      /* Preview padding tighter on mobile */
+      #preview-area { padding: 12px 8px; }
+
+      /* Shrink example select label */
+      #example-select { max-width: none; flex: 1; }
+    }
+
+    /* ── Tablet: narrow side-by-side ── */
+    @media (min-width: 640px) and (max-width: 900px) {
+      select { max-width: 120px; font-size: 11px; }
+      #example-select { max-width: 100px; }
+      .pane-bar label { font-size: 10px; }
+    }
+
+    /* ── Mode toggle ── */
+    .mode-toggle {
+      display: flex;
+      gap: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) + 2px);
+      padding: 2px;
+    }
+    .mode-toggle button {
+      padding: 3px 12px;
+      border: none;
+      border-radius: var(--radius);
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 500;
+      min-height: unset;
+    }
+    .mode-toggle button.active {
+      background: var(--accent);
+      color: #fff;
+    }
+    .mode-toggle button:hover:not(.active) { color: var(--text); opacity: 1; }
+
+    /* ── Ecosystem bar ── */
+    #ecosystem-bar {
+      display: none;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+    #ecosystem-bar.visible { display: flex; }
+    #ecosystem-bar label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
+    #adapter-select { max-width: 180px; }
+
+    /* ── HTML preview iframe ── */
+    #html-preview {
+      flex: 1;
+      width: 100%;
+      border: none;
+      display: none;
+      background: #fff;
+    }
+    #html-preview.visible { display: block; }
+
+    /* Markdown mode: hide SVG-specific footer buttons */
+    body.markdown-mode #copy-svg-btn,
+    body.markdown-mode #download-btn { display: none; }
+
+    /* Markdown mode: hide the hint-type select (n/a for ecosystem) */
+    body.markdown-mode #hint-row { display: none; }
+
+    @media (max-width: 639px) {
+      #adapter-select { max-width: none; flex: 1; }
+    }
+
+    /* ── Preview sub-tabs (markdown mode only) ── */
+    .preview-tabs {
+      display: none;
+      gap: 2px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) + 2px);
+      padding: 2px;
+    }
+    body.markdown-mode .preview-tabs { display: flex; }
+    body.markdown-mode .preview-pane .pane-bar > label { display: none; }
+
+    .preview-tab {
+      padding: 3px 12px;
+      border: none; border-radius: var(--radius);
+      background: transparent; color: var(--muted);
+      font-size: 12px; font-weight: 500;
+      cursor: pointer; min-height: unset;
+    }
+    .preview-tab.active { background: var(--accent); color: #fff; }
+    .preview-tab:hover:not(.active) { color: var(--text); opacity: 1; }
+
+    /* ── Integration panel ── */
+    #integration-panel {
+      display: none;
+      flex: 1;
+      flex-direction: column;
+      gap: 20px;
+      overflow: auto;
+      padding: 20px 24px;
+      min-height: 0;
+      -webkit-overflow-scrolling: touch;
+    }
+    #integration-panel.visible { display: flex; }
+
+    .int-label {
+      font-size: 10px; text-transform: uppercase;
+      letter-spacing: 0.8px; color: var(--muted);
+      font-weight: 600; margin-bottom: 8px;
+    }
+    .int-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+    .int-chip {
+      font-family: var(--mono); font-size: 12px;
+      padding: 3px 10px; border-radius: 20px; border: 1px solid;
+    }
+    .int-chip-main { background: var(--accent-dim); color: var(--accent); border-color: var(--accent)44; }
+    .int-chip-peer { background: transparent; color: var(--muted); border-color: var(--border); }
+    .int-peer-note { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+    .int-terminal {
+      display: flex; align-items: center; gap: 10px;
+      background: #0a0a0f; border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 10px 14px;
+      font-family: var(--mono); font-size: 12px;
+    }
+    .int-prompt { color: var(--green); user-select: none; flex-shrink: 0; }
+    .int-terminal code { flex: 1; color: var(--text); word-break: break-all; }
+    button.int-copy {
+      flex-shrink: 0; font-size: 11px; padding: 2px 8px;
+      min-height: unset; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 4px;
+      color: var(--muted);
+    }
+    button.int-copy:hover { color: var(--text); opacity: 1; }
+
+    pre.int-code {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 14px 16px;
+      font-family: var(--mono); font-size: 12px; line-height: 1.65;
+      color: var(--text); overflow-x: auto; white-space: pre;
+      -webkit-overflow-scrolling: touch; margin: 0;
+    }
+
+    .int-note {
+      font-size: 12px; color: var(--muted); line-height: 1.6;
+      border-left: 2px solid var(--border); padding-left: 10px;
+    }
+    .int-note code {
+      font-family: var(--mono); font-size: 11px;
+      background: var(--surface); padding: 1px 5px; border-radius: 3px;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <span class="logo">Md<span>Art</span></span>
+  <span class="badge">playground</span>
+  <div class="mode-toggle" id="mode-toggle">
+    <button class="active" data-mode="mdart">MdArt</button>
+    <button data-mode="markdown">Markdown</button>
+  </div>
+  <div class="header-right">
+    <span id="status-dot"></span>
+    <span id="status-text">ready</span>
+  </div>
+</header>
+
+<div class="mobile-tabs" id="mobile-tabs">
+  <button class="mobile-tab active" data-pane="editor">Editor</button>
+  <button class="mobile-tab" data-pane="preview">Preview</button>
+</div>
+
+<!-- ── Ecosystem adapter bar (shown in Markdown mode) ── -->
+<div id="ecosystem-bar">
+  <label>Adapter</label>
+  <select id="adapter-select" title="Markdown ecosystem to render through">
+    <option value="marked">marked v15</option>
+    <option value="markdown-it">markdown-it v14</option>
+    <option value="unified">unified / remark</option>
+  </select>
+  <span style="color:var(--muted);font-size:11px;margin-left:4px">
+    — processes full Markdown; mdart fences → inline SVG
+  </span>
+</div>
+
+<div class="main">
+
+  <!-- ── Editor pane ── -->
+  <div class="editor-pane">
+    <div class="pane-bar">
+      <label>Source</label>
+      <select id="example-select" title="Load an example">
+        <option value="">Examples…</option>
+      </select>
+    </div>
+
+    <textarea id="editor" spellcheck="false" autocorrect="off" autocapitalize="off"></textarea>
+
+    <div class="editor-footer">
+      <span id="hint-row" style="display:contents">
+        <select id="hint-select" title="Type hint (overrides front-matter)">
+          <option value="">Auto-detect type</option>
+        </select>
+      </span>
+      <button class="primary" id="render-btn" title="Render (Ctrl+Enter)">Render</button>
+      <button class="ghost" id="copy-src-btn" title="Copy source">Copy</button>
+    </div>
+  </div>
+
+  <!-- ── Preview pane ── -->
+  <div class="preview-pane">
+    <div class="pane-bar">
+      <label>Preview</label>
+      <!-- Sub-tabs: visible only in markdown mode -->
+      <div class="preview-tabs" id="preview-tabs">
+        <button class="preview-tab active" data-ptab="preview">Preview</button>
+        <button class="preview-tab" data-ptab="integration">Code</button>
+      </div>
+      <span id="type-chip"></span>
+    </div>
+
+    <div id="preview-area" class="empty">
+      <div class="empty-hint" id="empty-hint">
+        Write mdart source and press <kbd>Ctrl+Enter</kbd><br>
+        or tap <strong>Render</strong>
+      </div>
+      <iframe id="html-preview" sandbox="allow-scripts" title="Ecosystem HTML output"></iframe>
+    </div>
+
+    <!-- Integration code panel — sibling to preview-area, toggled by sub-tabs -->
+    <div id="integration-panel"></div>
+
+    <div class="preview-footer">
+      <div class="right">
+        <button class="ghost" id="copy-svg-btn" title="Copy SVG markup">Copy SVG</button>
+        <button class="ghost" id="download-btn" title="Download as SVG file">Download</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── Layout types for dropdown ─────────────────────────────────────────────────
+
+const LAYOUT_TYPES = [
+  // process
+  'process','chevron-process','arrow-process','circular-process','funnel','roadmap',
+  'waterfall','snake-process','step-up','step-down','circle-process','equation',
+  'bending-process','segmented-bar','phase-process','timeline-h','timeline-v','swimlane',
+  // list
+  'bullet-list','numbered-list','checklist','two-column-list','timeline-list','block-list',
+  'chevron-list','card-list','zigzag-list','ribbon-list','hexagon-list','trapezoid-list',
+  'tab-list','circle-list','icon-list',
+  // cycle
+  'cycle','donut-cycle','gear-cycle','spiral','block-cycle','segmented-cycle',
+  'nondirectional-cycle','multidirectional-cycle','loop',
+  // matrix
+  'swot','pros-cons','comparison','matrix-2x2','bcg','ansoff','matrix-nxm',
+  // hierarchy
+  'org-chart','tree','h-org-chart','hierarchy-list','radial-tree','decision-tree',
+  'sitemap','bracket','bracket-tree','mind-map',
+  // pyramid
+  'pyramid','inverted-pyramid','pyramid-list','segmented-pyramid','diamond-pyramid',
+  // relationship
+  'venn','venn-3','venn-4','concentric','balance','counterbalance','opposing-arrows',
+  'web','cluster','target','radial','converging','diverging','plus',
+  // statistical
+  'progress-list','bullet-chart','scorecard','treemap','sankey','waffle','gauge','radar','heatmap',
+  // planning
+  'kanban','gantt','gantt-lite','sprint-board','timeline','milestone','wbs',
+  // technical
+  'layered-arch','entity','network','pipeline','sequence','state-machine','class',
+]
+
+// ── Preset examples ───────────────────────────────────────────────────────────
+
+const EXAMPLES = {
+  'Process — Build Pipeline': `type: process
+title: Build Pipeline
+
+- Plan
+- Code
+- Review
+- Test
+- Deploy`,
+
+  'SWOT Analysis': `type: swot
+title: Product Launch
+
++ Strong brand recognition
++ Experienced engineering team
+- High customer acquisition cost
+- No mobile app yet
+? Asia-Pacific expansion
+? Enterprise tier pricing
+! Well-funded competitor entering market
+! Regulatory changes in EU`,
+
+  'Org Chart': `type: org-chart
+title: Engineering
+
+- CTO
+  - Frontend Lead
+    - Alice
+    - Bob
+  - Backend Lead
+    - Carol
+    - Dave
+  - Platform Lead
+    - Eve`,
+
+  'Tab List': `type: tab-list
+title: API Reference
+
+- Overview
+  REST API built on HTTP with JSON payloads.
+  Base URL: https://api.example.com/v1
+- Authentication
+  Use Bearer tokens in the Authorization header.
+  Tokens expire after 24 hours.
+- Rate Limits
+  100 requests per minute per API key.
+  Burst up to 200 req/s for 10 seconds.`,
+
+  'Kanban Board': `type: kanban
+title: Sprint 14
+
+- Backlog
+  - Write API docs
+  - Set up CI pipeline
+  - Design onboarding flow
+- In Progress
+  - Auth refresh token logic
+  - Dashboard redesign
+- Review
+  - Rate limiting middleware
+- Done
+  - Database migrations
+  - Unit tests for parser`,
+
+  'Sequence Diagram': `type: sequence
+title: OAuth Flow
+
+- Browser
+  - → Auth Server: GET /authorize?client_id=…
+  - → Auth Server: POST /token (code exchange)
+  - → API Server: GET /me (Bearer token)
+- Auth Server
+  - → Browser: 302 redirect + code
+  - → Browser: { access_token, refresh_token }
+- API Server
+  - → Browser: { id, email, name }`,
+
+  'Gantt Chart': `type: gantt-lite
+title: Q1 Roadmap
+
+- Discovery [wk1–wk2]
+- Design [wk2–wk4]
+- Implementation [wk4–wk10]
+* Beta Launch [wk10]
+- QA & Polish [wk10–wk12]
+* GA Release [wk12]`,
+
+  'Mind Map': `type: mind-map
+title: Product Strategy
+
+- Growth
+  - Acquisition
+  - Activation
+  - Retention
+- Platform
+  - API
+  - Integrations
+  - SDKs
+- Revenue
+  - Pricing
+  - Enterprise
+  - Partnerships`,
+}
+
+// ── Markdown examples (full docs with embedded mdart fences) ─────────────────
+
+const MARKDOWN_EXAMPLES = {
+  'Process — Build Pipeline': `# Deployment Pipeline
+
+Our standard release process moves code from commit to production
+through four automated gates.
+
+\`\`\`mdart process
+title: Release Pipeline
+
+Plan → Code → Review → Test → Deploy
+\`\`\`
+
+Each stage must pass before the next begins. Failed gates trigger
+an alert to the on-call engineer.`,
+
+  'Architecture — System Overview': `# System Architecture
+
+The platform is divided into three layers, each with a distinct
+responsibility boundary.
+
+\`\`\`mdart layered-arch
+title: Platform Layers
+
+- Presentation
+  - Web app
+  - Mobile app
+  - Public API
+- Application
+  - Auth service
+  - Worker service
+  - Scheduler
+- Data
+  - Postgres
+  - Redis
+  - Object storage
+\`\`\`
+
+All inter-service communication goes through the application layer;
+the presentation layer never touches the data layer directly.`,
+
+  'Planning — Sprint Board': `# Sprint 22 · Week 3
+
+Current board state after Tuesday's standup.
+
+\`\`\`mdart kanban
+title: Sprint 22
+
+- Backlog
+  - Refresh token rotation
+  - Dark mode polish
+  - Docs site search
+- In Progress
+  - Rate limiting middleware
+  - Dashboard v2 layout
+- Review
+  - CSV export feature
+- Done
+  - Auth flow refactor
+  - API error codes
+\`\`\`
+
+Blockers: Dashboard v2 is waiting on design sign-off.
+Target: clear Review column by Thursday.`,
+
+  'Strategy — SWOT Analysis': `# Product Strategy · Q3 Review
+
+Before committing to the roadmap, we ran a SWOT analysis against
+our two closest competitors.
+
+\`\`\`mdart swot
+title: Competitive Position
+
++ Strong developer community
++ Best-in-class onboarding
++ High NPS (72)
+- No enterprise SSO yet
+- Mobile app gaps
+? APAC market entry
+? AI-assisted editing tier
+! Well-funded new entrant
+! Pricing pressure from below
+\`\`\`
+
+The primary threat is a new entrant with deep pockets entering at
+30% below our base price. Our defensive play is to accelerate
+enterprise features.`,
+
+  'Technical — Auth Sequence': `# OAuth 2.0 — Authorization Code Flow
+
+Step-by-step message exchange for the standard auth code grant.
+
+\`\`\`mdart sequence
+title: OAuth Flow
+
+- Browser
+  - → Auth Server: GET /authorize?client_id=…&scope=openid
+  - → Auth Server: POST /token (code + PKCE verifier)
+  - → Resource API: GET /me  (Bearer token)
+- Auth Server
+  - → Browser: 302 redirect + code
+  - → Browser: { access_token, id_token, refresh_token }
+- Resource API
+  - → Browser: { id, email, name }
+\`\`\`
+
+PKCE is mandatory for all public clients (SPAs, mobile apps).
+The \`refresh_token\` must be rotated on every use.`,
+
+  'Report — Mixed Diagrams': `# Engineering Quarterly Report
+
+## Delivery
+
+\`\`\`mdart gantt-lite
+title: Q3 Milestones
+
+- Discovery & design [wk1–wk2]
+- Core implementation [wk3–wk8]
+* Beta to design partners [wk8]
+- Hardening & docs [wk9–wk11]
+* GA release [wk12]
+\`\`\`
+
+We shipped on schedule. The beta period surfaced 14 P1 bugs,
+all resolved before GA.
+
+## Team health
+
+\`\`\`mdart progress-list
+title: Survey Results (Q3)
+
+- Autonomy: 88
+- Clarity of goals: 76
+- Work-life balance: 82
+- Career growth: 71
+- Overall: 80
+\`\`\`
+
+Clarity and career growth remain the two lowest scores — both
+are addressed in the H2 people plan.`,
+}
+
+// ── Init dropdowns ────────────────────────────────────────────────────────────
+
+const hintSelect    = document.getElementById('hint-select')
+const exampleSelect = document.getElementById('example-select')
+const editor        = document.getElementById('editor')
+
+LAYOUT_TYPES.forEach(t => {
+  const opt = document.createElement('option')
+  opt.value = opt.textContent = t
+  hintSelect.appendChild(opt)
+})
+
+function populateExamples(map) {
+  // Keep the first placeholder option, replace the rest
+  while (exampleSelect.options.length > 1) exampleSelect.remove(1)
+  Object.keys(map).forEach(name => {
+    const opt = document.createElement('option')
+    opt.value = name
+    opt.textContent = name
+    exampleSelect.appendChild(opt)
+  })
+}
+
+populateExamples(EXAMPLES)
+
+exampleSelect.addEventListener('change', () => {
+  const map = mode === 'markdown' ? MARKDOWN_EXAMPLES : EXAMPLES
+  const src = map[exampleSelect.value]
+  if (src) { editor.value = src; dispatchRender(true) }
+  exampleSelect.value = ''
+})
+
+// ── State ─────────────────────────────────────────────────────────────────────
+
+let lastSVG     = ''
+let renderTimer = null
+let mode        = 'mdart'   // 'mdart' | 'markdown'
+
+// explicit=true  → user tapped Render / pressed Ctrl+Enter / picked example
+// explicit=false → debounced auto-render while typing (never switches pane)
+function dispatchRender(explicit = false) {
+  if (mode === 'mdart') render(explicit); else renderMarkdown(explicit)
+}
+
+// ── Render ────────────────────────────────────────────────────────────────────
+
+async function render(explicit = false) {
+  const source   = editor.value.trim()
+  if (!source) return
+  const hintType = hintSelect.value || undefined
+
+  setStatus('rendering', null)
+
+  try {
+    const res  = await fetch('/render', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ source, hintType }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
+
+    lastSVG = data.svg
+    showSVG(data.svg, data.type, data.title, data.tabCount)
+    setStatus('ok', data.type)
+    if (explicit && isMobile()) showPane('preview')
+  } catch (err) {
+    showError(err.message)
+    setStatus('err', null)
+  }
+}
+
+// ── Ecosystem render ──────────────────────────────────────────────────────────
+
+async function renderMarkdown(explicit = false) {
+  const source  = editor.value.trim()
+  if (!source) return
+  const adapter = document.getElementById('adapter-select').value
+  setStatus('rendering', null)
+  try {
+    const res  = await fetch('/render/ecosystem', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ source, adapter }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error ?? `HTTP ${res.status}`)
+    showHTML(data.html, data.adapter)
+    setStatus('ok', data.adapter)
+    if (explicit && isMobile()) showPane('preview')
+  } catch (err) {
+    showError(err.message)
+    setStatus('err', null)
+  }
+}
+
+// ── DOM helpers ───────────────────────────────────────────────────────────────
+
+function showSVG(svg, type, title, tabCount) {
+  const area   = document.getElementById('preview-area')
+  const iframe = document.getElementById('html-preview')
+  const hint   = document.getElementById('empty-hint')
+
+  // Hide iframe and empty hint, reset area
+  iframe.classList.remove('visible')
+  hint.style.display = 'none'
+  area.className = ''
+
+  // Remove any prior content except the persistent iframe and hint
+  Array.from(area.children).forEach(child => {
+    if (child !== iframe && child !== hint) child.remove()
+  })
+
+  // Insert SVG
+  const wrapper = document.createElement('div')
+  wrapper.innerHTML = svg
+  area.appendChild(wrapper.firstElementChild ?? wrapper)
+
+  // Wire tab-list interactivity
+  if (tabCount > 1) {
+    area.querySelectorAll('.mdart-tab-root').forEach(root => wireTabRoot(root))
+  }
+
+  // Type chip
+  const chip = document.getElementById('type-chip')
+  chip.textContent = title ? `${type} — ${title}` : type
+  chip.className = 'visible'
+}
+
+function showHTML(html, adapterName) {
+  const area   = document.getElementById('preview-area')
+  const iframe = document.getElementById('html-preview')
+  const hint   = document.getElementById('empty-hint')
+
+  area.className = ''
+  // Clear any SVG content, show the iframe
+  Array.from(area.children).forEach(child => {
+    if (child !== iframe && child !== hint) child.remove()
+  })
+  hint.style.display = 'none'
+  iframe.classList.add('visible')
+
+  // Inject minimal prose styles so SVGs and text look good on white
+  iframe.srcdoc = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif;
+         padding: 20px 24px; line-height: 1.65; color: #1a1a2e; }
+  h1,h2,h3 { margin: 1em 0 0.4em; font-weight: 600; }
+  p  { margin: 0.6em 0; }
+  code { background: #f1f1f8; padding: 2px 5px; border-radius: 3px; font-size: 0.9em; }
+  pre { background: #f1f1f8; padding: 12px; border-radius: 6px; overflow: auto; }
+  svg { max-width: 100%; height: auto; display: block; margin: 12px 0; }
+  .mdart-error { color: #c0392b; }
+</style>
+</head><body>${html}</body></html>`
+
+  const chip = document.getElementById('type-chip')
+  chip.textContent = adapterName
+  chip.className = 'visible'
+}
+
+function showError(msg) {
+  const area   = document.getElementById('preview-area')
+  const iframe = document.getElementById('html-preview')
+  iframe.classList.remove('visible')
+  area.className = ''
+  // Remove prior HTML preview iframe content
+  const hint = document.getElementById('empty-hint')
+  hint.style.display = 'none'
+  const errEl = document.createElement('div')
+  errEl.className = 'error-msg'
+  errEl.textContent = `⚠ ${msg}`
+  // Clear old errors, add new one
+  area.querySelectorAll('.error-msg').forEach(e => e.remove())
+  area.appendChild(errEl)
+}
+
+function setStatus(state, type) {
+  const dot  = document.getElementById('status-dot')
+  const text = document.getElementById('status-text')
+  dot.className  = state === 'ok' ? 'ok' : state === 'err' ? 'err' : ''
+  text.textContent = state === 'rendering' ? 'rendering…'
+                   : state === 'err'       ? 'error'
+                   : type                  ? type
+                   : 'ready'
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+}
+
+// ── Tab-list interactivity ────────────────────────────────────────────────────
+// Mirrors tabListInteract.ts logic — same selectors and SVG attribute mutations.
+
+function wireTabRoot(root) {
+  const hits   = root.querySelectorAll('.mdart-tab-hit')
+  if (!hits.length) return
+
+  hits.forEach((hit, i) => {
+    hit.style.cursor = 'pointer'
+    hit.addEventListener('click', () => activateTab(root, i))
+  })
+}
+
+function activateTab(root, activeIdx) {
+  const textMuted = root.getAttribute('data-text-muted') ?? '#888888'
+  const hits      = root.querySelectorAll('.mdart-tab-hit')
+  const panels    = root.querySelectorAll('.mdart-tab-panel')
+
+  hits.forEach((hit, k) => {
+    const color  = hit.getAttribute('data-color') ?? '#666666'
+    const rect   = hit.querySelector('.mdart-tab-rect')
+    const label  = hit.querySelector('.mdart-tab-label')
+    const on     = k === activeIdx
+
+    if (rect) {
+      if (on) {
+        rect.setAttribute('fill', color)
+        rect.removeAttribute('stroke')
+        rect.removeAttribute('stroke-width')
+      } else {
+        rect.setAttribute('fill', `${color}22`)
+        rect.setAttribute('stroke', `${color}55`)
+        rect.setAttribute('stroke-width', '1')
+      }
+    }
+    if (label) {
+      label.setAttribute('fill', on ? '#ffffff' : textMuted)
+      label.setAttribute('font-weight', on ? '700' : '400')
+    }
+  })
+
+  panels.forEach(panel => {
+    const t = parseInt(panel.getAttribute('data-tab') ?? '-1', 10)
+    panel.setAttribute('visibility', t === activeIdx ? 'visible' : 'hidden')
+  })
+
+  const contentBg    = root.querySelector('.mdart-tab-content-bg')
+  const activeColor  = hits[activeIdx]?.getAttribute('data-color')
+  if (contentBg && activeColor) {
+    contentBg.setAttribute('fill',         `${activeColor}11`)
+    contentBg.setAttribute('stroke',       `${activeColor}44`)
+    contentBg.setAttribute('stroke-width', '1.2')
+  }
+}
+
+// ── Buttons ───────────────────────────────────────────────────────────────────
+
+document.getElementById('render-btn').addEventListener('click', () => dispatchRender(true))
+
+document.getElementById('copy-src-btn').addEventListener('click', () => {
+  navigator.clipboard.writeText(editor.value)
+    .then(() => flash('copy-src-btn', 'Copied!'))
+})
+
+document.getElementById('copy-svg-btn').addEventListener('click', () => {
+  if (!lastSVG) return
+  navigator.clipboard.writeText(lastSVG)
+    .then(() => flash('copy-svg-btn', 'Copied!'))
+})
+
+document.getElementById('download-btn').addEventListener('click', () => {
+  if (!lastSVG) return
+  const blob = new Blob([lastSVG], { type: 'image/svg+xml' })
+  const url  = URL.createObjectURL(blob)
+  const a    = Object.assign(document.createElement('a'), {
+    href: url, download: 'mdart-diagram.svg'
+  })
+  a.click()
+  URL.revokeObjectURL(url)
+})
+
+function flash(id, text) {
+  const btn = document.getElementById(id)
+  const orig = btn.textContent
+  btn.textContent = text
+  setTimeout(() => { btn.textContent = orig }, 1500)
+}
+
+// ── Integration docs ─────────────────────────────────────────────────────────
+
+const INTEGRATION_DOCS = {
+  'marked': {
+    label: 'marked v15',
+    packages: ['mdart-marked'],
+    peers: ['marked'],
+    install: 'npm install mdart-marked marked',
+    usage:
+`import { Marked } from 'marked'
+import { mdartExtension } from 'mdart-marked'
+
+const marked = new Marked({
+  extensions: [mdartExtension()]
+})
+
+// mdart fences in the document become inline SVG
+const html = await marked.parse(markdown)`,
+    note: '<code>mdartExtension()</code> intercepts <code>```mdart</code> fences at the tokenizer level, so it composes cleanly with other marked extensions.',
+  },
+  'markdown-it': {
+    label: 'markdown-it v14',
+    packages: ['mdart-markdown-it'],
+    peers: ['markdown-it'],
+    install: 'npm install mdart-markdown-it markdown-it',
+    usage:
+`import MarkdownIt from 'markdown-it'
+import { mdartPlugin } from 'mdart-markdown-it'
+
+const md = new MarkdownIt().use(mdartPlugin)
+
+// mdart fences in the document become inline SVG
+const html = md.render(markdown)`,
+    note: 'The plugin overrides the <code>fence</code> renderer rule. Non-mdart fences pass through to the default renderer unchanged.',
+  },
+  'unified': {
+    label: 'unified / remark',
+    packages: ['mdart-remark'],
+    peers: ['unified', 'remark-parse', 'remark-rehype', 'rehype-stringify'],
+    install: 'npm install mdart-remark unified remark-parse remark-rehype rehype-stringify',
+    usage:
+`import { unified }       from 'unified'
+import remarkParse       from 'remark-parse'
+import remarkRehype      from 'remark-rehype'
+import rehypeStringify   from 'rehype-stringify'
+import { remarkMdart }   from 'mdart-remark'
+
+// Insert remarkMdart before remarkRehype — it replaces
+// code nodes in the mdast tree before hast conversion.
+const html = await unified()
+  .use(remarkParse)
+  .use(remarkMdart)
+  .use(remarkRehype, { allowDangerousHtml: true })
+  .use(rehypeStringify, { allowDangerousHtml: true })
+  .process(markdown)
+  .then(String)`,
+    note: 'The plugin visits <code>code</code> nodes with <code>lang="mdart"</code> and replaces them with raw <code>html</code> nodes. The optional meta field carries the type hint: <code>```mdart process</code>.',
+  },
+}
+
+const FENCE_SYNTAX =
+`# Auto-detect type from front-matter
+\`\`\`mdart
+type: process
+title: My Diagram
+
+- Step A
+- Step B
+\`\`\`
+
+# Override type via language tag
+\`\`\`mdart kanban
+title: Sprint
+
+- Todo
+  - Task A
+- Done
+  - Task B
+\`\`\``
+
+function buildIntegrationHTML(adapter) {
+  const doc = INTEGRATION_DOCS[adapter]
+  if (!doc) return `<p style="color:var(--muted)">Unknown adapter</p>`
+  const chips = [
+    ...doc.packages.map(p => `<span class="int-chip int-chip-main">${escHtml(p)}</span>`),
+    ...doc.peers.map(p => `<span class="int-chip int-chip-peer">${escHtml(p)}</span>`),
+  ].join('')
+  return `
+    <div>
+      <div class="int-label">Packages</div>
+      <div class="int-chips">${chips}</div>
+      <div class="int-peer-note">Peer dependencies shown in grey</div>
+    </div>
+    <div>
+      <div class="int-label">Install</div>
+      <div class="int-terminal">
+        <span class="int-prompt">$</span>
+        <code id="int-install-code">${escHtml(doc.install)}</code>
+        <button class="int-copy" id="int-copy-btn">Copy</button>
+      </div>
+    </div>
+    <div>
+      <div class="int-label">Usage</div>
+      <pre class="int-code">${escHtml(doc.usage)}</pre>
+    </div>
+    <div>
+      <div class="int-label">Fence syntax</div>
+      <pre class="int-code">${escHtml(FENCE_SYNTAX)}</pre>
+    </div>
+    <div>
+      <div class="int-label">Note</div>
+      <p class="int-note">${doc.note}</p>
+    </div>`
+}
+
+function showIntegration(adapter) {
+  const panel   = document.getElementById('integration-panel')
+  const area    = document.getElementById('preview-area')
+  panel.innerHTML = buildIntegrationHTML(adapter)
+  panel.classList.add('visible')
+  area.style.display = 'none'
+  // Wire copy button
+  document.getElementById('int-copy-btn')?.addEventListener('click', () => {
+    const cmd = document.getElementById('int-install-code')?.textContent ?? ''
+    navigator.clipboard.writeText(cmd).then(() => {
+      const btn = document.getElementById('int-copy-btn')
+      if (btn) { btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy' }, 1500) }
+    })
+  })
+}
+
+function hideIntegration() {
+  const panel = document.getElementById('integration-panel')
+  panel.classList.remove('visible')
+  panel.innerHTML = ''
+  document.getElementById('preview-area').style.display = ''
+}
+
+// ── Preview sub-tabs ──────────────────────────────────────────────────────────
+
+let previewSubTab = 'preview'   // 'preview' | 'integration'
+
+function setPreviewSubTab(name) {
+  previewSubTab = name
+  document.querySelectorAll('.preview-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.ptab === name)
+  )
+  if (name === 'integration') {
+    showIntegration(document.getElementById('adapter-select').value)
+  } else {
+    hideIntegration()
+  }
+}
+
+document.querySelectorAll('.preview-tab').forEach(btn => {
+  btn.addEventListener('click', () => setPreviewSubTab(btn.dataset.ptab))
+})
+
+// ── Mode toggle ───────────────────────────────────────────────────────────────
+
+document.querySelectorAll('#mode-toggle button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (btn.dataset.mode === mode) return
+    mode = btn.dataset.mode
+
+    // Update toggle button state
+    document.querySelectorAll('#mode-toggle button').forEach(b =>
+      b.classList.toggle('active', b.dataset.mode === mode)
+    )
+
+    const ecosystemBar = document.getElementById('ecosystem-bar')
+    const hintRow      = document.getElementById('hint-row')
+
+    if (mode === 'markdown') {
+      document.body.classList.add('markdown-mode')
+      ecosystemBar.classList.add('visible')
+      hintRow.style.display = 'none'
+      populateExamples(MARKDOWN_EXAMPLES)
+      // Load first markdown example if editor still holds raw mdart source
+      if (!editor.value.includes('```mdart')) {
+        editor.value = Object.values(MARKDOWN_EXAMPLES)[0]
+      }
+      renderMarkdown(true)
+    } else {
+      document.body.classList.remove('markdown-mode')
+      ecosystemBar.classList.remove('visible')
+      hintRow.style.display = ''
+      populateExamples(EXAMPLES)
+      // Reset preview sub-tab so integration panel doesn't linger
+      hideIntegration()
+      setPreviewSubTab('preview')
+      document.getElementById('html-preview').classList.remove('visible')
+      render(true)
+    }
+  })
+})
+
+// Re-render / refresh when adapter selection changes
+document.getElementById('adapter-select').addEventListener('change', () => {
+  if (mode !== 'markdown') return
+  if (previewSubTab === 'integration') {
+    // Refresh code panel in-place — no network call needed
+    showIntegration(document.getElementById('adapter-select').value)
+  } else {
+    renderMarkdown(true)
+  }
+})
+
+// ── Keyboard shortcut ─────────────────────────────────────────────────────────
+
+editor.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault()
+    dispatchRender(true)
+  }
+})
+
+// ── Auto-render on type (debounced 500ms) ─────────────────────────────────────
+
+editor.addEventListener('input', () => {
+  clearTimeout(renderTimer)
+  renderTimer = setTimeout(dispatchRender, 500)
+})
+
+// ── Mobile pane switching ─────────────────────────────────────────────────────
+
+function isMobile() { return window.innerWidth < 640 }
+
+function showPane(name) {
+  const editorPane  = document.querySelector('.editor-pane')
+  const previewPane = document.querySelector('.preview-pane')
+  document.querySelectorAll('.mobile-tab').forEach(t =>
+    t.classList.toggle('active', t.dataset.pane === name)
+  )
+  if (!isMobile()) {
+    editorPane.style.display = ''
+    previewPane.style.display = ''
+    return
+  }
+  editorPane.style.display  = name === 'editor'  ? 'flex' : 'none'
+  previewPane.style.display = name === 'preview' ? 'flex' : 'none'
+}
+
+document.querySelectorAll('.mobile-tab').forEach(btn => {
+  btn.addEventListener('click', () => showPane(btn.dataset.pane))
+})
+
+// Restore both panes when resizing back to desktop
+window.addEventListener('resize', () => {
+  if (!isMobile()) showPane('editor')
+})
+
+// Set --vh for iOS address-bar-aware height
+function setVh() {
+  document.documentElement.style.setProperty('--vh', `${window.innerHeight}px`)
+}
+setVh()
+window.addEventListener('resize', setVh)
+
+// ── Load default example and render ──────────────────────────────────────────
+
+editor.value = EXAMPLES['Process — Build Pipeline']
+render()
+</script>
+
+</body>
+</html>
