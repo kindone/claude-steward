@@ -1,7 +1,0 @@
-src/
-node_modules/
-build.mjs
-tsconfig.json
-**/*.map
-**/*.ts
-!dist/
