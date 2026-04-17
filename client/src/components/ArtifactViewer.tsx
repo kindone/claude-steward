@@ -721,11 +721,38 @@ function HtmlView({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
 
-  // Listen for resize messages from the iframe so it can report its own height
+  // Listen for messages from the iframe:
+  //   __stewardResize  — iframe reports its own height
+  //   __mdartRender    — iframe requests an mdart→SVG render (proxied through auth)
   useEffect(() => {
-    function onMessage(ev: MessageEvent) {
-      if (ev.data && typeof ev.data === 'object' && ev.data.__stewardResize) {
+    async function onMessage(ev: MessageEvent) {
+      if (!ev.data || typeof ev.data !== 'object') return
+
+      if (ev.data.__stewardResize) {
         setHeight(Math.min(Math.max(ev.data.height as number, 100), 2000))
+        return
+      }
+
+      if (ev.data.__mdartRender) {
+        const { id, source } = ev.data as { id: string; source: string }
+        try {
+          const res = await fetch('/api/mdart/render', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ source }),
+          })
+          const data = await res.json() as { svg?: string; error?: string }
+          ;(ev.source as Window | null)?.postMessage(
+            { __mdartRenderResult: true, id, svg: data.svg, error: data.error },
+            '*'
+          )
+        } catch (err) {
+          ;(ev.source as Window | null)?.postMessage(
+            { __mdartRenderResult: true, id, error: String(err) },
+            '*'
+          )
+        }
       }
     }
     window.addEventListener('message', onMessage)
