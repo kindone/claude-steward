@@ -184,13 +184,13 @@ function FileViewer({
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         spellCheck={false}
-        className="flex-1 min-h-0 w-full resize-none bg-[#0d0d0d] text-[#ccc] font-mono text-[13px] leading-relaxed p-5 border-none outline-none"
+        className="flex-1 min-h-0 w-full resize-none bg-app-bg text-app-text-2 font-mono text-[13px] leading-relaxed p-5 border-none outline-none"
         style={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}
       />
     )
   } else if (viewer.type === 'image') {
     body = (
-      <div className="flex-1 overflow-auto flex items-center justify-center p-6 bg-[#0d0d0d] min-h-0">
+      <div className="flex-1 overflow-auto flex items-center justify-center p-6 bg-app-bg min-h-0">
         <img src={rawSrc} alt={viewer.path.split('/').pop()} className="max-w-full max-h-full object-contain rounded" />
       </div>
     )
@@ -216,7 +216,7 @@ function FileViewer({
     body = (
       <div className="flex-1 flex overflow-hidden min-h-0">
         <div
-          className="select-none text-right text-[#3a3a3a] font-mono text-[13px] leading-relaxed flex-shrink-0 px-3 py-5 border-r border-[#1f1f1f] bg-[#0d0d0d] overflow-hidden"
+          className="select-none text-right text-app-text-7 font-mono text-[13px] leading-relaxed flex-shrink-0 px-3 py-5 border-r border-app-border bg-app-bg overflow-hidden"
           aria-hidden="true"
         >
           {Array.from({ length: lineCount }, (_, i) => <div key={i}>{i + 1}</div>)}
@@ -238,23 +238,23 @@ function FileViewer({
       onClick={editing ? undefined : onClose}
     >
       <div
-        className="bg-[#131313] border border-[#2a2a2a] rounded-xl flex flex-col overflow-hidden shadow-2xl"
+        className="bg-app-bg-overlay border border-app-border-2 rounded-xl flex flex-col overflow-hidden shadow-2xl"
         style={{ width: 'min(96vw, 1200px)', height: 'min(92dvh, 900px)' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-[#1f1f1f] gap-3 flex-shrink-0">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-app-border gap-3 flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             {badge && (
-              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#555] uppercase tracking-wider font-semibold">
+              <span className="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded border border-app-border-2 text-app-text-6 uppercase tracking-wider font-semibold">
                 {badge}
               </span>
             )}
-            <span className="text-[13px] text-[#888] font-mono truncate" title={viewer.path}>
+            <span className="text-[13px] text-app-text-4 font-mono truncate" title={viewer.path}>
               {viewer.path}
             </span>
             {isDirty && (
-              <span className="text-[#555] text-[11px] flex-shrink-0" title="Unsaved changes">●</span>
+              <span className="text-app-text-6 text-[11px] flex-shrink-0" title="Unsaved changes">●</span>
             )}
           </div>
 
@@ -270,7 +270,7 @@ function FileViewer({
                 </button>
                 <button
                   onClick={cancelEdit}
-                  className="text-xs text-[#666] hover:text-[#ccc] hover:bg-[#222] px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent"
+                  className="text-xs text-app-text-5 hover:text-app-text-2 hover:bg-app-bg-hover px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent"
                 >
                   Cancel
                 </button>
@@ -280,7 +280,7 @@ function FileViewer({
                 {canEdit && (
                   <button
                     onClick={startEdit}
-                    className="text-xs text-[#666] hover:text-[#ccc] hover:bg-[#222] px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent"
+                    className="text-xs text-app-text-5 hover:text-app-text-2 hover:bg-app-bg-hover px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent"
                   >
                     Edit
                   </button>
@@ -288,7 +288,7 @@ function FileViewer({
                 {viewer.type !== 'image' && (
                   <button
                     onClick={handleCopy}
-                    className="text-xs text-[#666] hover:text-[#ccc] hover:bg-[#222] px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent"
+                    className="text-xs text-app-text-5 hover:text-app-text-2 hover:bg-app-bg-hover px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent"
                   >
                     {copied ? '✓ Copied' : 'Copy'}
                   </button>
@@ -296,12 +296,12 @@ function FileViewer({
                 <a
                   href={`${rawSrc}&download=1`}
                   download
-                  className="text-xs text-[#666] hover:text-[#ccc] hover:bg-[#222] px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent no-underline"
+                  className="text-xs text-app-text-5 hover:text-app-text-2 hover:bg-app-bg-hover px-2.5 py-1.5 rounded transition-colors cursor-pointer border-none bg-transparent no-underline"
                 >
                   Download
                 </a>
                 <button
-                  className="bg-transparent border-none text-[#666] hover:text-[#ccc] hover:bg-[#222] text-xl cursor-pointer leading-none px-2 py-1 rounded transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
+                  className="bg-transparent border-none text-app-text-5 hover:text-app-text-2 hover:bg-app-bg-hover text-xl cursor-pointer leading-none px-2 py-1 rounded transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                   onClick={onClose}
                   aria-label="Close"
                 >
@@ -324,11 +324,11 @@ function FileViewer({
             </button>
             <button
               onClick={reloadFile}
-              className="px-2.5 py-1 rounded hover:bg-[#222] border border-[#2a2a2a] cursor-pointer text-[#aaa] transition-colors"
+              className="px-2.5 py-1 rounded hover:bg-app-bg-hover border border-app-border-2 cursor-pointer text-app-text-3 transition-colors"
             >
               Reload file
             </button>
-            <button onClick={() => setConflict(false)} className="text-[#555] hover:text-[#888] cursor-pointer bg-transparent border-none text-base leading-none">×</button>
+            <button onClick={() => setConflict(false)} className="text-app-text-6 hover:text-app-text-4 cursor-pointer bg-transparent border-none text-base leading-none">×</button>
           </div>
         )}
 
@@ -336,7 +336,7 @@ function FileViewer({
         {saveError && (
           <div className="flex items-center gap-3 px-4 py-2.5 bg-red-500/10 border-b border-red-500/20 text-red-300 text-[12px] flex-shrink-0">
             <span className="flex-1">{saveError}</span>
-            <button onClick={() => setSaveError(null)} className="text-[#555] hover:text-[#888] cursor-pointer bg-transparent border-none text-base leading-none">×</button>
+            <button onClick={() => setSaveError(null)} className="text-app-text-6 hover:text-app-text-4 cursor-pointer bg-transparent border-none text-base leading-none">×</button>
           </div>
         )}
 
@@ -345,7 +345,7 @@ function FileViewer({
 
         {/* Edit mode footer hint */}
         {editing && (
-          <div className="flex-shrink-0 px-4 py-1.5 border-t border-[#1f1f1f] text-[11px] text-[#3a3a3a]">
+          <div className="flex-shrink-0 px-4 py-1.5 border-t border-app-border text-[11px] text-app-text-7">
             ⌘S / Ctrl+S to save · Escape to cancel (if no changes)
           </div>
         )}
@@ -460,7 +460,7 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
         {entry.type === 'directory' ? (
           <>
             <button
-              className="flex items-center gap-1 w-full bg-transparent border-none text-[#7aa2d4] hover:text-[#93bbf0] font-medium text-xs px-1.5 py-1.5 cursor-pointer text-left rounded hover:bg-[#1a1a1a] transition-colors min-h-[36px]"
+              className="flex items-center gap-1 w-full bg-transparent border-none text-app-blue-link hover:text-app-blue-link-hover font-medium text-xs px-1.5 py-1.5 cursor-pointer text-left rounded hover:bg-app-bg-card transition-colors min-h-[36px]"
               onClick={() => void toggleDir(entry.path)}
             >
               <span>{openDirs.has(entry.path) ? '▾' : '▸'}</span>
@@ -472,10 +472,10 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
           </>
         ) : (
           <button
-            className="flex items-center gap-1 w-full bg-transparent border-none text-[#888] hover:text-[#ccc] text-xs px-1.5 py-1.5 cursor-pointer text-left rounded hover:bg-[#1a1a1a] transition-colors font-[inherit] min-h-[36px]"
+            className="flex items-center gap-1 w-full bg-transparent border-none text-app-text-4 hover:text-app-text-2 text-xs px-1.5 py-1.5 cursor-pointer text-left rounded hover:bg-app-bg-card transition-colors font-[inherit] min-h-[36px]"
             onClick={() => void openFile(entry.path)}
           >
-            <span className="text-[#444] flex-shrink-0">·</span>
+            <span className="text-app-text-7 flex-shrink-0">·</span>
             <span className="truncate">{entry.name}</span>
           </button>
         )}
@@ -517,16 +517,16 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
         <div className="px-3 py-1.5 text-[11px]">
           {uploading && uploadProgress ? (
             <div className="flex items-center gap-2">
-              <div className="flex-1 h-1 bg-[#1a1a1a] rounded overflow-hidden">
+              <div className="flex-1 h-1 bg-app-bg-card rounded overflow-hidden">
                 <div
                   className="h-full bg-blue-500 transition-all duration-200"
                   style={{ width: `${Math.round((uploadProgress.loaded / uploadProgress.total) * 100)}%` }}
                 />
               </div>
-              <span className="text-[#555] flex-shrink-0">{Math.round((uploadProgress.loaded / uploadProgress.total) * 100)}%</span>
+              <span className="text-app-text-6 flex-shrink-0">{Math.round((uploadProgress.loaded / uploadProgress.total) * 100)}%</span>
             </div>
           ) : uploading ? (
-            <span className="text-[#555]">Uploading…</span>
+            <span className="text-app-text-6">Uploading…</span>
           ) : uploadStatus ? (
             <span className={uploadStatus.startsWith('Error') ? 'text-red-400' : 'text-green-400'}>{uploadStatus}</span>
           ) : null}
@@ -545,13 +545,13 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
           onDrop={handleDrop}
         >
           <div className="flex items-center justify-between px-3 py-1.5 flex-shrink-0">
-            <span className="text-[11px] text-[#444] font-semibold tracking-widest uppercase">
+            <span className="text-[11px] text-app-text-7 font-semibold tracking-widest uppercase">
               {currentDirRef.current || 'Root'}
             </span>
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
-              className="text-[11px] text-[#555] hover:text-[#888] bg-transparent border-none cursor-pointer px-1.5 py-0.5 rounded hover:bg-[#1a1a1a] transition-colors disabled:opacity-50"
+              className="text-[11px] text-app-text-6 hover:text-app-text-4 bg-transparent border-none cursor-pointer px-1.5 py-0.5 rounded hover:bg-app-bg-card transition-colors disabled:opacity-50"
               title="Upload files"
             >
               ↑ Upload
@@ -560,10 +560,10 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
           {uploadBar}
           <div className="flex-1 overflow-y-auto px-1.5 py-1.5 min-h-0">
             {loading && !tree.has('') && (
-              <p className="text-xs text-[#444] px-2.5 py-1.5">Loading…</p>
+              <p className="text-xs text-app-text-7 px-2.5 py-1.5">Loading…</p>
             )}
             {tree.has('') && tree.get('')!.length === 0 && (
-              <p className="text-xs text-[#444] px-2.5 py-1.5 italic">Empty directory</p>
+              <p className="text-xs text-app-text-7 px-2.5 py-1.5 italic">Empty directory</p>
             )}
             {tree.has('') && renderEntries(tree.get('')!, 0)}
           </div>
@@ -575,25 +575,25 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
         </div>
       ) : (
         <div
-          className={`border-t border-[#1f1f1f] flex-shrink-0 ${dragOver && expanded ? 'ring-1 ring-inset ring-blue-500/40 bg-blue-500/5' : ''}`}
+          className={`border-t border-app-border flex-shrink-0 ${dragOver && expanded ? 'ring-1 ring-inset ring-blue-500/40 bg-blue-500/5' : ''}`}
           onDragOver={expanded ? handleDragOver : undefined}
           onDragLeave={expanded ? handleDragLeave : undefined}
           onDrop={expanded ? handleDrop : undefined}
         >
           <div className="flex items-center">
             <button
-              className="flex-1 flex items-center gap-1.5 px-3 py-2 bg-transparent border-none text-[#555] hover:text-[#888] text-[11px] font-semibold tracking-widest uppercase cursor-pointer text-left transition-colors"
+              className="flex-1 flex items-center gap-1.5 px-3 py-2 bg-transparent border-none text-app-text-6 hover:text-app-text-4 text-[11px] font-semibold tracking-widest uppercase cursor-pointer text-left transition-colors"
               onClick={() => setExpanded((e) => !e)}
             >
               <span>{expanded ? '▾' : '▸'}</span>
               <span>Files</span>
-              {loading && <span className="text-[#444] text-[11px]">…</span>}
+              {loading && <span className="text-app-text-7 text-[11px]">…</span>}
             </button>
             {expanded && (
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploading}
-                className="text-[11px] text-[#555] hover:text-[#888] bg-transparent border-none cursor-pointer px-2 py-1.5 mr-1 rounded hover:bg-[#1a1a1a] transition-colors disabled:opacity-50"
+                className="text-[11px] text-app-text-6 hover:text-app-text-4 bg-transparent border-none cursor-pointer px-2 py-1.5 mr-1 rounded hover:bg-app-bg-card transition-colors disabled:opacity-50"
                 title="Upload files"
               >
                 ↑
@@ -604,7 +604,7 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
           {expanded && (
             <div className="max-h-[200px] overflow-y-auto px-1.5 pb-1.5">
               {tree.has('') && tree.get('')!.length === 0 && (
-                <p className="text-xs text-[#444] px-2.5 py-1.5 italic">Empty directory</p>
+                <p className="text-xs text-app-text-7 px-2.5 py-1.5 italic">Empty directory</p>
               )}
               {tree.has('') && renderEntries(tree.get('')!, 0)}
             </div>

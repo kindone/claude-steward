@@ -32,7 +32,7 @@ export function MdArtView({ content }: Props) {
       <div className="flex justify-end flex-shrink-0">
         <button
           onClick={handleDownload}
-          className="text-[11px] text-[#555] hover:text-[#aaa] py-0.5 px-2 rounded border border-[#2a2a2a] hover:border-[#444]"
+          className="text-[11px] text-app-text-6 hover:text-app-text-3 py-0.5 px-2 rounded border border-app-border-2 hover:border-app-border-4"
           title="Download SVG"
         >
           ↓ SVG

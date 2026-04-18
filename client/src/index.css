@@ -1,10 +1,124 @@
 @import "tailwindcss";
 
+/* ── Design tokens ──────────────────────────────────────────────────────────── */
+/* Dark mode (default) */
+:root {
+  /* Backgrounds */
+  --app-bg:          #0d0d0d;
+  --app-bg-raised:   #111111;
+  --app-bg-overlay:  #161616;
+  --app-bg-card:     #1a1a1a;
+  --app-bg-hover:    #222222;
+
+  /* Text */
+  --app-text:    #e8e8e8;
+  --app-text-2:  #cccccc;
+  --app-text-3:  #aaaaaa;
+  --app-text-4:  #888888;
+  --app-text-5:  #666666;
+  --app-text-6:  #555555;
+  --app-text-7:  #444444;
+
+  /* Borders */
+  --app-border:    #1f1f1f;
+  --app-border-2:  #2a2a2a;
+  --app-border-3:  #333333;
+  --app-border-4:  #444444;
+  --app-border-5:  #555555;
+
+  /* Accent / link */
+  --app-accent:       #6b9fd4;
+  --app-accent-hover: #93bbdf;
+
+  /* Blue active-state tints (selected sessions, user message bubbles, etc.) */
+  --app-blue-tint:           #1e3a5f;
+  --app-blue-tint-hover:     #1e3248;
+  --app-blue-tint-subtle:    #1e2a3a;
+  --app-blue-border:         #2a4a6a;
+  --app-blue-link:           #7aa2d4;
+  --app-blue-link-hover:     #93bbf0;
+
+  /* Misc */
+  --app-blockquote-border:   #2a4a8a;
+  --app-streaming-cursor:    #2563eb;
+}
+
+/* Light mode — applied via .light class on <html> */
+:root.light {
+  --app-bg:          #ffffff;
+  --app-bg-raised:   #f5f5f5;
+  --app-bg-overlay:  #eeeeee;
+  --app-bg-card:     #e5e5e5;
+  --app-bg-hover:    #d8d8d8;
+
+  --app-text:    #111111;
+  --app-text-2:  #333333;
+  --app-text-3:  #555555;
+  --app-text-4:  #666666;
+  --app-text-5:  #777777;
+  --app-text-6:  #888888;
+  --app-text-7:  #999999;
+
+  --app-border:    #e0e0e0;
+  --app-border-2:  #d0d0d0;
+  --app-border-3:  #bbbbbb;
+  --app-border-4:  #aaaaaa;
+  --app-border-5:  #888888;
+
+  --app-accent:       #2563eb;
+  --app-accent-hover: #1d4ed8;
+
+  --app-blue-tint:           #dbeafe;
+  --app-blue-tint-hover:     #bfdbfe;
+  --app-blue-tint-subtle:    #eff6ff;
+  --app-blue-border:         #93c5fd;
+  --app-blue-link:           #2563eb;
+  --app-blue-link-hover:     #1d4ed8;
+
+  --app-blockquote-border:   #93c5fd;
+  --app-streaming-cursor:    #2563eb;
+}
+
+/* ── Tailwind v4 color utilities ────────────────────────────────────────────── */
+/* @theme inline makes generated utilities reference the CSS variable directly,
+   so they react to :root.light overrides at runtime. */
+@theme inline {
+  --color-app-bg:               var(--app-bg);
+  --color-app-bg-raised:        var(--app-bg-raised);
+  --color-app-bg-overlay:       var(--app-bg-overlay);
+  --color-app-bg-card:          var(--app-bg-card);
+  --color-app-bg-hover:         var(--app-bg-hover);
+
+  --color-app-text:             var(--app-text);
+  --color-app-text-2:           var(--app-text-2);
+  --color-app-text-3:           var(--app-text-3);
+  --color-app-text-4:           var(--app-text-4);
+  --color-app-text-5:           var(--app-text-5);
+  --color-app-text-6:           var(--app-text-6);
+  --color-app-text-7:           var(--app-text-7);
+
+  --color-app-border:           var(--app-border);
+  --color-app-border-2:         var(--app-border-2);
+  --color-app-border-3:         var(--app-border-3);
+  --color-app-border-4:         var(--app-border-4);
+  --color-app-border-5:         var(--app-border-5);
+
+  --color-app-accent:           var(--app-accent);
+  --color-app-accent-hover:     var(--app-accent-hover);
+
+  --color-app-blue-tint:        var(--app-blue-tint);
+  --color-app-blue-tint-hover:  var(--app-blue-tint-hover);
+  --color-app-blue-tint-subtle: var(--app-blue-tint-subtle);
+  --color-app-blue-border:      var(--app-blue-border);
+  --color-app-blue-link:        var(--app-blue-link);
+  --color-app-blue-link-hover:  var(--app-blue-link-hover);
+}
+
 /* ── Global ── */
 body {
   font-family: system-ui, -apple-system, sans-serif;
-  background: #0d0d0d;
-  color: #e8e8e8;
+  background: var(--app-bg);
+  color: var(--app-text);
   height: 100dvh;
   overflow: hidden;
   /* Prevent iOS elastic page-level bounce — scroll containers handle overscroll themselves */
@@ -39,7 +153,7 @@ body {
 .streaming-cursor::after {
   content: '▋';
   animation: blink 1s step-end infinite;
-  color: #2563eb;
+  color: var(--app-streaming-cursor);
 }
 
 /* ── Markdown prose (dangerouslySetInnerHTML — Tailwind can't reach inside) ── */
@@ -47,26 +161,26 @@ body {
 .prose p:last-child    { margin-bottom: 0; }
 
 .prose a {
-  color: #6b9fd4;
+  color: var(--app-accent);
   text-decoration: underline;
-  text-decoration-color: rgba(107, 159, 212, 0.35);
+  text-decoration-color: color-mix(in srgb, var(--app-accent) 35%, transparent);
   text-underline-offset: 2px;
 }
 .prose a:hover {
-  color: #93bbdf;
-  text-decoration-color: rgba(147, 187, 223, 0.6);
+  color: var(--app-accent-hover);
+  text-decoration-color: color-mix(in srgb, var(--app-accent-hover) 60%, transparent);
 }
 
 /* Heading scale — sizes relative to parent font-size, distinct visual hierarchy */
 .prose h1 {
   font-size: 1.75em; font-weight: 700;
   margin: 24px 0 12px; line-height: 1.25;
-  padding-bottom: 0.3em; border-bottom: 1px solid #252525;
+  padding-bottom: 0.3em; border-bottom: 1px solid var(--app-border-2);
 }
 .prose h2 {
   font-size: 1.4em; font-weight: 600;
   margin: 20px 0 8px; line-height: 1.3;
-  padding-bottom: 0.25em; border-bottom: 1px solid #1f1f1f;
+  padding-bottom: 0.25em; border-bottom: 1px solid var(--app-border);
 }
 .prose h3 {
   font-size: 1.15em; font-weight: 600;
@@ -79,7 +193,7 @@ body {
 .prose h5,
 .prose h6 {
   font-size: 0.875em; font-weight: 600;
-  margin: 10px 0 4px; color: #aaa;
+  margin: 10px 0 4px; color: var(--app-text-3);
 }
 /* Collapse excess top margin when headings follow each other */
 .prose h1 + h2,
@@ -106,20 +220,20 @@ body {
   font-size: 0.9em;
 }
 .prose th,
-.prose td              { padding: 6px 13px; border: 1px solid #2a2a2a; text-align: left; vertical-align: top; }
-.prose th              { background: #1a1a1a; font-weight: 600; color: #ccc; }
-.prose tr:nth-child(2n) { background: #131313; }
+.prose td              { padding: 6px 13px; border: 1px solid var(--app-border-2); text-align: left; vertical-align: top; }
+.prose th              { background: var(--app-bg-card); font-weight: 600; color: var(--app-text-2); }
+.prose tr:nth-child(2n) { background: var(--app-bg-overlay); }
 
 /* Horizontal rule */
 .prose hr {
   height: 1px;
-  background: #252525;
+  background: var(--app-border-2);
   border: none;
   margin: 20px 0;
 }
 
 .prose code {
-  background: #1e1e1e;
+  background: var(--app-bg-card);
   padding: 2px 5px;
   border-radius: 4px;
   font-family: 'SF Mono', 'Fira Code', monospace;
@@ -127,8 +241,8 @@ body {
 }
 
 .prose pre {
-  background: #161616;
-  border: 1px solid #2a2a2a;
+  background: var(--app-bg-overlay);
+  border: 1px solid var(--app-border-2);
   border-radius: 8px;
   padding: 14px 16px;
   overflow-x: auto;
@@ -143,9 +257,9 @@ body {
 }
 
 .prose blockquote {
-  border-left: 3px solid #2a4a8a;
+  border-left: 3px solid var(--app-blockquote-border);
   padding-left: 12px;
-  color: #999;
+  color: var(--app-text-4);
   margin: 12px 0;
   font-style: italic;
 }
@@ -170,10 +284,10 @@ body {
   right: 6px;
   z-index: 10;
   padding: 2px 6px;
-  background: rgba(26, 26, 26, 0.8);
-  border: 1px solid #444;
+  background: color-mix(in srgb, var(--app-bg-card) 80%, transparent);
+  border: 1px solid var(--app-border-4);
   border-radius: 4px;
-  color: #aaa;
+  color: var(--app-text-3);
   font-size: 13px;
   cursor: pointer;
   opacity: 0;
@@ -187,8 +301,8 @@ body {
 }
 
 .pikchr-save-btn:hover {
-  background: rgba(40, 40, 40, 0.95);
-  color: #fff;
+  background: color-mix(in srgb, var(--app-bg-hover) 95%, transparent);
+  color: var(--app-text);
 }
 
 .pikchr-placeholder svg {
@@ -281,7 +395,7 @@ body {
   left: 0;
   right: 0;
   font-size: 0.7rem;
-  color: #999;
+  color: var(--app-text-4);
   line-height: 1.5;
   padding-bottom: 8px;
 }
@@ -296,19 +410,19 @@ body {
 }
 
 .sidenote a {
-  color: #777;
+  color: var(--app-text-5);
   text-decoration: underline;
-  text-decoration-color: #555;
+  text-decoration-color: var(--app-border-5);
 }
 
 .sidenote a:hover {
-  color: #bbb;
+  color: var(--app-text-2);
 }
 
 .sidenote-marker {
   font-size: 0.75rem;
   font-weight: 700;
-  color: #a0a0a0;
+  color: var(--app-text-4);
   margin-right: 3px;
   user-select: none;
 }
@@ -317,8 +431,8 @@ body {
 .link-preview-card {
   position: fixed;
   z-index: 1000;
-  background: #161616;
-  border: 1px solid #2a2a2a;
+  background: var(--app-bg-overlay);
+  border: 1px solid var(--app-border-2);
   border-radius: 8px;
   padding: 10px 12px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.5);
@@ -335,7 +449,7 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #555;
+  color: var(--app-text-6);
   font-size: 0.75rem;
 }
 
@@ -343,8 +457,8 @@ body {
   display: inline-block;
   width: 12px;
   height: 12px;
-  border: 1.5px solid #333;
-  border-top-color: #666;
+  border: 1.5px solid var(--app-border-3);
+  border-top-color: var(--app-text-5);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
   flex-shrink: 0;
@@ -355,7 +469,7 @@ body {
 .link-preview-error,
 .link-preview-not-found {
   font-size: 0.72rem;
-  color: #555;
+  color: var(--app-text-6);
   font-style: italic;
 }
 
@@ -376,14 +490,14 @@ body {
   display: inline-block;
   margin-top: 8px;
   font-size: 0.72rem;
-  color: #6b9fd4;
+  color: var(--app-accent);
   text-decoration: none;
   padding: 3px 8px;
-  border: 1px solid #6b9fd430;
+  border: 1px solid color-mix(in srgb, var(--app-accent) 30%, transparent);
   border-radius: 4px;
 }
 .link-preview-open:hover {
-  background: #6b9fd415;
+  background: color-mix(in srgb, var(--app-accent) 10%, transparent);
 }
 
 .link-preview-header {
@@ -396,9 +510,9 @@ body {
 .link-preview-badge {
   font-size: 0.62rem;
   font-weight: 600;
-  color: #555;
-  background: #1f1f1f;
-  border: 1px solid #2a2a2a;
+  color: var(--app-text-6);
+  background: var(--app-border);
+  border: 1px solid var(--app-border-2);
   border-radius: 3px;
   padding: 1px 5px;
   text-transform: uppercase;
@@ -408,7 +522,7 @@ body {
 
 .link-preview-domain {
   font-size: 0.7rem;
-  color: #555;
+  color: var(--app-text-6);
   flex-shrink: 0;
   max-width: 120px;
   overflow: hidden;
@@ -419,7 +533,7 @@ body {
 .link-preview-title {
   font-size: 0.78rem;
   font-weight: 600;
-  color: #ccc;
+  color: var(--app-text-2);
   line-height: 1.3;
   overflow: hidden;
   display: -webkit-box;
@@ -429,7 +543,7 @@ body {
 
 .link-preview-excerpt {
   font-size: 0.7rem;
-  color: #666;
+  color: var(--app-text-5);
   line-height: 1.5;
   overflow: hidden;
   display: -webkit-box;
@@ -473,10 +587,10 @@ body {
 .img-gallery-expand {
   height: 140px;
   padding: 0 18px;
-  background: #111;
-  border: 1px solid #2a2a2a;
+  background: var(--app-bg-raised);
+  border: 1px solid var(--app-border-2);
   border-radius: 6px;
-  color: #666;
+  color: var(--app-text-5);
   font-size: 13px;
   cursor: pointer;
   display: flex;
@@ -488,9 +602,9 @@ body {
 }
 
 .img-gallery-expand:hover {
-  color: #ccc;
-  border-color: #444;
-  background: #1a1a1a;
+  color: var(--app-text-2);
+  border-color: var(--app-border-4);
+  background: var(--app-bg-card);
 }
 
 /* Hide expand pill when grid is expanded */
@@ -505,7 +619,7 @@ body {
   padding: 5px 0;
   background: none;
   border: none;
-  color: #444;
+  color: var(--app-border-4);
   font-size: 11px;
   cursor: pointer;
   text-align: left;
@@ -513,7 +627,7 @@ body {
 }
 
 .img-gallery-collapse:hover {
-  color: #888;
+  color: var(--app-text-4);
 }
 
 /* Hide collapse button when grid is collapsed */
@@ -556,10 +670,10 @@ pre:hover .code-action-group {
 .kernel-save-btn,
 .artifact-save-btn {
   padding: 2px 6px;
-  background: #1a1a1a;
-  border: 1px solid #2a2a2a;
+  background: var(--app-bg-card);
+  border: 1px solid var(--app-border-2);
   border-radius: 4px;
-  color: #555;
+  color: var(--app-text-6);
   font-size: 11px;
   font-family: inherit;
   cursor: pointer;
@@ -573,7 +687,7 @@ pre:hover .code-action-group {
 .kernel-run-btn:hover,
 .kernel-save-btn:hover,
 .artifact-save-btn:hover {
-  color: #ccc;
-  border-color: #444;
-  background: #222;
+  color: var(--app-text-2);
+  border-color: var(--app-border-4);
+  background: var(--app-bg-hover);
 }

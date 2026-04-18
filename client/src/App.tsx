@@ -15,6 +15,7 @@ import { ErrorConsole } from './components/ErrorConsole'
 import { useAppConnection, type ConnState } from './hooks/useAppConnection'
 import { ArtifactFloat, type OpenArtifact } from './components/ArtifactFloat'
 import { isBelowTailwindMd } from './lib/viewport'
+import { useTheme } from './hooks/useTheme'
 
 type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
 
@@ -31,7 +32,7 @@ function ConnectionDot({ state, lastSeenAt }: { state: ConnState; lastSeenAt: nu
   const dot =
     state === 'connected'    ? 'bg-green-500' :
     state === 'reconnecting' ? 'bg-amber-400 animate-pulse' :
-                               'bg-[#444]'
+                               'bg-app-border-4'
   const label =
     state === 'connected'    ? 'Connected' :
     state === 'reconnecting' ? 'Reconnecting…' :
@@ -81,6 +82,7 @@ class ErrorBoundary extends Component<EBProps, EBState> {
 // ── App ───────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const { theme, toggle: toggleTheme } = useTheme()
   const [authState, setAuthState] = useState<AuthState>('loading')
   const [hasCredentials, setHasCredentials] = useState(false)
   const [projects, setProjects] = useState<Project[]>([])
@@ -537,8 +539,8 @@ export default function App() {
 
   if (authState === 'loading') {
     return (
-      <div className="flex h-dvh items-center justify-center bg-[#0d0d0d]">
-        <span className="h-7 w-7 animate-spin rounded-full border-2 border-[#333] border-t-[#666]" />
+      <div className="flex h-dvh items-center justify-center bg-app-bg">
+        <span className="h-7 w-7 animate-spin rounded-full border-2 border-app-border-3 border-t-app-text-5" />
       </div>
     )
   }
@@ -549,7 +551,7 @@ export default function App() {
 
   return (
     <ErrorBoundary onError={pushError}>
-    <div className="flex h-dvh relative overflow-hidden bg-[#0d0d0d] text-[#e8e8e8]">
+    <div className="flex h-dvh relative overflow-hidden bg-app-bg text-app-text">
       {/* Client error console — unhandled JS exceptions and React render errors */}
       <ErrorConsole
         errors={clientErrors}
@@ -566,24 +568,24 @@ export default function App() {
               if (pushToastTimerRef.current) clearTimeout(pushToastTimerRef.current)
               navigateToPushTarget(pushToast.sessionId, pushToast.projectId)
             }}
-            className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl px-4 py-3 shadow-2xl cursor-pointer hover:border-[#555] transition-colors text-left"
+            className="w-full bg-app-bg-card border border-app-border-3 rounded-xl px-4 py-3 shadow-2xl cursor-pointer hover:border-app-border-5 transition-colors text-left"
           >
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-[#e8e8e8] truncate flex-1">{pushToast.title}</span>
+              <span className="text-sm font-medium text-app-text truncate flex-1">{pushToast.title}</span>
               <span
                 onClick={(e) => { e.stopPropagation(); setPushToast(null); if (pushToastTimerRef.current) clearTimeout(pushToastTimerRef.current) }}
-                className="text-[#555] hover:text-[#888] text-xs flex-shrink-0 px-1"
+                className="text-app-text-6 hover:text-app-text-4 text-xs flex-shrink-0 px-1"
               >✕</span>
             </div>
-            {pushToast.body && <div className="text-xs text-[#aaa] mt-1 line-clamp-2">{pushToast.body}</div>}
-            <div className="text-[11px] text-[#666] mt-1">Tap to switch session</div>
+            {pushToast.body && <div className="text-xs text-app-text-3 mt-1 line-clamp-2">{pushToast.body}</div>}
+            <div className="text-[11px] text-app-text-5 mt-1">Tap to switch session</div>
           </button>
         </div>
       )}
 
       {/* Restart overlay */}
       {restarting && (
-        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] text-lg font-semibold text-[#e8e8e8] tracking-wide">
+        <div className="fixed inset-0 bg-black/75 flex items-center justify-center z-[9999] text-lg font-semibold text-app-text tracking-wide">
           <p>Restarting…</p>
         </div>
       )}
@@ -624,6 +626,8 @@ export default function App() {
           onOpenApp={(url, name) => setAppPanel({ url, name })}
           onOpenArtifact={handleOpenArtifact}
           artifactRefreshTick={artifactRefreshTick}
+          theme={theme}
+          onThemeToggle={toggleTheme}
         />
       </div>
 
@@ -632,21 +636,32 @@ export default function App() {
         {/* Chat column */}
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           {/* Mobile header bar */}
-          <div className="flex items-center gap-2 h-11 px-2 border-b border-[#1f1f1f] md:hidden flex-shrink-0 bg-[#0d0d0d]">
+          <div className="flex items-center gap-2 h-11 px-2 border-b border-app-border md:hidden flex-shrink-0 bg-app-bg">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="w-11 h-11 flex items-center justify-center text-[#666] hover:text-[#aaa] text-xl flex-shrink-0"
+              className="w-11 h-11 flex items-center justify-center text-app-text-5 hover:text-app-text-3 text-xl flex-shrink-0"
               aria-label="Open sidebar"
             >
               ☰
             </button>
             <ConnectionDot state={connState} lastSeenAt={lastSeenAt} />
-            <span className="flex-1 text-sm text-[#888] truncate text-center">
+            <span className="flex-1 text-sm text-app-text-4 truncate text-center">
               {mobileTitle}
             </span>
             <button
+              onClick={toggleTheme}
+              className="w-11 h-11 flex items-center justify-center text-app-text-6 hover:text-app-text-3 flex-shrink-0"
+              title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              aria-label="Toggle theme"
+            >
+              {theme === 'dark'
+                ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              }
+            </button>
+            <button
               onClick={() => window.location.reload()}
-              className="w-11 h-11 flex items-center justify-center text-[#555] hover:text-[#aaa] flex-shrink-0"
+              className="w-11 h-11 flex items-center justify-center text-app-text-6 hover:text-app-text-3 flex-shrink-0"
               title="Refresh"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -656,7 +671,7 @@ export default function App() {
             </button>
             <button
               onClick={handleLogout}
-              className="w-11 h-11 flex items-center justify-center text-[#555] hover:text-[#aaa] flex-shrink-0"
+              className="w-11 h-11 flex items-center justify-center text-app-text-6 hover:text-app-text-3 flex-shrink-0"
               title="Sign out"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -694,7 +709,7 @@ export default function App() {
               onOpenArtifact={handleOpenArtifact}
             />
           ) : (
-            <div className="flex flex-col items-center justify-center h-full gap-4 text-[#666]">
+            <div className="flex flex-col items-center justify-center h-full gap-4 text-app-text-5">
               {activeProjectId ? (
                 <>
                   <p>No sessions in this project yet.</p>

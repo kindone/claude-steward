@@ -188,17 +188,17 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
   }
 
   return (
-    <div className="border-t border-[#1f1f1f] bg-[#0d0d0d]">
+    <div className="border-t border-app-border bg-app-bg">
       {/* Pending file chips */}
       {pendingFiles.length > 0 && (
         <div className="flex flex-wrap gap-1.5 px-4 pt-2.5 md:px-6">
           {pendingFiles.map((f, i) => (
-            <span key={`${f.name}-${i}`} className="inline-flex items-center gap-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-md px-2 py-1 text-[11px] text-[#888]">
+            <span key={`${f.name}-${i}`} className="inline-flex items-center gap-1 bg-app-bg-card border border-app-border-2 rounded-md px-2 py-1 text-[11px] text-app-text-4">
               <span className="truncate max-w-[120px]">{f.name}</span>
-              <span className="text-[#888] text-[10px]">({(f.size / 1024).toFixed(0)}K)</span>
+              <span className="text-app-text-4 text-[10px]">({(f.size / 1024).toFixed(0)}K)</span>
               <button
                 onClick={() => removeFile(i)}
-                className="text-[#555] hover:text-[#ccc] bg-transparent border-none cursor-pointer text-xs leading-none ml-0.5 p-0"
+                className="text-app-text-6 hover:text-app-text-2 bg-transparent border-none cursor-pointer text-xs leading-none ml-0.5 p-0"
               >×</button>
             </span>
           ))}
@@ -216,13 +216,13 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
         <div className="flex-1 min-w-0 relative">
           {/* @mention autocomplete dropdown */}
           {mentionQuery !== null && suggestions.length > 0 && (
-            <div className="absolute bottom-full left-0 mb-1 z-50 bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg shadow-xl min-w-[200px] max-w-[320px] overflow-hidden">
+            <div className="absolute bottom-full left-0 mb-1 z-50 bg-app-bg-card border border-app-border-2 rounded-lg shadow-xl min-w-[200px] max-w-[320px] overflow-hidden">
               {suggestions.map((a, i) => (
                 <button
                   key={a.id}
                   onMouseDown={(e) => { e.preventDefault(); insertMention(a) }}
                   className={`w-full text-left flex items-center gap-2 px-3 py-1.5 text-[12px] transition-colors cursor-pointer border-none
-                    ${i === mentionIndex ? 'bg-[#2a2a2a] text-[#eee]' : 'text-[#aaa] hover:bg-[#222]'}`}
+                    ${i === mentionIndex ? 'bg-app-border-2 text-app-text' : 'text-app-text-3 hover:bg-app-bg-hover'}`}
                 >
                   <span className="flex-1 truncate font-medium">{a.name}</span>
                   <span className={`text-[10px] px-1.5 py-px rounded border flex-shrink-0 ${
@@ -236,8 +236,8 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
             </div>
           )}
         <div
-          className={`flex items-end gap-1 bg-[#1a1a1a] border rounded-[10px] transition-colors
-            ${dragOver ? 'border-blue-500/60 bg-blue-500/5' : draftState === 'typing' ? 'border-amber-500/50' : draftState === 'saved' ? 'border-green-600/50' : 'border-[#2a2a2a] focus-within:border-blue-600'}`}
+          className={`flex items-end gap-1 bg-app-bg-card border rounded-[10px] transition-colors
+            ${dragOver ? 'border-blue-500/60 bg-blue-500/5' : draftState === 'typing' ? 'border-amber-500/50' : draftState === 'saved' ? 'border-green-600/50' : 'border-app-border-2 focus-within:border-blue-600'}`}
           onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
           onDragLeave={() => setDragOver(false)}
           onDrop={(e) => {
@@ -251,7 +251,7 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
             <button
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || uploading}
-              className="text-[#555] hover:text-[#888] bg-transparent border-none cursor-pointer px-2 py-2.5 flex-shrink-0 transition-colors disabled:opacity-50 text-sm leading-none"
+              className="text-app-text-6 hover:text-app-text-4 bg-transparent border-none cursor-pointer px-2 py-2.5 flex-shrink-0 transition-colors disabled:opacity-50 text-sm leading-none"
               title="Attach files"
             >
               📎
@@ -259,7 +259,7 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
           )}
           <textarea
             ref={textareaRef}
-            className="flex-1 bg-transparent text-[#e8e8e8] px-2.5 py-2.5 text-base font-[inherit] leading-relaxed
+            className="flex-1 bg-transparent text-app-text px-2.5 py-2.5 text-base font-[inherit] leading-relaxed
               resize-none outline-none border-none disabled:opacity-50"
             placeholder={dragOver ? 'Drop files here…' : 'Message Claude…'}
             rows={3}
@@ -279,7 +279,7 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
           </button>
         ) : (
           <button
-            className="bg-blue-600 hover:bg-blue-700 disabled:bg-[#1e2a3a] disabled:text-[#555] disabled:cursor-not-allowed
+            className="bg-blue-600 hover:bg-blue-700 disabled:bg-app-blue-tint-subtle disabled:text-app-text-6 disabled:cursor-not-allowed
               text-white border-none px-5 rounded-[10px] cursor-pointer text-sm font-medium
               whitespace-nowrap flex-shrink-0 self-end min-h-[44px] transition-colors"
             disabled={uploading}

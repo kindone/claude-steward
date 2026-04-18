@@ -143,8 +143,8 @@ export function ImageLightbox({ content, onClose }: Props) {
       {/* Close button */}
       <button
         className="absolute top-4 right-4 z-10 w-9 h-9 flex items-center justify-center
-                   bg-[#1a1a1a]/50 border border-[#333]/50 rounded-full text-[#888]
-                   hover:bg-[#1a1a1a]/80 hover:text-white hover:border-[#666]/80
+                   bg-app-bg-card/50 border border-app-border-3/50 rounded-full text-app-text-4
+                   hover:bg-app-bg-card/80 hover:text-white hover:border-app-text-5/80
                    cursor-pointer text-lg leading-none transition-all"
         onClick={(e) => { e.stopPropagation(); onClose() }}
         aria-label="Close lightbox"
@@ -155,8 +155,8 @@ export function ImageLightbox({ content, onClose }: Props) {
       {/* Reset zoom button */}
       <button
         className="absolute top-4 right-16 z-10 h-9 px-3 flex items-center
-                   bg-[#1a1a1a]/50 border border-[#333]/50 rounded-full text-[#666]
-                   hover:bg-[#1a1a1a]/80 hover:text-[#aaa] cursor-pointer text-xs transition-all"
+                   bg-app-bg-card/50 border border-app-border-3/50 rounded-full text-app-text-5
+                   hover:bg-app-bg-card/80 hover:text-app-text-3 cursor-pointer text-xs transition-all"
         onClick={handleResetView}
         title="Reset zoom"
       >
@@ -167,8 +167,8 @@ export function ImageLightbox({ content, onClose }: Props) {
       {isGallery && galleryIdx > 0 && (
         <button
           className="absolute left-4 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center
-                     bg-[#1a1a1a]/50 border border-[#333]/50 rounded-full text-[#888]
-                     hover:bg-[#1a1a1a]/80 hover:text-white hover:border-[#666]/80
+                     bg-app-bg-card/50 border border-app-border-3/50 rounded-full text-app-text-4
+                     hover:bg-app-bg-card/80 hover:text-white hover:border-app-text-5/80
                      cursor-pointer text-lg transition-all"
           onClick={(e) => { e.stopPropagation(); goTo(galleryIdx - 1) }}
           aria-label="Previous image"
@@ -179,8 +179,8 @@ export function ImageLightbox({ content, onClose }: Props) {
       {isGallery && galleryIdx < totalImages - 1 && (
         <button
           className="absolute right-16 top-1/2 -translate-y-1/2 z-10 w-10 h-10 flex items-center justify-center
-                     bg-[#1a1a1a]/50 border border-[#333]/50 rounded-full text-[#888]
-                     hover:bg-[#1a1a1a]/80 hover:text-white hover:border-[#666]/80
+                     bg-app-bg-card/50 border border-app-border-3/50 rounded-full text-app-text-4
+                     hover:bg-app-bg-card/80 hover:text-white hover:border-app-text-5/80
                      cursor-pointer text-lg transition-all"
           onClick={(e) => { e.stopPropagation(); goTo(galleryIdx + 1) }}
           aria-label="Next image"
@@ -219,7 +219,7 @@ export function ImageLightbox({ content, onClose }: Props) {
       </div>
 
       {/* Bottom hint / gallery counter */}
-      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-[#555] select-none pointer-events-none whitespace-nowrap">
+      <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-xs text-app-text-6 select-none pointer-events-none whitespace-nowrap">
         {isGallery
           ? `${galleryIdx + 1} / ${totalImages}  ·  scroll to zoom · drag to pan · ← → to navigate`
           : 'scroll to zoom · drag to pan · click outside to close'}
@@ -236,7 +236,7 @@ export function ImageLightbox({ content, onClose }: Props) {
               key={i}
               onClick={(e) => { e.stopPropagation(); goTo(i) }}
               className={`w-10 h-10 rounded overflow-hidden border-2 transition-all cursor-pointer p-0
-                ${i === galleryIdx ? 'border-blue-500 opacity-100' : 'border-[#333] opacity-50 hover:opacity-80'}`}
+                ${i === galleryIdx ? 'border-blue-500 opacity-100' : 'border-app-border-3 opacity-50 hover:opacity-80'}`}
               aria-label={`Go to image ${i + 1}`}
             >
               <img

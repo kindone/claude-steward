@@ -22,6 +22,7 @@ interface Props {
   readOnly?: boolean
   className?: string
   wrapLines?: boolean
+  theme?: 'dark' | 'light'
 }
 
 function langExtension(language: string): Extension {
@@ -56,10 +57,11 @@ function langExtension(language: string): Extension {
   }
 }
 
-export const ArtifactCodeMirror = memo(function ArtifactCodeMirror({ value, onChange, language, readOnly = false, className, wrapLines = false }: Props) {
+export const ArtifactCodeMirror = memo(function ArtifactCodeMirror({ value, onChange, language, readOnly = false, className, wrapLines = false, theme = 'dark' }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<EditorView | null>(null)
   const wrapCompartment = useRef(new Compartment())
+  const themeCompartment = useRef(new Compartment())
 
   // Keep onChange stable inside editor via ref
   const onChangeRef = useRef(onChange)
@@ -77,12 +79,38 @@ export const ArtifactCodeMirror = memo(function ArtifactCodeMirror({ value, onCh
   // value to be dispatched back into the editor and the cursor to jump.
   const lastNotifiedRef = useRef(value)
 
+  function buildThemeExtension(t: 'dark' | 'light'): Extension {
+    const isDark = t === 'dark'
+    return [
+      isDark ? oneDark : [],
+      EditorView.theme({
+        '&': { background: 'var(--app-bg) !important', height: '100%' },
+        '.cm-editor': { background: 'var(--app-bg) !important', height: '100%' },
+        '.cm-scroller': {
+          fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", monospace',
+          fontSize: '12px',
+          lineHeight: '1.6',
+          overflow: 'auto',
+        },
+        '.cm-content': { padding: '8px 0', ...(isDark ? {} : { color: 'var(--app-text)' }) },
+        '.cm-focused': { outline: 'none' },
+        '.cm-gutters': {
+          background: 'var(--app-bg)',
+          borderRight: '1px solid var(--app-border)',
+          color: 'var(--app-text-7)',
+        },
+        '.cm-activeLineGutter': { background: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)' },
+        '.cm-activeLine': { background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)' },
+      }, { dark: isDark }),
+    ]
+  }
+
   // Create / recreate editor when language or readOnly changes
   useEffect(() => {
     if (!containerRef.current) return
 
     const extensions: Extension[] = [
-      oneDark,
+      themeCompartment.current.of(buildThemeExtension(theme)),
       lineNumbers(),
       syntaxHighlighting(defaultHighlightStyle),
       keymap.of([indentWithTab, ...defaultKeymap]),
@@ -101,25 +129,6 @@ export const ArtifactCodeMirror = memo(function ArtifactCodeMirror({ value, onCh
             onChangeRef.current(doc)
           }
         }, 150)
-      }),
-      EditorView.theme({
-        '&': { background: '#0d0d0d !important', height: '100%' },
-        '.cm-editor': { background: '#0d0d0d !important', height: '100%' },
-        '.cm-scroller': {
-          fontFamily: '"Cascadia Code", "Fira Code", "JetBrains Mono", monospace',
-          fontSize: '12px',
-          lineHeight: '1.6',
-          overflow: 'auto',
-        },
-        '.cm-content': { padding: '8px 0' },
-        '.cm-focused': { outline: 'none' },
-        '.cm-gutters': {
-          background: '#0d0d0d',
-          borderRight: '1px solid #1f1f1f',
-          color: '#444',
-        },
-        '.cm-activeLineGutter': { background: 'rgba(255,255,255,0.04)' },
-        '.cm-activeLine': { background: 'rgba(255,255,255,0.03)' },
       }),
     ]
 
@@ -153,6 +162,14 @@ export const ArtifactCodeMirror = memo(function ArtifactCodeMirror({ value, onCh
     })
   }, [wrapLines])
 
+  // Reconfigure color theme without recreating the editor
+  useEffect(() => {
+    viewRef.current?.dispatch({
+      effects: themeCompartment.current.reconfigure(buildThemeExtension(theme)),
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [theme])
+
   // Sync external value changes (e.g. SSE refresh) without resetting cursor.
   // Skip when the value is our own round-trip from the debounced notification —
   // the editor already has this content and dispatching would clobber any chars
@@ -171,7 +188,7 @@ export const ArtifactCodeMirror = memo(function ArtifactCodeMirror({ value, onCh
     <div
       ref={containerRef}
       className={className}
-      style={{ background: '#0d0d0d' }}
+      style={{ background: 'var(--app-bg)' }}
     />
   )
 })

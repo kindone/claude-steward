@@ -17,26 +17,26 @@ export function AppViewPanel({ url, name, preset, onPresetChange, onClose }: Pro
   return (
     <>
       {/* Divider — desktop only */}
-      <div className="hidden md:block w-px bg-[#1f1f1f] flex-shrink-0" />
+      <div className="hidden md:block w-px bg-app-border flex-shrink-0" />
 
       {/* Panel — fixed full-screen on mobile, inline column on desktop */}
       <div
         className={`
-          fixed inset-0 z-50 flex flex-col bg-[#0d0d0d]
+          fixed inset-0 z-50 flex flex-col bg-app-bg
           md:static md:inset-auto md:z-auto md:flex-shrink-0
           ${PRESET_WIDTH[preset]}
         `}
       >
         {/* Title bar */}
-        <div className="flex items-center gap-1.5 h-10 px-3 border-b border-[#1f1f1f] flex-shrink-0 bg-[#111]">
-          <span className="flex-1 text-[12px] text-[#888] truncate" title={url}>{name}</span>
+        <div className="flex items-center gap-1.5 h-10 px-3 border-b border-app-border flex-shrink-0 bg-app-bg-raised">
+          <span className="flex-1 text-[12px] text-app-text-4 truncate" title={url}>{name}</span>
 
           {/* Preset toggles */}
           <button
             onClick={() => onPresetChange('half')}
             title="50/50 split"
             className={`hidden md:flex w-7 h-7 items-center justify-center rounded text-[11px] transition-colors
-              ${preset === 'half' ? 'bg-[#2a2a2a] text-[#e8e8e8]' : 'text-[#555] hover:text-[#aaa]'}`}
+              ${preset === 'half' ? 'bg-app-border-2 text-app-text' : 'text-app-text-6 hover:text-app-text-3'}`}
           >
             ½
           </button>
@@ -44,7 +44,7 @@ export function AppViewPanel({ url, name, preset, onPresetChange, onClose }: Pro
             onClick={() => onPresetChange('wide')}
             title="60/40 split (app wider)"
             className={`hidden md:flex w-7 h-7 items-center justify-center rounded text-[11px] transition-colors
-              ${preset === 'wide' ? 'bg-[#2a2a2a] text-[#e8e8e8]' : 'text-[#555] hover:text-[#aaa]'}`}
+              ${preset === 'wide' ? 'bg-app-border-2 text-app-text' : 'text-app-text-6 hover:text-app-text-3'}`}
           >
             ⅔
           </button>
@@ -55,7 +55,7 @@ export function AppViewPanel({ url, name, preset, onPresetChange, onClose }: Pro
             target="_blank"
             rel="noopener noreferrer"
             title="Open in new tab"
-            className="w-7 h-7 flex items-center justify-center rounded text-[#555] hover:text-[#aaa] transition-colors text-[13px]"
+            className="w-7 h-7 flex items-center justify-center rounded text-app-text-6 hover:text-app-text-3 transition-colors text-[13px]"
           >
             ↗
           </a>
@@ -64,7 +64,7 @@ export function AppViewPanel({ url, name, preset, onPresetChange, onClose }: Pro
           <button
             onClick={onClose}
             title="Close"
-            className="w-7 h-7 flex items-center justify-center rounded text-[#555] hover:text-[#aaa] transition-colors text-[15px]"
+            className="w-7 h-7 flex items-center justify-center rounded text-app-text-6 hover:text-app-text-3 transition-colors text-[15px]"
           >
             ✕
           </button>

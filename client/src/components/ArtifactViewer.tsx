@@ -112,7 +112,7 @@ function ChartView({ content }: { content: string }) {
     <div className="relative min-h-[200px]" style={{ overflowX: 'auto' }}>
       {loading && (
         <div className="absolute inset-0 flex items-center justify-center">
-          <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#333] border-t-[#666]" />
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-app-border-3 border-t-app-text-5" />
         </div>
       )}
       <div ref={containerRef} style={{ width: '100%', minWidth: 0 }} />
@@ -553,23 +553,23 @@ function DataView({ content }: { content: string }) {
   })
 
   if (headers.length === 0) {
-    return <p className="text-[12px] text-[#444] italic px-1">No data to display.</p>
+    return <p className="text-[12px] text-app-text-7 italic px-1">No data to display.</p>
   }
 
   return (
-    <div className="overflow-auto max-h-[500px] rounded-md border border-[#2a2a2a]">
+    <div className="overflow-auto max-h-[500px] rounded-md border border-app-border-2">
       <table className="text-[12px] w-full border-collapse">
-        <thead className="sticky top-0 bg-[#1a1a1a]">
+        <thead className="sticky top-0 bg-app-bg-card">
           <tr>
             {headers.map((h, i) => (
               <th
                 key={i}
                 onClick={() => toggleSort(i)}
-                className="text-left px-3 py-2 text-[#aaa] font-semibold cursor-pointer select-none border-b border-[#2a2a2a] hover:text-[#e8e8e8] whitespace-nowrap"
+                className="text-left px-3 py-2 text-app-text-3 font-semibold cursor-pointer select-none border-b border-app-border-2 hover:text-app-text whitespace-nowrap"
               >
                 {h}
                 {sort.col === i && (
-                  <span className="ml-1 text-[#666]">{sort.dir === 'asc' ? '↑' : '↓'}</span>
+                  <span className="ml-1 text-app-text-5">{sort.dir === 'asc' ? '↑' : '↓'}</span>
                 )}
               </th>
             ))}
@@ -577,9 +577,9 @@ function DataView({ content }: { content: string }) {
         </thead>
         <tbody>
           {sortedRows.map((row, ri) => (
-            <tr key={ri} className="border-b border-[#1e1e1e] hover:bg-[#1a1a1a]">
+            <tr key={ri} className="border-b border-app-bg-overlay hover:bg-app-bg-card">
               {headers.map((_, ci) => (
-                <td key={ci} className="px-3 py-1.5 text-[#ccc] whitespace-nowrap">
+                <td key={ci} className="px-3 py-1.5 text-app-text-2 whitespace-nowrap">
                   {row[ci] ?? ''}
                 </td>
               ))}
@@ -664,7 +664,7 @@ function CodeView({ content, artifact }: { content: string; artifact: Artifact }
   })
 
   return (
-    <pre className="rounded-md bg-[#0d0d0d] border border-[#2a2a2a] overflow-auto text-[12px]">
+    <pre className="rounded-md bg-app-bg border border-app-border-2 overflow-auto text-[12px]">
       <code ref={codeRef} className={lang ? `language-${lang}` : ''}>{content}</code>
     </pre>
   )
@@ -701,7 +701,7 @@ function PikchrView({ content }: { content: string }) {
   if (!svg) {
     return (
       <div className="flex items-center justify-center py-12">
-        <span className="h-6 w-6 animate-spin rounded-full border-2 border-[#333] border-t-[#666]" />
+        <span className="h-6 w-6 animate-spin rounded-full border-2 border-app-border-3 border-t-app-text-5" />
       </div>
     )
   }
@@ -789,7 +789,7 @@ function HtmlView({ content }: { content: string }) {
       <div className="flex items-center justify-end gap-2">
         <button
           onClick={() => setReloadKey(k => k + 1)}
-          className="text-[11px] text-[#555] hover:text-[#aaa] py-0.5 px-2 rounded border border-[#2a2a2a] hover:border-[#444]"
+          className="text-[11px] text-app-text-6 hover:text-app-text-3 py-0.5 px-2 rounded border border-app-border-2 hover:border-app-border-4"
           title="Force reload preview"
         >
           ↺ reload
@@ -799,14 +799,14 @@ function HtmlView({ content }: { content: string }) {
         key={reloadKey}
         srcDoc={srcdoc}
         sandbox="allow-scripts allow-downloads"
-        className="w-full rounded-md border border-[#2a2a2a] bg-white"
+        className="w-full rounded-md border border-app-border-2 bg-white"
         style={{ height: displayHeight, transition: 'height 0.15s ease' }}
         title="HTML artifact"
       />
       {height > 500 && (
         <button
           onClick={() => setExpanded(e => !e)}
-          className="self-center text-[11px] text-[#555] hover:text-[#aaa] py-0.5 px-2 rounded border border-[#2a2a2a] hover:border-[#444]"
+          className="self-center text-[11px] text-app-text-6 hover:text-app-text-3 py-0.5 px-2 rounded border border-app-border-2 hover:border-app-border-4"
         >
           {expanded ? '↑ collapse' : `↓ expand (${height}px)`}
         </button>
@@ -820,7 +820,7 @@ function HtmlView({ content }: { content: string }) {
 export function ArtifactViewer({ artifact, content, className }: Props) {
   if (!content) {
     return (
-      <div className={`flex items-center justify-center py-12 text-[#444] text-sm italic ${className ?? ''}`}>
+      <div className={`flex items-center justify-center py-12 text-app-text-7 text-sm italic ${className ?? ''}`}>
         This artifact has no content yet.
       </div>
     )

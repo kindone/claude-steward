@@ -149,12 +149,12 @@ export function TerminalPanel({ projectId }: Props) {
   }
 
   return (
-    <div className="flex flex-col flex-1 min-h-0 bg-[#0d0d0d]">
+    <div className="flex flex-col flex-1 min-h-0 bg-app-bg">
       {/* xterm.js viewport */}
       <div ref={containerRef} className="flex-1 min-h-0 px-1 pt-1" />
 
       {/* Input bar */}
-      <div className="flex items-center gap-1.5 px-2 py-2 border-t border-[#1f1f1f] flex-shrink-0">
+      <div className="flex items-center gap-1.5 px-2 py-2 border-t border-app-border flex-shrink-0">
         <span className="text-[#4a9] text-[12px] font-mono flex-shrink-0 select-none">$</span>
         <input
           type="text"
@@ -163,7 +163,7 @@ export function TerminalPanel({ projectId }: Props) {
           onKeyDown={handleKeyDown}
           disabled={running}
           placeholder={running ? 'Running…' : 'Enter command'}
-          className="flex-1 bg-transparent border-none outline-none text-[12px] font-mono text-[#ccc] placeholder-[#333] disabled:opacity-40 min-w-0"
+          className="flex-1 bg-transparent border-none outline-none text-[12px] font-mono text-app-text-2 placeholder-[#333] disabled:opacity-40 min-w-0"
           style={{ fontFamily: "'SF Mono', 'Fira Code', monospace" }}
           spellCheck={false}
           autoComplete="off"
@@ -180,13 +180,13 @@ export function TerminalPanel({ projectId }: Props) {
             <button
               onClick={runCommand}
               disabled={!command.trim()}
-              className="text-[10px] px-2 py-1 rounded border border-[#2a2a2a] text-[#666] hover:text-[#ccc] hover:border-[#444] cursor-pointer bg-transparent transition-colors disabled:opacity-30 disabled:cursor-default flex-shrink-0"
+              className="text-[10px] px-2 py-1 rounded border border-app-border-2 text-app-text-5 hover:text-app-text-2 hover:border-app-border-4 cursor-pointer bg-transparent transition-colors disabled:opacity-30 disabled:cursor-default flex-shrink-0"
             >
               Run
             </button>
             <button
               onClick={handleClear}
-              className="text-[10px] px-1.5 py-1 rounded text-[#444] hover:text-[#666] cursor-pointer bg-transparent border-none transition-colors flex-shrink-0"
+              className="text-[10px] px-1.5 py-1 rounded text-app-text-7 hover:text-app-text-5 cursor-pointer bg-transparent border-none transition-colors flex-shrink-0"
               title="Clear terminal"
             >
               ⌫

@@ -64,36 +64,36 @@ export function KernelSelector({ projectId, refreshTick = 0 }: Props) {
     <div className="relative" ref={panelRef}>
       <button
         onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-[#666] hover:text-[#aaa] hover:bg-[#1a1a1a] transition-colors cursor-pointer"
+        className="flex items-center gap-1 px-2 py-1 rounded text-[11px] text-app-text-5 hover:text-app-text-3 hover:bg-app-bg-card transition-colors cursor-pointer"
         title="Kernels"
       >
-        <span className={`inline-block w-1.5 h-1.5 rounded-full ${alive.length > 0 ? 'bg-green-500' : 'bg-[#444]'}`} />
+        <span className={`inline-block w-1.5 h-1.5 rounded-full ${alive.length > 0 ? 'bg-green-500' : 'bg-app-border-4'}`} />
         <span className="hidden sm:inline">{alive.length > 0 ? `${alive.length} kernel${alive.length !== 1 ? 's' : ''}` : 'kernels'}</span>
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-[#151515] border border-[#2a2a2a] rounded-lg shadow-lg min-w-[220px] py-1 text-xs">
+        <div className="absolute right-0 top-full mt-1 z-50 bg-app-bg-raised border border-app-border-2 rounded-lg shadow-lg min-w-[220px] py-1 text-xs">
           {kernels.length === 0 && (
-            <div className="px-3 py-2 text-[#555]">No active kernels</div>
+            <div className="px-3 py-2 text-app-text-6">No active kernels</div>
           )}
           {kernels.map((k) => (
-            <div key={`${k.name}:${k.language}`} className="flex items-center gap-2 px-3 py-2 hover:bg-[#1e1e1e]">
-              <span className={`font-mono ${langColor[k.language] ?? 'text-[#aaa]'}`}>{k.language}</span>
-              <span className="text-[#888] truncate flex-1">{k.name}</span>
-              <span className="text-[#444] shrink-0">{formatAge(k.lastUsedAt)}</span>
+            <div key={`${k.name}:${k.language}`} className="flex items-center gap-2 px-3 py-2 hover:bg-app-bg-overlay">
+              <span className={`font-mono ${langColor[k.language] ?? 'text-app-text-3'}`}>{k.language}</span>
+              <span className="text-app-text-4 truncate flex-1">{k.name}</span>
+              <span className="text-app-text-7 shrink-0">{formatAge(k.lastUsedAt)}</span>
               <button
                 onClick={() => handleReset(k)}
-                className="text-[#555] hover:text-yellow-400 transition-colors cursor-pointer"
+                className="text-app-text-6 hover:text-yellow-400 transition-colors cursor-pointer"
                 title="Reset kernel state"
               >↺</button>
               <button
                 onClick={() => handleKill(k)}
-                className="text-[#555] hover:text-red-400 transition-colors cursor-pointer"
+                className="text-app-text-6 hover:text-red-400 transition-colors cursor-pointer"
                 title="Kill kernel"
               >✕</button>
             </div>
           ))}
-          <div className="px-3 py-1.5 border-t border-[#1e1e1e] text-[#444] text-[10px]">
+          <div className="px-3 py-1.5 border-t border-app-bg-overlay text-app-text-7 text-[10px]">
             Kernels idle 30 min are auto-killed
           </div>
         </div>

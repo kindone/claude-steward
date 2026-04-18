@@ -112,8 +112,8 @@ export function SaveAsArtifactDialog({
       ref={dialogRef}
       className={
         isMobile
-          ? 'bg-[#151515] border-t border-[#2a2a2a] rounded-t-2xl shadow-2xl text-xs w-full'
-          : 'bg-[#151515] border border-[#2a2a2a] rounded-lg shadow-xl text-xs'
+          ? 'bg-app-bg-raised border-t border-app-border-2 rounded-t-2xl shadow-2xl text-xs w-full'
+          : 'bg-app-bg-raised border border-app-border-2 rounded-lg shadow-xl text-xs'
       }
       style={isMobile ? {} : popoverStyle}
       onClick={(e) => e.stopPropagation()}
@@ -128,16 +128,16 @@ export function SaveAsArtifactDialog({
           {/* Drag handle (mobile only) */}
           {isMobile && (
             <div className="flex justify-center pt-3 pb-1">
-              <div className="w-10 h-1 rounded-full bg-[#333]" />
+              <div className="w-10 h-1 rounded-full bg-app-border-3" />
             </div>
           )}
 
           {/* Header */}
-          <div className="flex items-center justify-between px-4 pt-2.5 pb-2 border-b border-[#1e1e1e]">
-            <span className="text-[#888] font-medium text-sm">Save as Artifact</span>
+          <div className="flex items-center justify-between px-4 pt-2.5 pb-2 border-b border-app-bg-overlay">
+            <span className="text-app-text-4 font-medium text-sm">Save as Artifact</span>
             <button
               onClick={onClose}
-              className="text-[#444] hover:text-[#888] cursor-pointer leading-none p-1 -mr-1 text-base"
+              className="text-app-text-7 hover:text-app-text-4 cursor-pointer leading-none p-1 -mr-1 text-base"
             >
               ✕
             </button>
@@ -146,7 +146,7 @@ export function SaveAsArtifactDialog({
           <div className={`px-4 flex flex-col gap-3 ${isMobile ? 'py-4 pb-8' : 'py-3'}`}>
             {/* Name */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[#555]">Name</label>
+              <label className="text-app-text-6">Name</label>
               <input
                 autoFocus={!isMobile}
                 type="text"
@@ -154,18 +154,18 @@ export function SaveAsArtifactDialog({
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
                 placeholder="my-artifact"
-                className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-2 py-2 text-[#ccc] text-sm focus:outline-none focus:border-[#444]"
+                className="bg-app-bg border border-app-border-2 rounded px-2 py-2 text-app-text-2 text-sm focus:outline-none focus:border-app-border-4"
                 disabled={status === 'saving'}
               />
             </div>
 
             {/* Type */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-[#555]">Type</label>
+              <label className="text-app-text-6">Type</label>
               <select
                 value={type}
                 onChange={(e) => setType(e.target.value as ArtifactType)}
-                className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-2 py-2 text-[#ccc] text-sm focus:outline-none focus:border-[#444] cursor-pointer"
+                className="bg-app-bg border border-app-border-2 rounded px-2 py-2 text-app-text-2 text-sm focus:outline-none focus:border-app-border-4 cursor-pointer"
                 disabled={status === 'saving'}
               >
                 <option value="chart">chart</option>
@@ -178,13 +178,13 @@ export function SaveAsArtifactDialog({
             {/* Language (code only) */}
             {type === 'code' && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-[#555]">Language</label>
+                <label className="text-app-text-6">Language</label>
                 <input
                   type="text"
                   value={language}
                   onChange={(e) => setLanguage(e.target.value)}
                   placeholder="python, javascript…"
-                  className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-2 py-2 text-[#ccc] text-sm focus:outline-none focus:border-[#444]"
+                  className="bg-app-bg border border-app-border-2 rounded px-2 py-2 text-app-text-2 text-sm focus:outline-none focus:border-app-border-4"
                   disabled={status === 'saving'}
                 />
               </div>
@@ -193,11 +193,11 @@ export function SaveAsArtifactDialog({
             {/* Format (data only) */}
             {type === 'data' && (
               <div className="flex flex-col gap-1.5">
-                <label className="text-[#555]">Format</label>
+                <label className="text-app-text-6">Format</label>
                 <select
                   value={format}
                   onChange={(e) => setFormat(e.target.value as 'json' | 'csv')}
-                  className="bg-[#0d0d0d] border border-[#2a2a2a] rounded px-2 py-2 text-[#ccc] text-sm focus:outline-none focus:border-[#444] cursor-pointer"
+                  className="bg-app-bg border border-app-border-2 rounded px-2 py-2 text-app-text-2 text-sm focus:outline-none focus:border-app-border-4 cursor-pointer"
                   disabled={status === 'saving'}
                 >
                   <option value="json">json</option>
@@ -215,7 +215,7 @@ export function SaveAsArtifactDialog({
             <button
               onClick={handleSave}
               disabled={status === 'saving'}
-              className={`w-full bg-[#1a2a3a] hover:bg-[#1e3248] border border-[#2a4a6a] text-blue-300 rounded cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-default ${isMobile ? 'py-3 text-base' : 'py-1.5 text-xs'}`}
+              className={`w-full bg-app-blue-tint-subtle hover:bg-app-blue-tint-hover border border-app-blue-border text-blue-300 rounded cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-default ${isMobile ? 'py-3 text-base' : 'py-1.5 text-xs'}`}
             >
               {status === 'saving' ? 'Saving…' : 'Save'}
             </button>

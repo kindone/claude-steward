@@ -194,9 +194,9 @@ export function SchedulePanel({ sessionId, timezone, refreshTick }: Props) {
   return (
     <div className="px-3 pb-3 flex flex-col gap-2">
       {loading ? (
-        <p className="text-[11px] text-[#555]">Loading…</p>
+        <p className="text-[11px] text-app-text-6">Loading…</p>
       ) : schedules.length === 0 ? (
-        <p className="text-[11px] text-[#444] italic">
+        <p className="text-[11px] text-app-text-7 italic">
           No schedules yet — ask Claude to schedule something for you.
         </p>
       ) : (
@@ -210,40 +210,40 @@ export function SchedulePanel({ sessionId, timezone, refreshTick }: Props) {
             return (
               <li
                 key={s.id}
-                className={`border rounded-md px-2.5 py-2 flex flex-col gap-1 transition-colors ${s.enabled ? 'border-[#2a2a2a]' : 'border-[#1e1e1e] opacity-60'}`}
+                className={`border rounded-md px-2.5 py-2 flex flex-col gap-1 transition-colors ${s.enabled ? 'border-app-border-2' : 'border-app-bg-overlay opacity-60'}`}
               >
                 {/* Row 1: toggle + title + badges + actions */}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => handleToggle(s)}
                     title={s.enabled ? 'Disable' : 'Enable'}
-                    className={`w-8 h-4 rounded-full flex-shrink-0 transition-colors relative ${s.enabled ? 'bg-blue-600' : 'bg-[#333]'}`}
+                    className={`w-8 h-4 rounded-full flex-shrink-0 transition-colors relative ${s.enabled ? 'bg-blue-600' : 'bg-app-border-3'}`}
                   >
                     <span className={`absolute top-0.5 left-0 w-3 h-3 rounded-full bg-white transition-transform ${s.enabled ? 'translate-x-[18px]' : 'translate-x-[2px]'}`} />
                   </button>
 
                   <span
-                    className="flex-1 text-[12px] font-medium text-[#ccc] truncate"
+                    className="flex-1 text-[12px] font-medium text-app-text-2 truncate"
                     title={s.label ? s.prompt : undefined}
                   >
                     {title}
                   </span>
 
                   {s.once === 1 && (
-                    <span className="text-[10px] text-[#555] border border-[#2a2a2a] rounded px-1 py-px flex-shrink-0">once</span>
+                    <span className="text-[10px] text-app-text-6 border border-app-border-2 rounded px-1 py-px flex-shrink-0">once</span>
                   )}
 
                   <button
                     onClick={() => handleRunNow(s.id)}
                     title="Run now"
-                    className="text-[11px] text-[#555] hover:text-[#aaa] flex-shrink-0 px-1"
+                    className="text-[11px] text-app-text-6 hover:text-app-text-3 flex-shrink-0 px-1"
                   >
                     ▶
                   </button>
                   <button
                     onClick={() => handleDelete(s.id)}
                     title="Delete"
-                    className="text-[11px] text-[#555] hover:text-red-500 flex-shrink-0 px-1"
+                    className="text-[11px] text-app-text-6 hover:text-red-500 flex-shrink-0 px-1"
                   >
                     ×
                   </button>
@@ -252,12 +252,12 @@ export function SchedulePanel({ sessionId, timezone, refreshTick }: Props) {
                 {/* Row 2: human-readable cron + condition + expiry */}
                 <div className="pl-10 flex flex-col gap-0.5">
                   <p
-                    className="text-[10px] text-[#555]"
+                    className="text-[10px] text-app-text-6"
                     title={s.cron}
                   >
                     {cronDesc}
                     {conditionDesc && (
-                      <span className="ml-1 text-[#444]">· {conditionDesc}</span>
+                      <span className="ml-1 text-app-text-7">· {conditionDesc}</span>
                     )}
                   </p>
                   {expiryDesc && (
@@ -266,7 +266,7 @@ export function SchedulePanel({ sessionId, timezone, refreshTick }: Props) {
                 </div>
 
                 {/* Row 3: next / last run */}
-                <div className="text-[10px] text-[#444] pl-10">
+                <div className="text-[10px] text-app-text-7 pl-10">
                   Next: {formatTime(s.next_run_at, timezone)}
                   {s.last_run_at != null && (
                     <span className="ml-2">· Last: {formatTime(s.last_run_at, timezone)}</span>

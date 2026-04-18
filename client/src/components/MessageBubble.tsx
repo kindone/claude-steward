@@ -603,17 +603,17 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
     >
       {role === 'user' ? (
         <>
-          <p className="bg-[#1e3a5f] px-3.5 py-2.5 rounded-[14px_14px_2px_14px] whitespace-pre-wrap break-words text-sm leading-relaxed max-w-[600px]">
+          <p className="bg-app-blue-tint px-3.5 py-2.5 rounded-[14px_14px_2px_14px] whitespace-pre-wrap break-words text-sm leading-relaxed max-w-[600px]">
             {displayContent}
           </p>
           {timeLabel && (
-            <span className="mt-1 text-[10px] text-[#3a3a3a] select-none">{timeLabel}</span>
+            <span className="mt-1 text-[10px] text-app-text-7 select-none">{timeLabel}</span>
           )}
         </>
       ) : (
         <>
           {isScheduled && (
-            <div className="flex items-center gap-1.5 text-[11px] text-[#555] mb-1.5 select-none">
+            <div className="flex items-center gap-1.5 text-[11px] text-app-text-6 mb-1.5 select-none">
               <span>⏰</span>
               <span>Scheduled</span>
             </div>
@@ -664,10 +664,10 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
             ))}
             {!streaming && displayContent && (
               <button
-                className={`absolute top-1 right-1 bg-[#1a1a1a] border border-[#2a2a2a] text-[#555]
+                className={`absolute top-1 right-1 bg-app-bg-card border border-app-border-2 text-app-text-6
                   rounded cursor-pointer text-[13px] leading-none px-1.5 py-0.5 transition-[opacity,color,border-color]
                   opacity-0 group-hover:opacity-100 [@media(hover:none)]:opacity-100
-                  hover:text-[#ccc] hover:border-[#444]
+                  hover:text-app-text-2 hover:border-app-border-4
                   ${copied ? '!text-green-400 !border-green-400/30 !opacity-100' : ''}`}
                 onClick={handleCopy}
                 title="Copy message"
@@ -677,13 +677,13 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
             )}
           </div>
           {timeLabel && (
-            <span className="mt-1 text-[10px] text-[#3a3a3a] select-none">{timeLabel}</span>
+            <span className="mt-1 text-[10px] text-app-text-7 select-none">{timeLabel}</span>
           )}
           {!streaming && toolUses && toolUses.length > 0 && (
             <div className="mt-1.5 w-full">
               <button
                 onClick={() => setToolsOpen((o) => !o)}
-                className="flex items-center gap-1.5 text-[11px] text-[#555] hover:text-[#888] transition-colors cursor-pointer bg-transparent border-none p-0"
+                className="flex items-center gap-1.5 text-[11px] text-app-text-6 hover:text-app-text-4 transition-colors cursor-pointer bg-transparent border-none p-0"
               >
                 <span className={`inline-block transition-transform duration-150 ${toolsOpen ? 'rotate-90' : ''}`}>▶</span>
                 <span>{toolUses.map((c) => toolDisplayName(c.name, c.detail)).join(' · ')}</span>
@@ -693,17 +693,17 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
                   {toolUses.map((call, i) => (
                     <div key={i} className="flex flex-col gap-0.5 min-w-0">
                       <div className="flex items-baseline gap-1.5 min-w-0">
-                        <span className="text-[11px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#666] flex-shrink-0">
+                        <span className="text-[11px] px-1.5 py-0.5 rounded border border-app-border-2 text-app-text-5 flex-shrink-0">
                           {toolDisplayName(call.name, call.detail)}
                         </span>
                         {toolDisplayDetail(call.name, call.detail) && (
-                          <span className="text-[11px] text-[#444] truncate" title={call.detail}>
+                          <span className="text-[11px] text-app-text-7 truncate" title={call.detail}>
                             {toolDisplayDetail(call.name, call.detail)}
                           </span>
                         )}
                       </div>
                       {call.output && (
-                        <pre className="mt-1 text-[11px] text-[#555] bg-[#0d0d0d] border border-[#1a1a1a] rounded px-2 py-1.5 overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all">
+                        <pre className="mt-1 text-[11px] text-app-text-6 bg-app-bg border border-app-bg-card rounded px-2 py-1.5 overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap break-all">
                           {(() => {
                             // Safety guard: output should always be a string, but Claude API
                             // tool_result content can be an array of blocks — normalize defensively.

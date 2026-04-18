@@ -69,9 +69,9 @@ function CopyableId({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
   return (
     <span className="flex items-center gap-1">
-      <code className="text-[11px] font-mono text-[#666] bg-[#111] px-1.5 py-0.5 rounded select-all">{value}</code>
+      <code className="text-[11px] font-mono text-app-text-5 bg-app-bg-raised px-1.5 py-0.5 rounded select-all">{value}</code>
       <button
-        className="bg-transparent border-none cursor-pointer text-[#444] hover:text-[#888] text-[11px] px-1 transition-colors"
+        className="bg-transparent border-none cursor-pointer text-app-text-7 hover:text-app-text-4 text-[11px] px-1 transition-colors"
         onClick={() => { void navigator.clipboard.writeText(value); setCopied(true); setTimeout(() => setCopied(false), 1500) }}
         title="Copy"
       >
@@ -606,19 +606,19 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   return (
     <div className="flex flex-col h-full overflow-hidden">
       {/* Session header: system prompt toggle + permission mode selector */}
-      <div className="flex-shrink-0 border-b border-[#1a1a1a]">
+      <div className="flex-shrink-0 border-b border-app-bg-card">
         <div className="flex items-center justify-between px-2">
           <span className="flex items-center gap-1">
             <button
               className={`bg-transparent border-none cursor-pointer text-xs py-1.5 px-1.5 text-left transition-colors flex-shrink-0
-                ${systemPrompt ? 'text-blue-500 hover:text-blue-400' : 'text-[#444] hover:text-[#888]'}`}
+                ${systemPrompt ? 'text-blue-500 hover:text-blue-400' : 'text-app-text-7 hover:text-app-text-4'}`}
               onClick={() => setPromptOpen((o) => !o)}
               title="System prompt"
             >
               ⚙<span className="hidden sm:inline"> {systemPrompt ? 'Prompt set' : 'Prompt'}</span>
             </button>
             <button
-              className={`bg-transparent border-none cursor-pointer text-xs py-1.5 px-1 transition-colors flex-shrink-0 ${debugOpen ? 'text-[#666]' : 'text-[#333] hover:text-[#555]'}`}
+              className={`bg-transparent border-none cursor-pointer text-xs py-1.5 px-1 transition-colors flex-shrink-0 ${debugOpen ? 'text-app-text-5' : 'text-app-border-3 hover:text-app-text-6'}`}
               onClick={() => setDebugOpen((o) => !o)}
               title="Session debug info"
             >
@@ -634,7 +634,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
 
             {/* Schedule button */}
             <button
-              className={`bg-transparent border border-[#222] hover:border-[#444] rounded cursor-pointer text-xs px-2.5 py-1.5 transition-colors ${scheduleOpen ? 'text-blue-400 border-blue-500/40' : 'text-[#444] hover:text-[#888]'}`}
+              className={`bg-transparent border border-app-bg-hover hover:border-app-border-4 rounded cursor-pointer text-xs px-2.5 py-1.5 transition-colors ${scheduleOpen ? 'text-blue-400 border-blue-500/40' : 'text-app-text-7 hover:text-app-text-4'}`}
               onClick={() => setScheduleOpen((o) => !o)}
               title="Scheduled prompts"
             >
@@ -644,7 +644,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             {/* Chain info button — shown when this session is part of a compacted chain */}
             {pastSegments.length > 0 && (
               <button
-                className={`bg-transparent border border-[#222] hover:border-[#444] rounded cursor-pointer text-xs px-2 py-1.5 transition-colors ${chainInfoOpen ? 'text-blue-400 border-blue-500/40' : 'text-[#444] hover:text-[#888]'}`}
+                className={`bg-transparent border border-app-bg-hover hover:border-app-border-4 rounded cursor-pointer text-xs px-2 py-1.5 transition-colors ${chainInfoOpen ? 'text-blue-400 border-blue-500/40' : 'text-app-text-7 hover:text-app-text-4'}`}
                 onClick={() => setChainInfoOpen((o) => !o)}
                 title="Session chain — this conversation spans multiple compacted sessions"
               >
@@ -654,7 +654,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
 
             {/* Compact button */}
             <button
-              className={`bg-transparent border border-[#222] hover:border-[#444] rounded text-[#444] hover:text-[#888] cursor-pointer text-xs px-2.5 py-1.5 transition-colors ${(compacting || streaming) ? 'opacity-40 cursor-default' : ''}`}
+              className={`bg-transparent border border-app-bg-hover hover:border-app-border-4 rounded text-app-text-7 hover:text-app-text-4 cursor-pointer text-xs px-2.5 py-1.5 transition-colors ${(compacting || streaming) ? 'opacity-40 cursor-default' : ''}`}
               onClick={handleCompact}
               disabled={compacting || streaming}
               title="Summarize this session and start fresh — resets the context window"
@@ -664,14 +664,14 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             </button>
 
             {/* Permission mode segmented control */}
-            <span className="inline-flex border border-[#222] rounded overflow-hidden">
+            <span className="inline-flex border border-app-bg-hover rounded overflow-hidden">
               {MODES.map((m) => (
                 <button
                   key={m.value}
-                  className={`bg-transparent border-r border-[#222] last:border-r-0 cursor-pointer text-xs px-2 sm:px-3 py-2 transition-colors
+                  className={`bg-transparent border-r border-app-bg-hover last:border-r-0 cursor-pointer text-xs px-2 sm:px-3 py-2 transition-colors
                     ${permissionMode === m.value
-                      ? 'bg-[#1e3a5f] text-blue-400'
-                      : 'text-[#444] hover:bg-[#1a1a1a] hover:text-[#888]'}`}
+                      ? 'bg-app-blue-tint text-blue-400'
+                      : 'text-app-text-7 hover:bg-app-bg-card hover:text-app-text-4'}`}
                   onClick={() => handleModeChange(m.value)}
                   title={m.title}
                 >
@@ -696,10 +696,10 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
           ].filter(Boolean).join(' · ')
           return (
             <div className="flex items-center gap-2 px-3 pb-1">
-              <span className="text-[11px] text-[#444] tabular-nums" title={titleParts}>
+              <span className="text-[11px] text-app-text-7 tabular-nums" title={titleParts}>
                 {ctx.toLocaleString()} ctx · {lastUsage.output_tokens.toLocaleString()} out
                 {lastUsage.total_cost_usd != null && (
-                  <span className="ml-1.5 text-[#333]">${lastUsage.total_cost_usd.toFixed(4)}</span>
+                  <span className="ml-1.5 text-app-border-3">${lastUsage.total_cost_usd.toFixed(4)}</span>
                 )}
               </span>
             </div>
@@ -709,17 +709,17 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         {debugOpen && (
           <div className="px-3 pb-2 flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-[#444] w-28 flex-shrink-0">claude_session_id</span>
+              <span className="text-[11px] text-app-text-7 w-28 flex-shrink-0">claude_session_id</span>
               {claudeSessionId ? (
                 <CopyableId value={claudeSessionId} />
               ) : (
-                <span className="text-[11px] text-[#333] italic">none (not yet sent)</span>
+                <span className="text-[11px] text-app-border-3 italic">none (not yet sent)</span>
               )}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-[#444] w-28 flex-shrink-0">model</span>
+              <span className="text-[11px] text-app-text-7 w-28 flex-shrink-0">model</span>
               <select
-                className="bg-[#0d0d0d] border border-[#222] hover:border-[#444] rounded text-[#888] cursor-pointer text-xs px-2 py-1 transition-colors outline-none"
+                className="bg-app-bg border border-app-bg-hover hover:border-app-border-4 rounded text-app-text-4 cursor-pointer text-xs px-2 py-1 transition-colors outline-none"
                 value={model ?? ''}
                 onChange={(e) => handleModelChange(e.target.value || null)}
                 title="Model for this session"
@@ -734,21 +734,21 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
 
         {chainInfoOpen && pastSegments.length > 0 && (
           <div className="px-3 pb-3 flex flex-col gap-1">
-            <p className="text-[10px] text-[#333] uppercase tracking-wider pb-1">Session chain ({pastSegments.length + 1} segments)</p>
+            <p className="text-[10px] text-app-border-3 uppercase tracking-wider pb-1">Session chain ({pastSegments.length + 1} segments)</p>
             {pastSegments.map((seg, i) => (
-              <div key={seg.id} className="flex items-center gap-2 text-[11px] text-[#444]">
-                <span className="text-[#2a2a2a]">{i + 1}.</span>
+              <div key={seg.id} className="flex items-center gap-2 text-[11px] text-app-text-7">
+                <span className="text-app-border-2">{i + 1}.</span>
                 <span className="flex-1 truncate">{seg.title || 'Session'}</span>
-                <span className="text-[#333] flex-shrink-0">
+                <span className="text-app-border-3 flex-shrink-0">
                   {new Date(seg.created_at * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' })}
                 </span>
-                <span className="text-[#2a2a2a] flex-shrink-0">{seg.messages.length} msgs</span>
+                <span className="text-app-border-2 flex-shrink-0">{seg.messages.length} msgs</span>
               </div>
             ))}
             <div className="flex items-center gap-2 text-[11px] text-blue-500">
-              <span className="text-[#2a2a2a]">{pastSegments.length + 1}.</span>
+              <span className="text-app-border-2">{pastSegments.length + 1}.</span>
               <span className="flex-1">Current session</span>
-              <span className="text-[#333] flex-shrink-0">{messages.length} msgs</span>
+              <span className="text-app-border-3 flex-shrink-0">{messages.length} msgs</span>
             </div>
           </div>
         )}
@@ -763,7 +763,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         {promptOpen && (
           <div className="px-3 pb-3 flex flex-col gap-2">
             <textarea
-              className="bg-[#0d0d0d] border border-[#2a2a2a] focus:border-blue-600 rounded-md text-[#e8e8e8] text-base font-[inherit] leading-relaxed px-2.5 py-2 resize-y outline-none w-full"
+              className="bg-app-bg border border-app-border-2 focus:border-blue-600 rounded-md text-app-text text-base font-[inherit] leading-relaxed px-2.5 py-2 resize-y outline-none w-full"
               value={promptDraft}
               onChange={(e) => setPromptDraft(e.target.value)}
               onKeyDown={handlePromptKeyDown}
@@ -778,18 +778,18 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
               >
                 Save
               </button>
-              <span className={`text-[11px] tabular-nums ml-1 ${promptDraft.length > 2000 ? 'text-yellow-500' : 'text-[#555]'}`}>
+              <span className={`text-[11px] tabular-nums ml-1 ${promptDraft.length > 2000 ? 'text-yellow-500' : 'text-app-text-6'}`}>
                 {promptDraft.length} chars
               </span>
               <button
-                className="bg-transparent border border-[#2a2a2a] hover:border-[#444] hover:text-[#aaa] rounded text-[#666] cursor-pointer text-xs px-2.5 py-1.5 transition-colors"
+                className="bg-transparent border border-app-border-2 hover:border-app-border-4 hover:text-app-text-3 rounded text-app-text-5 cursor-pointer text-xs px-2.5 py-1.5 transition-colors"
                 onClick={() => { setPromptDraft(systemPrompt ?? ''); setPromptOpen(false) }}
               >
                 Cancel
               </button>
               {systemPrompt && (
                 <button
-                  className="bg-transparent border border-[#2a2a2a] hover:text-red-500 hover:border-red-500/40 rounded text-[#555] cursor-pointer text-xs px-2.5 py-1.5 ml-auto transition-colors"
+                  className="bg-transparent border border-app-border-2 hover:text-red-500 hover:border-red-500/40 rounded text-app-text-6 cursor-pointer text-xs px-2.5 py-1.5 ml-auto transition-colors"
                   onClick={async () => { await updateSystemPrompt(sessionId, null); onSystemPromptChange?.(null); setPromptDraft(''); setPromptOpen(false) }}
                 >
                   Clear
@@ -811,7 +811,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             <button
               onClick={loadOlder}
               disabled={loadingOlder}
-              className="text-xs text-[#555] hover:text-[#888] border border-[#2a2a2a] hover:border-[#444] rounded-full px-3 py-1.5 bg-transparent cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-default"
+              className="text-xs text-app-text-6 hover:text-app-text-4 border border-app-border-2 hover:border-app-border-4 rounded-full px-3 py-1.5 bg-transparent cursor-pointer transition-colors disabled:opacity-40 disabled:cursor-default"
             >
               {loadingOlder ? 'Loading…' : '↑ Load older messages'}
             </button>
@@ -831,9 +831,9 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
                 <div key={m.id} className="flex flex-col gap-5 mb-5">
                   {showDateSep && (
                     <div className="flex items-center gap-3 select-none">
-                      <div className="flex-1 h-px bg-[#1e1e1e]" />
-                      <span className="text-[11px] text-[#3a3a3a]">{formatDateLabel(m.createdAt!)}</span>
-                      <div className="flex-1 h-px bg-[#1e1e1e]" />
+                      <div className="flex-1 h-px bg-app-bg-overlay" />
+                      <span className="text-[11px] text-app-text-7">{formatDateLabel(m.createdAt!)}</span>
+                      <div className="flex-1 h-px bg-app-bg-overlay" />
                     </div>
                   )}
                   <MessageBubble
@@ -860,7 +860,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         ))}
 
         {messages.length === 0 && !hasMore && pastSegments.length === 0 && (
-          <div className="flex items-center justify-center flex-1 text-[#444] text-sm">
+          <div className="flex items-center justify-center flex-1 text-app-text-7 text-sm">
             <p>Start a conversation with Claude.</p>
           </div>
         )}
@@ -875,9 +875,9 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             <div key={m.id} className="flex flex-col gap-5">
               {showDateSep && (
                 <div className="flex items-center gap-3 select-none">
-                  <div className="flex-1 h-px bg-[#1e1e1e]" />
-                  <span className="text-[11px] text-[#3a3a3a]">{formatDateLabel(m.createdAt!)}</span>
-                  <div className="flex-1 h-px bg-[#1e1e1e]" />
+                  <div className="flex-1 h-px bg-app-bg-overlay" />
+                  <span className="text-[11px] text-app-text-7">{formatDateLabel(m.createdAt!)}</span>
+                  <div className="flex-1 h-px bg-app-bg-overlay" />
                 </div>
               )}
               <MessageBubble
@@ -898,15 +898,15 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         })}
         {streaming && (
           <div className="flex items-center gap-1.5 px-3 py-1.5 flex-wrap">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse flex-shrink-0" />
-            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse tool-pulse-2 flex-shrink-0" />
-            <span className="w-1.5 h-1.5 rounded-full bg-[#555] tool-pulse tool-pulse-3 flex-shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-app-text-6 tool-pulse flex-shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-app-text-6 tool-pulse tool-pulse-2 flex-shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-app-text-6 tool-pulse tool-pulse-3 flex-shrink-0" />
             {/* Assembled tool calls with detail (muted, completed) */}
             {streamingToolUses.map((call, i) => (
-              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded border border-[#2a2a2a] text-[#555] max-w-[280px] truncate">
-                <span className="text-[#777]">{toolDisplayName(call.name, call.detail)}</span>
+              <span key={i} className="text-[11px] px-1.5 py-0.5 rounded border border-app-border-2 text-app-text-6 max-w-[280px] truncate">
+                <span className="text-app-text-2">{toolDisplayName(call.name, call.detail)}</span>
                 {toolDisplayDetail(call.name, call.detail) && (
-                  <span className="text-[#444]">: {toolDisplayDetail(call.name, call.detail)}</span>
+                  <span className="text-app-text-7">: {toolDisplayDetail(call.name, call.detail)}</span>
                 )}
               </span>
             ))}
@@ -939,7 +939,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             })
             setIsAtBottom(true)
           }}
-          className="absolute -top-12 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-[#1a1a1a] border border-[#333] hover:border-[#555] rounded-full text-[#888] hover:text-[#ccc] text-xs px-3 py-1.5 cursor-pointer shadow-lg transition-[opacity,visibility] duration-200 opacity-0 invisible"
+          className="absolute -top-12 left-1/2 -translate-x-1/2 z-10 flex items-center gap-1.5 bg-app-bg-card border border-app-border-3 hover:border-app-border-5 rounded-full text-app-text-4 hover:text-app-text-2 text-xs px-3 py-1.5 cursor-pointer shadow-lg transition-[opacity,visibility] duration-200 opacity-0 invisible"
           title="Scroll to bottom"
         >
           ↓ Scroll to bottom

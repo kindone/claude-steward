@@ -31,13 +31,13 @@ export function KernelOutputPanel({ state, onSendToChat, onDismiss }: Props) {
   const outputText = lines.join('\n')
 
   return (
-    <div className="kernel-output-panel mt-1 mb-2 rounded-md border border-[#2a2a2a] bg-[#0d0d0d] text-xs font-mono overflow-hidden">
+    <div className="kernel-output-panel mt-1 mb-2 rounded-md border border-app-border-2 bg-app-bg text-xs font-mono overflow-hidden">
       {/* Compile step (C++ only) */}
       {compileOutput !== undefined && (
-        <div className={`px-3 py-1.5 border-b border-[#2a2a2a] text-[11px] ${compileOk ? 'text-green-400' : 'text-red-400'}`}>
+        <div className={`px-3 py-1.5 border-b border-app-border-2 text-[11px] ${compileOk ? 'text-green-400' : 'text-red-400'}`}>
           {compileOk ? '✓ Compiled' : '✗ Compile error'}
           {compileOutput && (
-            <pre className="mt-1 text-[#888] whitespace-pre-wrap">{compileOutput}</pre>
+            <pre className="mt-1 text-app-text-4 whitespace-pre-wrap">{compileOutput}</pre>
           )}
         </div>
       )}
@@ -45,13 +45,13 @@ export function KernelOutputPanel({ state, onSendToChat, onDismiss }: Props) {
       {/* Output lines */}
       <pre
         ref={outputRef}
-        className="p-3 text-[#ccc] whitespace-pre-wrap max-h-64 overflow-y-auto leading-relaxed"
+        className="p-3 text-app-text-2 whitespace-pre-wrap max-h-64 overflow-y-auto leading-relaxed"
       >
-        {outputText || (status === 'running' ? <span className="text-[#555] animate-pulse">Running…</span> : null)}
+        {outputText || (status === 'running' ? <span className="text-app-text-6 animate-pulse">Running…</span> : null)}
       </pre>
 
       {/* Footer */}
-      <div className="flex items-center gap-2 px-3 py-1.5 border-t border-[#2a2a2a] bg-[#111]">
+      <div className="flex items-center gap-2 px-3 py-1.5 border-t border-app-border-2 bg-app-bg-raised">
         {/* Status badge */}
         <span className={`flex items-center gap-1 text-[11px] ${
           status === 'running' ? 'text-blue-400' :
@@ -65,7 +65,7 @@ export function KernelOutputPanel({ state, onSendToChat, onDismiss }: Props) {
            status === 'done' && exitCode === 0 ? `✓ Done` :
            `✗ Error (exit ${exitCode ?? '?'})`}
           {durationMs != null && status !== 'running' && (
-            <span className="text-[#555] ml-1">{durationMs < 1000 ? `${durationMs}ms` : `${(durationMs / 1000).toFixed(1)}s`}</span>
+            <span className="text-app-text-6 ml-1">{durationMs < 1000 ? `${durationMs}ms` : `${(durationMs / 1000).toFixed(1)}s`}</span>
           )}
         </span>
 
@@ -75,7 +75,7 @@ export function KernelOutputPanel({ state, onSendToChat, onDismiss }: Props) {
         {status === 'running' && state.abort && (
           <button
             onClick={state.abort}
-            className="text-[11px] text-[#666] hover:text-red-400 transition-colors cursor-pointer"
+            className="text-[11px] text-app-text-5 hover:text-red-400 transition-colors cursor-pointer"
           >
             ■ Stop
           </button>
@@ -85,7 +85,7 @@ export function KernelOutputPanel({ state, onSendToChat, onDismiss }: Props) {
         {status !== 'running' && outputText && onSendToChat && (
           <button
             onClick={() => onSendToChat(outputText)}
-            className="text-[11px] text-[#666] hover:text-[#aaa] transition-colors cursor-pointer"
+            className="text-[11px] text-app-text-5 hover:text-app-text-3 transition-colors cursor-pointer"
             title="Send output to Claude as a follow-up message"
           >
             ↑ Send to Claude
@@ -95,7 +95,7 @@ export function KernelOutputPanel({ state, onSendToChat, onDismiss }: Props) {
         {/* Dismiss */}
         <button
           onClick={onDismiss}
-          className="text-[11px] text-[#444] hover:text-[#888] transition-colors cursor-pointer"
+          className="text-[11px] text-app-text-7 hover:text-app-text-4 transition-colors cursor-pointer"
           title="Dismiss output"
         >
           ✕

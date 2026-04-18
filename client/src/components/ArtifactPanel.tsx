@@ -128,11 +128,11 @@ export function ArtifactPanel({ projectId, onOpen, refreshTick }: Props) {
   return (
     <div className="px-3 pb-3 flex flex-col gap-2">
       {loading ? (
-        <p className="text-[11px] text-[#555]">Loading…</p>
+        <p className="text-[11px] text-app-text-6">Loading…</p>
       ) : error ? (
         <p className="text-[11px] text-red-500">{error}</p>
       ) : artifacts.length === 0 ? (
-        <p className="text-[11px] text-[#444] italic">
+        <p className="text-[11px] text-app-text-7 italic">
           No artifacts yet — save a code block or ask Claude to create one.
         </p>
       ) : (
@@ -140,7 +140,7 @@ export function ArtifactPanel({ projectId, onOpen, refreshTick }: Props) {
           {artifacts.map((a) => (
             <li
               key={a.id}
-              className="border border-[#2a2a2a] rounded-md px-2.5 py-2 flex flex-col gap-1"
+              className="border border-app-border-2 rounded-md px-2.5 py-2 flex flex-col gap-1"
             >
               <div className="flex items-center gap-2">
                 <TypeBadge type={a.type} />
@@ -155,26 +155,26 @@ export function ArtifactPanel({ projectId, onOpen, refreshTick }: Props) {
                         if (e.key === 'Enter') void handleRename(a.id)
                         if (e.key === 'Escape') setRenamingId(null)
                       }}
-                      className="flex-1 bg-[#1a1a1a] border border-[#3a3a3a] rounded px-1 text-[12px] text-[#ccc] outline-none min-w-0"
+                      className="flex-1 bg-app-bg-card border border-app-border-3 rounded px-1 text-[12px] text-app-text-2 outline-none min-w-0"
                       onClick={e => e.stopPropagation()}
                     />
                   ) : (
                     <span
-                      className="text-[12px] font-medium text-[#ccc] truncate cursor-text"
+                      className="text-[12px] font-medium text-app-text-2 truncate cursor-text"
                       title={`${a.name} — click to rename`}
                       onClick={() => { setRenamingId(a.id); setRenameValue(a.name) }}
                     >
                       {a.name}
                     </span>
                   )}
-                  <span className="text-[10px] text-[#444]">{relativeTime(a.updated_at)}</span>
+                  <span className="text-[10px] text-app-text-7">{relativeTime(a.updated_at)}</span>
                 </div>
                 {getRefreshCommand(a) && (
                   <button
                     onClick={() => void handleRefresh(a.id)}
                     disabled={refreshingIds.has(a.id)}
                     title="Refresh artifact"
-                    className={`text-[#555] hover:text-[#aaa] flex-shrink-0 px-1 flex items-center disabled:opacity-50 ${refreshingIds.has(a.id) ? 'animate-spin' : ''}`}
+                    className={`text-app-text-6 hover:text-app-text-3 flex-shrink-0 px-1 flex items-center disabled:opacity-50 ${refreshingIds.has(a.id) ? 'animate-spin' : ''}`}
                   >
                     ↻
                   </button>
@@ -182,14 +182,14 @@ export function ArtifactPanel({ projectId, onOpen, refreshTick }: Props) {
                 <button
                   onClick={() => onOpen(a)}
                   title="Open artifact"
-                  className="text-[#555] hover:text-[#aaa] flex-shrink-0 px-1 flex items-center"
+                  className="text-app-text-6 hover:text-app-text-3 flex-shrink-0 px-1 flex items-center"
                 >
                   <EyeIcon />
                 </button>
                 <button
                   onClick={() => handleDelete(a.id)}
                   title="Delete artifact"
-                  className="text-[#555] hover:text-red-500 flex-shrink-0 px-1 flex items-center"
+                  className="text-app-text-6 hover:text-red-500 flex-shrink-0 px-1 flex items-center"
                 >
                   <TrashIcon />
                 </button>

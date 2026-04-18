@@ -161,7 +161,7 @@ export function ArtifactFloat({
         bottom: idx * 44 + 8,
         width: 32,
         height: 120,
-        background: '#1a1a1a',
+        background: 'var(--app-bg-card)',
         border: '1px solid #2a2a2a',
         borderRight: 'none',
         borderRadius: '6px 0 0 6px',
@@ -169,7 +169,7 @@ export function ArtifactFloat({
         writingMode: 'vertical-rl',
         textOrientation: 'mixed',
         fontSize: 11,
-        color: '#888',
+        color: 'var(--app-text-4)',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap',
@@ -197,7 +197,7 @@ export function ArtifactFloat({
         transform: 'translateY(-50%)',
         width: 28,
         height: 80,
-        background: '#1a1a1a',
+        background: 'var(--app-bg-card)',
         border: '1px solid #2a2a2a',
         borderRight: 'none',
         borderRadius: '6px 0 0 6px',
@@ -205,7 +205,7 @@ export function ArtifactFloat({
         writingMode: 'vertical-rl',
         textOrientation: 'mixed',
         fontSize: 11,
-        color: '#666',
+        color: 'var(--app-text-5)',
         padding: '6px 0',
         zIndex: 199,
         display: 'flex',
@@ -235,7 +235,7 @@ export function ArtifactFloat({
         height: '100dvh',
         width: effectiveWidth,
         zIndex: 200,
-        background: '#111',
+        background: 'var(--app-bg-raised)',
         borderLeft: '1px solid #1f1f1f',
         display: 'flex',
         flexDirection: 'column',
@@ -247,7 +247,7 @@ export function ArtifactFloat({
         alignSelf: 'stretch',
         minHeight: 0,
         width: effectiveWidth,
-        background: '#111',
+        background: 'var(--app-bg-raised)',
         borderLeft: '1px solid #1f1f1f',
         display: 'flex',
         flexDirection: 'column',
@@ -315,7 +315,7 @@ export function ArtifactFloat({
                       gap: 4,
                       padding: '4px 8px',
                       borderRadius: '6px 6px 0 0',
-                      background: isActive ? '#1a1a1a' : 'transparent',
+                      background: isActive ? 'var(--app-bg-card)' : 'transparent',
                       border: isActive ? '1px solid #2a2a2a' : '1px solid transparent',
                       borderBottom: isActive ? '1px solid #1a1a1a' : '1px solid transparent',
                       cursor: 'pointer',
@@ -327,7 +327,7 @@ export function ArtifactFloat({
                     <span
                       style={{
                         fontSize: 11,
-                        color: isActive ? '#ccc' : '#666',
+                        color: isActive ? 'var(--app-text-2)' : 'var(--app-text-5)',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
@@ -343,7 +343,7 @@ export function ArtifactFloat({
                         background: 'none',
                         border: 'none',
                         cursor: 'pointer',
-                        color: '#555',
+                        color: 'var(--app-text-6)',
                         fontSize: 11,
                         padding: 0,
                         lineHeight: 1,
@@ -365,7 +365,7 @@ export function ArtifactFloat({
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: '#444',
+                color: 'var(--app-text-7)',
                 fontSize: 13,
                 padding: '0 4px',
                 flexShrink: 0,
@@ -383,7 +383,7 @@ export function ArtifactFloat({
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                color: '#444',
+                color: 'var(--app-text-7)',
                 fontSize: 14,
                 padding: '0 6px',
                 flexShrink: 0,
@@ -410,34 +410,34 @@ export function ArtifactFloat({
               flexShrink: 0,
             }}
           >
-            <span style={{ flex: 1, fontSize: 12, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            <span style={{ flex: 1, fontSize: 12, color: 'var(--app-text-4)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {activeEntry.artifact.name}
             </span>
             <button
               onClick={() => onMinimize(activeEntry.artifact.id)}
               title="Minimize"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 14, padding: '0 4px' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--app-text-6)', fontSize: 14, padding: '0 4px' }}
             >
               −
             </button>
             <button
               onClick={() => setIsMaximized((v) => !v)}
               title={isMaximized ? 'Restore size' : 'Maximize'}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 13, padding: '0 4px', lineHeight: 1 }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--app-text-6)', fontSize: 13, padding: '0 4px', lineHeight: 1 }}
             >
               {isMaximized ? '⤡' : '⤢'}
             </button>
             <button
               onClick={() => onClose(activeEntry.artifact.id)}
               title="Close"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#555', fontSize: 14, padding: '0 4px' }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--app-text-6)', fontSize: 14, padding: '0 4px' }}
             >
               ×
             </button>
             <button
               onClick={() => setPanelHidden(true)}
               title="Hide panel"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#444', fontSize: 16, padding: '0 4px', lineHeight: 1 }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--app-text-7)', fontSize: 16, padding: '0 4px', lineHeight: 1 }}
             >
               ›
             </button>

@@ -6,6 +6,7 @@ import { ArtifactCodeMirror } from './ArtifactCodeMirror'
 import { KernelOutputPanel, type OutputPanelState } from './KernelOutputPanel'
 import { runCode, normalizeLanguage } from '../lib/kernelApi'
 import { defaultDesktopViewMode, defaultMobileArtifactTab, type ArtifactDesktopViewMode } from '../lib/artifactViewDefaults'
+import { useCurrentTheme } from '../hooks/useTheme'
 
 type ViewMode = ArtifactDesktopViewMode
 
@@ -30,6 +31,7 @@ const PreviewPane = memo(function PreviewPane({ artifact, content }: { artifact:
 })
 
 export function ArtifactEditor({ artifact, content, projectId, onChange, onSave }: Props) {
+  const editorTheme = useCurrentTheme()
   // Local editing value — starts from content prop but is independent after that
   const [localContent, setLocalContent] = useState(content)
   // For chart: debounced viewer content
@@ -202,7 +204,7 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
     data: 'text-green-400 bg-green-400/10 border-green-400/20',
     code: 'text-amber-400 bg-amber-400/10 border-amber-400/20',
   }
-  const badgeClass = typeBadgeColor[artifact.type] ?? 'text-[#888] bg-[#222] border-[#333]'
+  const badgeClass = typeBadgeColor[artifact.type] ?? 'text-app-text-4 bg-app-bg-hover border-app-border-3'
 
   const editorEl = (
     <ArtifactCodeMirror
@@ -210,6 +212,7 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
       onChange={handleChange}
       language={editorLanguage}
       wrapLines={wrapLines}
+      theme={editorTheme}
       className="w-full h-full"
     />
   )
@@ -219,8 +222,8 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
   return (
     <div className="flex flex-col h-full">
       {/* Header strip */}
-      <div className="flex items-center gap-2 h-10 px-3 border-b border-[#1f1f1f] flex-shrink-0 bg-[#111]">
-        <span className="flex-1 text-[13px] text-[#ccc] truncate font-medium">{artifact.name}</span>
+      <div className="flex items-center gap-2 h-10 px-3 border-b border-app-border flex-shrink-0 bg-app-bg-raised">
+        <span className="flex-1 text-[13px] text-app-text-2 truncate font-medium">{artifact.name}</span>
         <span className={`text-[10px] px-1.5 py-0.5 rounded border ${badgeClass} flex-shrink-0`}>
           {artifact.type}
         </span>
@@ -228,14 +231,14 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
         {isMobile && artifact.type !== 'code' && (
           <button
             onClick={() => setMobileTab(t => t === 'editor' ? 'preview' : 'editor')}
-            className="text-[11px] text-[#666] hover:text-[#aaa] border border-[#2a2a2a] rounded px-2 py-0.5 cursor-pointer flex-shrink-0"
+            className="text-[11px] text-app-text-5 hover:text-app-text-3 border border-app-border-2 rounded px-2 py-0.5 cursor-pointer flex-shrink-0"
           >
             {mobileTab === 'editor' ? 'Preview' : 'Edit'}
           </button>
         )}
         {/* Desktop view mode toggle — types with a preview pane */}
         {!isMobile && artifact.type !== 'code' && (
-          <div className="flex items-center rounded border border-[#2a2a2a] overflow-hidden text-[11px] flex-shrink-0">
+          <div className="flex items-center rounded border border-app-border-2 overflow-hidden text-[11px] flex-shrink-0">
             {(['split', 'source', 'preview'] as ViewMode[]).map((m) => (
               <button
                 key={m}
@@ -243,8 +246,8 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
                 title={{ split: 'Side by side', source: 'Source only', preview: 'Preview only' }[m]}
                 className={`px-2 py-0.5 transition-colors ${
                   viewMode === m
-                    ? 'bg-[#2a2a2a] text-[#ccc]'
-                    : 'text-[#555] hover:text-[#888] hover:bg-[#1a1a1a]'
+                    ? 'bg-app-border-2 text-app-text-2'
+                    : 'text-app-text-6 hover:text-app-text-4 hover:bg-app-bg-card'
                 }`}
               >
                 {{ split: '⬛⬛', source: '≡', preview: '◻' }[m]}
@@ -266,7 +269,7 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
         <button
           onClick={toggleWrap}
           className={`text-[11px] px-2 py-1 rounded border cursor-pointer transition-colors flex-shrink-0
-            ${wrapLines ? 'text-[#ccc] border-[#444] bg-[#222]' : 'text-[#555] border-[#2a2a2a] bg-[#1a1a1a] hover:text-[#aaa]'}`}
+            ${wrapLines ? 'text-app-text-2 border-app-border-4 bg-app-bg-hover' : 'text-app-text-6 border-app-border-2 bg-app-bg-card hover:text-app-text-3'}`}
           title={wrapLines ? 'Line wrap on — click to disable' : 'Line wrap off — click to enable'}
         >
           ↵
@@ -274,7 +277,7 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
         <button
           onClick={() => setSettingsOpen(o => !o)}
           className={`text-[11px] px-2 py-1 rounded border cursor-pointer transition-colors flex-shrink-0
-            ${settingsOpen ? 'text-[#ccc] border-[#444] bg-[#222]' : 'text-[#555] border-[#2a2a2a] bg-[#1a1a1a] hover:text-[#aaa]'}`}
+            ${settingsOpen ? 'text-app-text-2 border-app-border-4 bg-app-bg-hover' : 'text-app-text-6 border-app-border-2 bg-app-bg-card hover:text-app-text-3'}`}
           title="Artifact settings"
         >
           ⚙
@@ -287,7 +290,7 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
               ? 'text-green-400 border-green-400/30 bg-green-400/10'
               : saveStatus === 'error'
               ? 'text-red-400 border-red-400/30 bg-red-400/10'
-              : 'text-[#888] border-[#2a2a2a] bg-[#1a1a1a] hover:text-[#ccc] hover:border-[#444]'
+              : 'text-app-text-4 border-app-border-2 bg-app-bg-card hover:text-app-text-2 hover:border-app-border-4'
             }`}
         >
           {saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved ✓' : saveStatus === 'error' ? 'Error ✗' : 'Save'}
@@ -296,17 +299,17 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
 
       {/* Settings panel */}
       {settingsOpen && (
-        <div className="flex-shrink-0 border-b border-[#1f1f1f] p-3 bg-[#0d0d0d] flex flex-col gap-2">
-          <label className="text-[11px] text-[#666]">Refresh command</label>
+        <div className="flex-shrink-0 border-b border-app-border p-3 bg-app-bg flex flex-col gap-2">
+          <label className="text-[11px] text-app-text-5">Refresh command</label>
           <input value={refreshCmd} onChange={e => setRefreshCmd(e.target.value)}
             placeholder="e.g. python fetch_data.py"
-            className="text-[12px] bg-[#111] border border-[#2a2a2a] rounded px-2 py-1 text-[#ccc] outline-none font-mono" />
-          <label className="text-[11px] text-[#666]">Refresh schedule (cron)</label>
+            className="text-[12px] bg-app-bg-raised border border-app-border-2 rounded px-2 py-1 text-app-text-2 outline-none font-mono" />
+          <label className="text-[11px] text-app-text-5">Refresh schedule (cron)</label>
           <input value={refreshSched} onChange={e => setRefreshSched(e.target.value)}
             placeholder="e.g. 0 17 * * 1-5"
-            className="text-[12px] bg-[#111] border border-[#2a2a2a] rounded px-2 py-1 text-[#ccc] outline-none font-mono" />
+            className="text-[12px] bg-app-bg-raised border border-app-border-2 rounded px-2 py-1 text-app-text-2 outline-none font-mono" />
           <button onClick={() => void handleSaveMeta()} disabled={metaSaving}
-            className="self-start text-[11px] px-2.5 py-1 rounded border border-[#2a2a2a] bg-[#1a1a1a] text-[#888] hover:text-[#ccc] cursor-pointer disabled:opacity-50">
+            className="self-start text-[11px] px-2.5 py-1 rounded border border-app-border-2 bg-app-bg-card text-app-text-4 hover:text-app-text-2 cursor-pointer disabled:opacity-50">
             {metaSaving ? 'Saving…' : 'Save settings'}
           </button>
         </div>
@@ -320,7 +323,7 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
             {editorEl}
           </div>
           {runState && (
-            <div className="flex-shrink-0 border-t border-[#1f1f1f] max-h-[40%] overflow-auto">
+            <div className="flex-shrink-0 border-t border-app-border max-h-[40%] overflow-auto">
               <KernelOutputPanel
                 state={runState}
                 onDismiss={() => setRunState(null)}
@@ -337,7 +340,7 @@ export function ArtifactEditor({ artifact, content, projectId, onChange, onSave 
         // Desktop: view mode — split / source-only / preview-only
         <div className="flex flex-row flex-1 overflow-hidden">
           {(viewMode === 'split' || viewMode === 'source') && (
-            <div className={`h-full overflow-hidden flex ${viewMode === 'split' ? 'w-1/2 border-r border-[#1f1f1f]' : 'w-full'}`}>
+            <div className={`h-full overflow-hidden flex ${viewMode === 'split' ? 'w-1/2 border-r border-app-border' : 'w-full'}`}>
               {editorEl}
             </div>
           )}

@@ -16,10 +16,10 @@ export function HtmlPreview({ html }: Props) {
   const [showSource, setShowSource] = useState(false)
 
   return (
-    <div className="my-2 rounded-xl border border-[#2a2a2a] overflow-hidden">
+    <div className="my-2 rounded-xl border border-app-border-2 overflow-hidden">
       {/* Tab bar */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#111] border-b border-[#2a2a2a]">
-        <span className="text-[11px] text-[#555] select-none">HTML</span>
+      <div className="flex items-center justify-between px-3 py-1.5 bg-app-bg-raised border-b border-app-border-2">
+        <span className="text-[11px] text-app-text-6 select-none">HTML</span>
         <div className="flex gap-1">
           <TabButton active={!showSource} onClick={() => setShowSource(false)}>
             Preview
@@ -32,7 +32,7 @@ export function HtmlPreview({ html }: Props) {
 
       {/* Content */}
       {showSource ? (
-        <pre className="p-4 text-xs text-[#ccc] bg-[#0d0d0d] overflow-x-auto whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto">
+        <pre className="p-4 text-xs text-app-text-2 bg-app-bg overflow-x-auto whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto">
           <code>{html}</code>
         </pre>
       ) : (
@@ -77,8 +77,8 @@ function TabButton({
       onClick={onClick}
       className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
         active
-          ? 'bg-[#2a2a2a] text-[#ccc]'
-          : 'text-[#555] hover:text-[#888]'
+          ? 'bg-app-border-2 text-app-text-2'
+          : 'text-app-text-6 hover:text-app-text-4'
       }`}
     >
       {children}

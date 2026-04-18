@@ -65,7 +65,7 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
   }
 
   return (
-    <div className="flex h-dvh w-full items-center justify-center bg-[#0d0d0d]">
+    <div className="flex h-dvh w-full items-center justify-center bg-app-bg">
       <div className="w-full max-w-sm px-6">
         {/* Logo / title */}
         <div className="mb-10 text-center">
@@ -73,7 +73,7 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
             🧭
           </div>
           <h1 className="text-2xl font-semibold text-white">Claude Steward</h1>
-          <p className="mt-1 text-sm text-[#888]">
+          <p className="mt-1 text-sm text-app-text-4">
             {hasCredentials ? 'Sign in to continue' : 'Set up your passkey to get started'}
           </p>
         </div>
@@ -118,20 +118,20 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
         {hasCredentials && (
           <div className="mt-5">
             {!showBootstrap ? (
-              <p className="text-center text-xs text-[#555]">
+              <p className="text-center text-xs text-app-text-6">
                 No passkey on this device?{' '}
                 <button
                   onClick={() => { setShowBootstrap(true); setError(null) }}
-                  className="text-[#888] underline hover:text-white"
+                  className="text-app-text-4 underline hover:text-white"
                 >
                   Register with API key
                 </button>
               </p>
             ) : (
-              <div className="rounded-xl border border-[#2a2a2a] bg-[#111] p-4">
-                <p className="mb-3 text-xs text-[#888]">
-                  Enter the <code className="text-[#aaa]">API_KEY</code> from your server's{' '}
-                  <code className="text-[#aaa]">.env</code> file to register this device.
+              <div className="rounded-xl border border-app-border-2 bg-app-bg-raised p-4">
+                <p className="mb-3 text-xs text-app-text-4">
+                  Enter the <code className="text-app-text-3">API_KEY</code> from your server's{' '}
+                  <code className="text-app-text-3">.env</code> file to register this device.
                 </p>
                 <input
                   type="password"
@@ -140,7 +140,7 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
                   onKeyDown={(e) => { if (e.key === 'Enter' && bootstrapKey) handleRegister(bootstrapKey) }}
                   placeholder="API key"
                   autoFocus
-                  className="w-full rounded-lg border border-[#333] bg-[#1a1a1a] px-3 py-2.5 text-sm text-white placeholder-[#555] outline-none focus:border-[#555] mb-3"
+                  className="w-full rounded-lg border border-app-border-3 bg-app-bg-card px-3 py-2.5 text-sm text-white placeholder-[#555] outline-none focus:border-app-border-5 mb-3"
                 />
                 <div className="flex gap-2">
                   <button
@@ -163,7 +163,7 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
                       finally { setBusy(false) }
                     }}
                     disabled={busy || !bootstrapKey}
-                    className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-[#333] bg-[#1a1a1a] px-4 py-2.5 text-sm font-medium text-[#aaa] transition hover:text-white hover:border-[#555] disabled:opacity-50"
+                    className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-app-border-3 bg-app-bg-card px-4 py-2.5 text-sm font-medium text-app-text-3 transition hover:text-white hover:border-app-border-5 disabled:opacity-50"
                   >
                     Sign in directly
                   </button>
@@ -171,7 +171,7 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
                 <button
                   onClick={() => { setShowBootstrap(false); setBootstrapKey(''); setError(null) }}
                   disabled={busy}
-                  className="mt-1 w-full text-center text-xs text-[#444] hover:text-[#888] transition disabled:opacity-50"
+                  className="mt-1 w-full text-center text-xs text-app-text-7 hover:text-app-text-4 transition disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -180,7 +180,7 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
           </div>
         )}
 
-        <p className="mt-8 text-center text-xs text-[#444]">
+        <p className="mt-8 text-center text-xs text-app-text-7">
           Passkeys use your device&apos;s biometrics or PIN — no password needed.
         </p>
       </div>

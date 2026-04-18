@@ -10,7 +10,7 @@ type Props = {
 const MKDOCS_TEMPLATE = '/home/ubuntu/venv/bin/mkdocs serve --dev-addr 0.0.0.0:{port}'
 
 const STATUS_DOT: Record<AppConfig['status'], string> = {
-  stopped: 'bg-[#444]',
+  stopped: 'bg-app-border-4',
   starting: 'bg-yellow-500 animate-pulse',
   running: 'bg-green-500',
   error:   'bg-red-500',
@@ -108,16 +108,16 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
     }
   }
 
-  if (loading) return <div className="flex-1 flex items-center justify-center text-[#555] text-xs">Loading…</div>
+  if (loading) return <div className="flex-1 flex items-center justify-center text-app-text-6 text-xs">Loading…</div>
 
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-3 pt-2 pb-1.5 flex-shrink-0">
-        <span className="text-[11px] text-[#555] uppercase tracking-widest font-semibold">Apps</span>
+        <span className="text-[11px] text-app-text-6 uppercase tracking-widest font-semibold">Apps</span>
         <button
           onClick={() => { setShowForm((v) => !v); setFormError(null) }}
-          className="bg-[#1e3a5f] hover:bg-blue-600 text-white border-none w-7 h-7 rounded-md cursor-pointer text-lg leading-none flex items-center justify-center transition-colors"
+          className="bg-app-blue-tint hover:bg-blue-600 text-white border-none w-7 h-7 rounded-md cursor-pointer text-lg leading-none flex items-center justify-center transition-colors"
           title="New app"
         >
           +
@@ -134,22 +134,22 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
 
       {/* Create form */}
       {showForm && (
-        <div className="mx-3 mb-3 p-2.5 bg-[#111] border border-[#2a2a2a] rounded-lg flex flex-col gap-2 flex-shrink-0">
+        <div className="mx-3 mb-3 p-2.5 bg-app-bg-raised border border-app-border-2 rounded-lg flex flex-col gap-2 flex-shrink-0">
           <input
-            className="bg-[#1a1a1a] border border-[#2a2a2a] focus:border-blue-600 rounded px-2 py-1.5 text-[12px] text-[#e8e8e8] outline-none w-full"
+            className="bg-app-bg-card border border-app-border-2 focus:border-blue-600 rounded px-2 py-1.5 text-[12px] text-app-text outline-none w-full"
             placeholder="Name"
             value={formName}
             onChange={(e) => setFormName(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void handleCreate()}
           />
           <input
-            className="bg-[#1a1a1a] border border-[#2a2a2a] focus:border-blue-600 rounded px-2 py-1.5 text-[11px] text-[#aaa] font-mono outline-none w-full"
+            className="bg-app-bg-card border border-app-border-2 focus:border-blue-600 rounded px-2 py-1.5 text-[11px] text-app-text-3 font-mono outline-none w-full"
             placeholder="Command template (must include {port})"
             value={formTemplate}
             onChange={(e) => setFormTemplate(e.target.value)}
           />
           <input
-            className="bg-[#1a1a1a] border border-[#2a2a2a] focus:border-blue-600 rounded px-2 py-1.5 text-[11px] text-[#aaa] font-mono outline-none w-full"
+            className="bg-app-bg-card border border-app-border-2 focus:border-blue-600 rounded px-2 py-1.5 text-[11px] text-app-text-3 font-mono outline-none w-full"
             placeholder="Working directory"
             value={formDir}
             onChange={(e) => setFormDir(e.target.value)}
@@ -165,7 +165,7 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
             </button>
             <button
               onClick={() => { setShowForm(false); setFormError(null) }}
-              className="bg-transparent border border-[#2a2a2a] hover:border-[#444] text-[#666] hover:text-[#aaa] rounded px-3 py-1 text-[12px] cursor-pointer transition-colors"
+              className="bg-transparent border border-app-border-2 hover:border-app-border-4 text-app-text-5 hover:text-app-text-3 rounded px-3 py-1 text-[12px] cursor-pointer transition-colors"
             >
               Cancel
             </button>
@@ -176,7 +176,7 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
       {/* App list */}
       <ul className="list-none flex-1 overflow-y-auto px-2 py-1 flex flex-col gap-1">
         {apps.length === 0 && !showForm && (
-          <li className="text-[#444] text-xs text-center py-8">No apps yet</li>
+          <li className="text-app-text-7 text-xs text-center py-8">No apps yet</li>
         )}
         {apps.map((app) => {
           const isRunning = app.status === 'running'
@@ -185,11 +185,11 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
           const appUrl = app.slot != null ? `https://app${app.slot}.${window.location.hostname}` : null
 
           return (
-            <li key={app.id} className="bg-[#111] border border-[#1f1f1f] rounded-lg px-2.5 py-2 flex flex-col gap-1.5">
+            <li key={app.id} className="bg-app-bg-raised border border-app-border rounded-lg px-2.5 py-2 flex flex-col gap-1.5">
               {/* Name + status */}
               <div className="flex items-center gap-2">
                 <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${STATUS_DOT[app.status]}`} />
-                <span className="text-[13px] text-[#e8e8e8] font-medium truncate flex-1">{app.name}</span>
+                <span className="text-[13px] text-app-text font-medium truncate flex-1">{app.name}</span>
                 {isRunning && appUrl && (
                   <a
                     href={appUrl}
@@ -225,14 +225,14 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
                     <button
                       onClick={() => void handleStop(app)}
                       disabled={isBusy || isStarting}
-                      className="bg-transparent border border-[#2a2a2a] hover:border-red-500/50 hover:text-red-400 text-[#666] rounded px-2 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40"
+                      className="bg-transparent border border-app-border-2 hover:border-red-500/50 hover:text-red-400 text-app-text-5 rounded px-2 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40"
                     >
                       {isBusy ? 'Stopping…' : isStarting ? 'Starting…' : 'Stop'}
                     </button>
                     {isRunning && appUrl && onOpenApp && (
                       <button
                         onClick={() => onOpenApp(appUrl, app.name)}
-                        className="bg-transparent border border-[#2a2a2a] hover:border-blue-500/50 hover:text-blue-400 text-[#666] rounded px-2 py-0.5 text-[11px] cursor-pointer transition-colors"
+                        className="bg-transparent border border-app-border-2 hover:border-blue-500/50 hover:text-blue-400 text-app-text-5 rounded px-2 py-0.5 text-[11px] cursor-pointer transition-colors"
                       >
                         View
                       </button>
@@ -242,7 +242,7 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
                   <button
                     onClick={() => void handleStart(app)}
                     disabled={isBusy}
-                    className="bg-transparent border border-[#2a2a2a] hover:border-green-500/50 hover:text-green-400 text-[#666] rounded px-2 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40"
+                    className="bg-transparent border border-app-border-2 hover:border-green-500/50 hover:text-green-400 text-app-text-5 rounded px-2 py-0.5 text-[11px] cursor-pointer transition-colors disabled:opacity-40"
                   >
                     {isBusy ? 'Starting…' : 'Start'}
                   </button>
@@ -260,7 +260,7 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
                       </button>
                       <button
                         onClick={() => setPendingDelete(null)}
-                        className="text-[11px] text-[#555] hover:text-[#888] cursor-pointer bg-transparent border-none px-1"
+                        className="text-[11px] text-app-text-6 hover:text-app-text-4 cursor-pointer bg-transparent border-none px-1"
                       >
                         No
                       </button>
@@ -268,7 +268,7 @@ export function AppsPanel({ projectId, projectPath, onOpenApp }: Props) {
                   ) : (
                     <button
                       onClick={() => setPendingDelete(app.id)}
-                      className="text-[#333] hover:text-red-500 cursor-pointer bg-transparent border-none text-[11px] px-1 ml-auto transition-colors"
+                      className="text-app-border-3 hover:text-red-500 cursor-pointer bg-transparent border-none text-[11px] px-1 ml-auto transition-colors"
                       title="Delete"
                     >
                       ✕
