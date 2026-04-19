@@ -106,6 +106,7 @@ type Props = {
 export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact, schedulesTick = 0, artifactRefreshTick, onOpenArtifact }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMore, setHasMore] = useState(false)
+  const [loadingSession, setLoadingSession] = useState(true)
   const [loadingOlder, setLoadingOlder] = useState(false)
   const [streaming, setStreaming] = useState(false)
   const [streamingTool, setStreamingTool] = useState<string | null>(null)
@@ -356,6 +357,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
     scrollBehaviorRef.current = 'instant'
 
     // Reset chain state when root session changes
+    setLoadingSession(true)
     setPastSegments([])
     setCurrentSessionId(sessionId)
 
@@ -393,6 +395,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
       if (cancelled) return
       setMessages(page.messages.map(dbMessageToLocal))
       setHasMore(page.hasMore)
+      setLoadingSession(false)
       // Show spinner and watch for completion if:
       // - last message is from the user (Claude hasn't responded yet), OR
       // - last message is a streaming assistant message (in-progress, possibly partial content)
@@ -418,7 +421,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
           () => { if (!cancelled) setStreaming(false) },
         )
       }
-    }).catch(() => {/* session may be new — ignore */})
+    }).catch(() => { setLoadingSession(false) /* session may be new — ignore */ })
 
     return () => {
       cancelled = true
@@ -861,7 +864,9 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
 
         {messages.length === 0 && !hasMore && pastSegments.length === 0 && (
           <div className="flex items-center justify-center flex-1 text-app-text-7 text-sm">
-            <p>Start a conversation with Claude.</p>
+            {loadingSession
+              ? <div className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border-2 border-app-text-7 border-t-transparent animate-spin" /><span>Loading conversation…</span></div>
+              : <p>Start a conversation with Claude.</p>}
           </div>
         )}
         {messages.map((m, i) => {
