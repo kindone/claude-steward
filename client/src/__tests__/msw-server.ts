@@ -63,6 +63,8 @@ export const handlers = [
   http.get('/api/projects/:id/files/content', () =>
     HttpResponse.json({ content: '# Hello\n', path: 'README.md' })
   ),
+
+  http.get('/api/rate-limits', () => HttpResponse.json(null)),
 ]
 
 export const server = setupServer(...handlers)

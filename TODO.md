@@ -26,6 +26,16 @@ Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`
   - Schema delta: `ALTER TABLE schedules ADD COLUMN condition TEXT; ALTER TABLE schedules ADD COLUMN expires_at INTEGER;`
   - MCP tool surface: `schedule_create` / `schedule_update` gain optional `condition` and `expires_at` params; prompt fragment updated to explain plain-language → structured translation.
 
+### Rate Limit Widget
+- [ ] **Show Anthropic rate limits in UI** — lightweight SDK probe reads `anthropic-ratelimit-*` response headers and surfaces remaining requests/tokens in the sidebar. Requires `ANTHROPIC_API_KEY` in `.env` (OAuth tokens don't work with the SDK); existing CLI subprocess is untouched.
+  - `server/package.json` — add `@anthropic-ai/sdk`
+  - `server/src/claude/rateLimits.ts` — background probe (~40 lines): fires on startup + every 60s using a minimal 1-token haiku call; caches last-known headers in memory
+  - `server/src/routes/rateLimits.ts` — `GET /api/rate-limits` returns cached values (or `null` if no API key configured)
+  - `server/src/index.ts` — wire route + start probe
+  - `.env.example` — add `ANTHROPIC_API_KEY=` entry with comment
+  - `client/src/components/RateLimitWidget.tsx` — mini widget (~40 lines): polls `/api/rate-limits` every 60s, shows requests and tokens remaining as numbers or progress bar
+  - `client/src/components/SessionSidebar.tsx` (or `App.tsx`) — mount widget in sidebar footer
+
 ### Core UX
 - [ ] **`after=<id>` message fetch endpoint** — `GET /api/sessions/:id/messages?after=<messageId>` returns only messages newer than the given ID; client uses it on visibility-change to append new messages without replacing the full view. Currently the visibility-change re-fetch loads the latest 50 and replaces state, which loses scroll position if the user had paged into older messages. Low priority — >50 new messages while backgrounded is practically impossible in a chat app.
 

@@ -20,6 +20,7 @@ import notebooksRouter from './routes/notebooks.js'
 import { projectArtifactsRouter, artifactRouter } from './routes/artifacts.js'
 import linkPreviewRouter from './routes/linkPreview.js'
 import mdartRouter from './routes/mdart.js'
+import rateLimitsRouter from './routes/rateLimits.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Monorepo root — two levels up from server/src/
@@ -73,6 +74,7 @@ export function createApp() {
   app.use('/api/artifacts/:artifactId', artifactRouter)
   app.use('/api/link-preview', linkPreviewRouter)
   app.use('/api/mdart', mdartRouter)
+  app.use('/api/rate-limits', rateLimitsRouter)
 
   if (NODE_ENV === 'production') {
     const publicDir = path.join(__dirname, '../public')

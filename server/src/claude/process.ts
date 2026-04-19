@@ -120,10 +120,13 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
 
   // Strip all Claude Code session vars. Inheriting CLAUDECODE=1 makes claude
   // think it's a sub-agent and wait for IPC from the parent session, hanging forever.
-  // The spawned process will auth via ~/.claude/ stored credentials instead.
+  // Also strip ANTHROPIC_API_KEY — the CLI should auth via ~/.claude/ OAuth credentials.
+  // If an API key were present the CLI would use it instead of OAuth, which breaks when
+  // the key has no credits (compaction, direct-spawn fallback, etc.).
+  const STRIP = new Set(['ANTHROPIC_BASE_URL', 'ANTHROPIC_API_KEY'])
   const cleanEnv: NodeJS.ProcessEnv = {}
   for (const [key, val] of Object.entries(process.env)) {
-    if (!key.startsWith('CLAUDE') && key !== 'ANTHROPIC_BASE_URL') {
+    if (!key.startsWith('CLAUDE') && !STRIP.has(key)) {
       cleanEnv[key] = val
     }
   }
@@ -309,9 +312,10 @@ export function runClaudePrompt(prompt: string): Promise<string> {
       '--permission-mode', 'plan',
     ]
 
+    const STRIP = new Set(['ANTHROPIC_BASE_URL', 'ANTHROPIC_API_KEY'])
     const cleanEnv: NodeJS.ProcessEnv = {}
     for (const [key, val] of Object.entries(process.env)) {
-      if (!key.startsWith('CLAUDE') && key !== 'ANTHROPIC_BASE_URL') {
+      if (!key.startsWith('CLAUDE') && !STRIP.has(key)) {
         cleanEnv[key] = val
       }
     }

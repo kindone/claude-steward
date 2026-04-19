@@ -7,6 +7,7 @@ import { projectQueries, migrateOrphanedSessions } from './db/index.js'
 import { workerClient } from './worker/client.js'
 import { recoverStreamingSessions } from './worker/recovery.js'
 import { startScheduler } from './lib/scheduler.js'
+import { startProbe as startRateLimitProbe } from './claude/rateLimits.js'
 import { writeMcpConfig } from './mcp/config.js'
 import { appsClient } from './apps/client.js'
 import { appSlotQueries } from './db/index.js'
@@ -93,6 +94,7 @@ initProjectKernelManager()
 writeMcpConfig()
 
 startScheduler()
+startRateLimitProbe()
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10)
 

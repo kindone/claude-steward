@@ -46,7 +46,7 @@ describe('SessionSidebar', () => {
   it('marks the active session', () => {
     renderSidebar()
     const active = screen.getByText('First chat').closest('li')!
-    expect(active).toHaveClass('bg-[#1e3a5f]')
+    expect(active).toHaveClass('bg-app-blue-tint')
   })
 
   it('calls onSelectSession when a session is clicked', async () => {

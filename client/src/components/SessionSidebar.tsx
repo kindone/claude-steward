@@ -7,6 +7,7 @@ import { TerminalPanel } from './TerminalPanel'
 import { AppsPanel } from './AppsPanel'
 import { ArtifactPanel } from './ArtifactPanel'
 import { usePushNotifications } from '../hooks/usePushNotifications'
+import { RateLimitWidget } from './RateLimitWidget'
 import type { ConnState } from '../hooks/useAppConnection'
 
 type Props = {
@@ -345,6 +346,10 @@ export function SessionSidebar({
           ? <TerminalPanel projectId={activeProjectId} />
           : <p className="px-3 py-4 text-[12px] text-app-text-7 italic">No project selected</p>
         }
+      </div>
+
+      <div className="hidden md:block">
+        <RateLimitWidget />
       </div>
 
       {/* Desktop footer: connection status + sign out */}
