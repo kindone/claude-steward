@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import fs from 'node:fs'
 import path from 'node:path'
 import { exec } from 'node:child_process'
-import { artifactQueries, projectQueries } from '../db/index.js'
+import { artifactQueries, projectQueries, topicQueries } from '../db/index.js'
 import { broadcastEvent } from '../lib/connections.js'
 import { syncArtifactSchedule, cleanupArtifactSchedule } from '../lib/artifactSchedule.js'
 
@@ -111,6 +111,7 @@ projectArtifactsRouter.post('/', (req, res) => {
     type: type as 'chart' | 'report' | 'data' | 'code' | 'pikchr' | 'html' | 'mdart',
     path: relPath,
     metadata: metadata ? JSON.stringify(metadata) : null,
+    topic_id: null,
     created_from_session: created_from_session ?? null,
   })
 
@@ -140,7 +141,7 @@ artifactRouter.patch('/', (req, res) => {
     return
   }
 
-  const { name, metadata } = req.body as { name?: string; metadata?: Record<string, unknown> }
+  const { name, metadata, topic_id } = req.body as { name?: string; metadata?: Record<string, unknown>; topic_id?: string | null }
 
   if (name !== undefined && (!name || !name.trim())) {
     res.status(400).json({ error: 'name must be a non-empty string' })
@@ -151,6 +152,10 @@ artifactRouter.patch('/', (req, res) => {
     name: name?.trim(),
     metadata: metadata !== undefined ? JSON.stringify(metadata) : undefined,
   })
+
+  if (topic_id !== undefined) {
+    topicQueries.moveArtifact(artifact.id, topic_id)
+  }
 
   if (metadata !== undefined) {
     syncArtifactSchedule(artifact.id)
@@ -289,4 +294,52 @@ artifactRouter.post('/refresh', (req, res) => {
     broadcastEvent('artifact_updated', { artifactId: artifact.id, projectId: artifact.project_id })
     res.json({ ok: true, output: stdout })
   })
+})
+
+// ── Topics router: /api/projects/:projectId/topics ────────────────────────────
+
+export const projectTopicsRouter = Router({ mergeParams: true })
+
+// GET /api/projects/:projectId/topics
+projectTopicsRouter.get('/', (req, res) => {
+  const project = projectQueries.findById((req.params as ProjectArtifactParams).projectId)
+  if (!project) { res.status(404).json({ error: 'Project not found' }); return }
+  res.json(topicQueries.listByProject(project.id))
+})
+
+// POST /api/projects/:projectId/topics
+projectTopicsRouter.post('/', (req, res) => {
+  const project = projectQueries.findById((req.params as ProjectArtifactParams).projectId)
+  if (!project) { res.status(404).json({ error: 'Project not found' }); return }
+  const { name } = req.body as { name?: string }
+  if (!name || !name.trim()) { res.status(400).json({ error: 'name is required' }); return }
+  const topic = topicQueries.create(uuidv4(), project.id, name.trim())
+  broadcastEvent('topic_created', { projectId: project.id, topicId: topic.id })
+  res.status(201).json(topic)
+})
+
+// ── Individual topic router: /api/topics/:topicId ─────────────────────────────
+
+type TopicParams = { topicId: string }
+export const topicRouter = Router({ mergeParams: true })
+
+// PATCH /api/topics/:topicId  (rename)
+topicRouter.patch('/', (req, res) => {
+  const topic = topicQueries.findById((req.params as TopicParams).topicId)
+  if (!topic) { res.status(404).json({ error: 'Topic not found' }); return }
+  const { name } = req.body as { name?: string }
+  if (!name || !name.trim()) { res.status(400).json({ error: 'name is required' }); return }
+  const updated = topicQueries.update(topic.id, name.trim())
+  broadcastEvent('topic_updated', { topicId: topic.id, projectId: topic.project_id })
+  res.json(updated)
+})
+
+// DELETE /api/topics/:topicId
+topicRouter.delete('/', (req, res) => {
+  const topic = topicQueries.findById((req.params as TopicParams).topicId)
+  if (!topic) { res.status(404).json({ error: 'Topic not found' }); return }
+  // ON DELETE SET NULL on artifacts.topic_id handles moving artifacts to root
+  topicQueries.delete(topic.id)
+  broadcastEvent('topic_deleted', { topicId: topic.id, projectId: topic.project_id })
+  res.status(204).end()
 })

@@ -169,6 +169,33 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
       'python', 'py', 'javascript', 'js', 'typescript', 'ts',
       'bash', 'sh', 'shell', 'cpp', 'c++', 'c',
     ])
+    // Copy button: inject on all code blocks as soon as streaming is done (no projectId required)
+    if (!streaming) {
+      contentRef.current.querySelectorAll<HTMLElement>('pre[data-runnable-lang]').forEach((pre) => {
+        let group = pre.querySelector<HTMLDivElement>('.code-action-group')
+        if (!group) {
+          group = document.createElement('div')
+          group.className = 'code-action-group'
+          pre.appendChild(group)
+        }
+        if (!group.querySelector('.copy-btn')) {
+          const btn = document.createElement('button')
+          btn.className = 'copy-btn'
+          btn.title = 'Copy to clipboard'
+          btn.textContent = '📋'
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation()
+            const code = pre.querySelector('code')?.textContent ?? ''
+            void navigator.clipboard.writeText(code).then(() => {
+              btn.textContent = '✓'
+              setTimeout(() => { btn.textContent = '📋' }, 1500)
+            })
+          })
+          group.appendChild(btn)
+        }
+      })
+    }
+
     if (!streaming && projectId) {
       const pres = contentRef.current.querySelectorAll<HTMLElement>('pre[data-runnable-lang]')
       let mountsChanged = false
@@ -183,7 +210,7 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
           pre.appendChild(group)
         }
 
-        // 🧩 Artifact-save — leftmost, always shown when callback is available
+        // 🧩 Artifact-save — always shown when callback is available
         if (!group.querySelector('.artifact-save-btn') && onSaveAsArtifactRef.current) {
           const btn = document.createElement('button')
           btn.className = 'artifact-save-btn'

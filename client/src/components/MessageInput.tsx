@@ -95,14 +95,19 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
     const ta = textareaRef.current
     if (ta) {
       const before = ta.value.slice(0, ta.selectionStart)
-      const m = /(?:^|\s)@([\w-]*)$/.exec(before)
+      const m = /(?:^|\s)@([\w -]*)$/.exec(before)
       setMentionQuery(m ? m[1] : null)
       setMentionIndex(0)
     }
   }
 
+  // Strip symbols so names like "my-report (v2)" match a query of "my report v2"
+  function normalizeMention(s: string) {
+    return s.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ').trim()
+  }
+
   const suggestions = (artifacts ?? [])
-    .filter(a => a.name.toLowerCase().includes((mentionQuery ?? '').toLowerCase()))
+    .filter(a => normalizeMention(a.name).includes(normalizeMention((mentionQuery ?? '').trimEnd())))
     .slice(0, 6)
 
   function insertMention(artifact: Artifact) {
@@ -110,7 +115,7 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
     if (!ta) return
     const before = ta.value.slice(0, ta.selectionStart)
     const after = ta.value.slice(ta.selectionStart)
-    const m = /(?:^|\s)@([\w-]*)$/.exec(before)
+    const m = /(?:^|\s)@([\w -]*)$/.exec(before)
     if (!m) return
     const start = ta.selectionStart - m[1].length - 1 // position of '@'
     const newVal = ta.value.slice(0, start) + '@' + artifact.name + ' ' + after

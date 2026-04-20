@@ -17,7 +17,7 @@ import appsRouter from './routes/apps.js'
 import mcpNotifyRouter from './routes/mcp.js'
 import kernelsRouter from './routes/kernels.js'
 import notebooksRouter from './routes/notebooks.js'
-import { projectArtifactsRouter, artifactRouter } from './routes/artifacts.js'
+import { projectArtifactsRouter, artifactRouter, projectTopicsRouter, topicRouter } from './routes/artifacts.js'
 import linkPreviewRouter from './routes/linkPreview.js'
 import mdartRouter from './routes/mdart.js'
 import rateLimitsRouter from './routes/rateLimits.js'
@@ -72,6 +72,8 @@ export function createApp() {
   app.use('/api/projects/:projectId/notebooks', notebooksRouter)
   app.use('/api/projects/:projectId/artifacts', projectArtifactsRouter)
   app.use('/api/artifacts/:artifactId', artifactRouter)
+  app.use('/api/projects/:projectId/topics', projectTopicsRouter)
+  app.use('/api/topics/:topicId', topicRouter)
   app.use('/api/link-preview', linkPreviewRouter)
   app.use('/api/mdart', mdartRouter)
   app.use('/api/rate-limits', rateLimitsRouter)

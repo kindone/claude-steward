@@ -419,9 +419,17 @@ export interface Artifact {
   type: ArtifactType
   path: string
   metadata: string | null
+  topic_id: string | null
   created_from_session: string | null
   created_at: number
   updated_at: number
+}
+
+export interface Topic {
+  id: string
+  project_id: string
+  name: string
+  created_at: number
 }
 
 export async function listArtifacts(projectId: string): Promise<Artifact[]> {
@@ -533,6 +541,58 @@ export async function putArtifactContent(id: string, content: string): Promise<v
 export async function refreshArtifact(id: string): Promise<void> {
   await fetch(`/api/artifacts/${encodeURIComponent(id)}/refresh`, {
     method: 'POST',
+    ...credentialsOpt,
+  })
+}
+
+// ── Topics ────────────────────────────────────────────────────────────────────
+
+export async function listTopics(projectId: string): Promise<Topic[]> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/topics`, credentialsOpt)
+  if (!res.ok) throw new Error('Failed to list topics')
+  return res.json() as Promise<Topic[]>
+}
+
+export async function createTopic(projectId: string, name: string): Promise<Topic> {
+  const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/topics`, {
+    method: 'POST',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name }),
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(b.error ?? 'Failed to create topic')
+  }
+  return res.json() as Promise<Topic>
+}
+
+export async function updateTopic(id: string, name: string): Promise<Topic> {
+  const res = await fetch(`/api/topics/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ name }),
+    ...credentialsOpt,
+  })
+  if (!res.ok) {
+    const b = await res.json().catch(() => ({})) as { error?: string }
+    throw new Error(b.error ?? 'Failed to update topic')
+  }
+  return res.json() as Promise<Topic>
+}
+
+export async function deleteTopic(id: string): Promise<void> {
+  await fetch(`/api/topics/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    ...credentialsOpt,
+  })
+}
+
+export async function moveArtifactToTopic(artifactId: string, topicId: string | null): Promise<void> {
+  await fetch(`/api/artifacts/${encodeURIComponent(artifactId)}`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ topic_id: topicId }),
     ...credentialsOpt,
   })
 }

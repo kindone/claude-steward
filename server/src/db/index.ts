@@ -187,6 +187,23 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_artifacts_project_id ON artifacts(project_id)
 `)
 
+db.exec(`
+  CREATE TABLE IF NOT EXISTS topics (
+    id         TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+    name       TEXT NOT NULL,
+    created_at INTEGER NOT NULL DEFAULT (unixepoch())
+  )
+`)
+
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_topics_project_id ON topics(project_id)
+`)
+
+try {
+  db.exec(`ALTER TABLE artifacts ADD COLUMN topic_id TEXT REFERENCES topics(id) ON DELETE SET NULL`)
+} catch { /* already exists */ }
+
 // ── Mini-app tables ───────────────────────────────────────────────────────────
 
 db.exec(`
@@ -284,9 +301,17 @@ export interface Artifact {
   type: ArtifactType
   path: string
   metadata: string | null
+  topic_id: string | null
   created_from_session: string | null
   created_at: number
   updated_at: number
+}
+
+export type Topic = {
+  id: string
+  project_id: string
+  name: string
+  created_at: number
 }
 
 // ── Project queries ───────────────────────────────────────────────────────────
@@ -695,6 +720,37 @@ export const artifactQueries = {
   delete: (id: string): void => {
     deleteArtifactStmt.run(id)
   },
+}
+
+// ── Topic queries ─────────────────────────────────────────────────────────────
+
+const listTopicsByProjectStmt = db.prepare(
+  `SELECT * FROM topics WHERE project_id = ? ORDER BY created_at ASC`
+)
+const findTopicByIdStmt = db.prepare(`SELECT * FROM topics WHERE id = ?`)
+const insertTopicStmt = db.prepare(
+  `INSERT INTO topics (id, project_id, name) VALUES (?, ?, ?) RETURNING *`
+)
+const updateTopicStmt = db.prepare(
+  `UPDATE topics SET name = ? WHERE id = ? RETURNING *`
+)
+const deleteTopicStmt = db.prepare(`DELETE FROM topics WHERE id = ?`)
+const moveArtifactToTopicStmt = db.prepare(
+  `UPDATE artifacts SET topic_id = ?, updated_at = unixepoch() WHERE id = ? RETURNING *`
+)
+
+export const topicQueries = {
+  listByProject: (projectId: string): Topic[] =>
+    listTopicsByProjectStmt.all(projectId) as unknown as Topic[],
+  findById: (id: string): Topic | undefined =>
+    findTopicByIdStmt.get(id) as unknown as Topic | undefined,
+  create: (id: string, projectId: string, name: string): Topic =>
+    insertTopicStmt.get(id, projectId, name) as unknown as Topic,
+  update: (id: string, name: string): Topic | undefined =>
+    updateTopicStmt.get(name, id) as unknown as Topic | undefined,
+  delete: (id: string): void => { deleteTopicStmt.run(id) },
+  moveArtifact: (artifactId: string, topicId: string | null): Artifact | undefined =>
+    moveArtifactToTopicStmt.get(topicId, artifactId) as unknown as Artifact | undefined,
 }
 
 // ── App config types + queries ────────────────────────────────────────────────

@@ -14,6 +14,7 @@ const mockArtifact: Artifact = {
   type: 'report',
   path: '/r',
   metadata: null,
+  topic_id: null,
   created_from_session: null,
   created_at: 0,
   updated_at: 0,
