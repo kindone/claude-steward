@@ -7,6 +7,8 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '../', '')
   // In dev, backend may be on 3002 (up:dev) or 3001 (plain npm run dev). PM2 ecosystem sets VITE_API_PORT.
   const apiPort = process.env.VITE_API_PORT || env.VITE_API_PORT || '3001'
+  // loadEnv does not strip inline .env comments — strip manually so allowedHosts matches correctly.
+  const appDomain = (env.APP_DOMAIN || '').split(/\s+#/)[0].trim()
   return {
   plugins: [react(), tailwindcss()],
   resolve: {
@@ -18,8 +20,8 @@ export default defineConfig(({ mode }) => {
   server: {
     host: true,
     port: 5173,
-    ...(env.APP_DOMAIN
-      ? { allowedHosts: [env.APP_DOMAIN, `dev.${env.APP_DOMAIN}`] }
+    ...(appDomain
+      ? { allowedHosts: [appDomain, `dev.${appDomain}`] }
       : {}),
     proxy: {
       '/api': {
