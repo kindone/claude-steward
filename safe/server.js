@@ -155,7 +155,7 @@ async function handleChat(req, res) {
     // to hang waiting for IPC from a parent session that does not exist.
     const cleanEnv = {}
     for (const [k, v] of Object.entries(process.env)) {
-      if (!k.startsWith('CLAUDE') && k !== 'ANTHROPIC_BASE_URL') cleanEnv[k] = v
+      if (!k.startsWith('CLAUDE') && k !== 'ANTHROPIC_BASE_URL' && k !== 'ANTHROPIC_API_KEY') cleanEnv[k] = v
     }
     if (process.env.ANTHROPIC_BASE_URL) cleanEnv.ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL
 
