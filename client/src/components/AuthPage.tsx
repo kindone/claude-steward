@@ -114,8 +114,8 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
           </button>
         )}
 
-        {/* Bootstrap: register new device with API key */}
-        {hasCredentials && (
+        {/* Bootstrap: register new device with API key (always available) */}
+        {(
           <div className="mt-5">
             {!showBootstrap ? (
               <p className="text-center text-xs text-app-text-6">

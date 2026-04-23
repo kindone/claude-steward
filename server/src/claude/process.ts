@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import type { Response } from 'express'
+import { buildCleanEnv } from './clean-env.js'
 
 type SystemInitChunk = {
   type: 'system'
@@ -118,22 +119,8 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
     args.push('--disallowed-tools', 'CronCreate,CronDelete')
   }
 
-  // Strip all Claude Code session vars. Inheriting CLAUDECODE=1 makes claude
-  // think it's a sub-agent and wait for IPC from the parent session, hanging forever.
-  // Also strip ANTHROPIC_API_KEY — the CLI should auth via ~/.claude/ OAuth credentials.
-  // If an API key were present the CLI would use it instead of OAuth, which breaks when
-  // the key has no credits (compaction, direct-spawn fallback, etc.).
-  const STRIP = new Set(['ANTHROPIC_BASE_URL', 'ANTHROPIC_API_KEY'])
-  const cleanEnv: NodeJS.ProcessEnv = {}
-  for (const [key, val] of Object.entries(process.env)) {
-    if (!key.startsWith('CLAUDE') && !STRIP.has(key)) {
-      cleanEnv[key] = val
-    }
-  }
-  // Keep the base URL so requests go to the right endpoint
-  if (process.env.ANTHROPIC_BASE_URL) {
-    cleanEnv.ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL
-  }
+  // See buildCleanEnv() for the strip/allowlist policy (same in worker path).
+  const cleanEnv = buildCleanEnv(process.env)
 
   const child = spawn(CLAUDE_BIN, args, {
     // CI=true suppresses TTY detection so claude writes to pipes correctly.
@@ -312,16 +299,7 @@ export function runClaudePrompt(prompt: string): Promise<string> {
       '--permission-mode', 'plan',
     ]
 
-    const STRIP = new Set(['ANTHROPIC_BASE_URL', 'ANTHROPIC_API_KEY'])
-    const cleanEnv: NodeJS.ProcessEnv = {}
-    for (const [key, val] of Object.entries(process.env)) {
-      if (!key.startsWith('CLAUDE') && !STRIP.has(key)) {
-        cleanEnv[key] = val
-      }
-    }
-    if (process.env.ANTHROPIC_BASE_URL) {
-      cleanEnv.ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL
-    }
+    const cleanEnv = buildCleanEnv(process.env)
 
     const child = spawn(CLAUDE_BIN, args, {
       env: { ...cleanEnv, CI: 'true' },

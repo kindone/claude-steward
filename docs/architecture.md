@@ -13,6 +13,7 @@ This document covers the overall system structure, how the three programs relate
 | [Self-Management](self-management.md) | In-app upgrade flow, PM2 process management, nginx dev/prod switching |
 | [Worker protocol](worker-protocol.md) | Claude worker process, Unix socket IPC, `worker.db`, recovery flow |
 | [Apps Sidecar](apps-sidecar.md) | Mini-app process manager, slot model, Unix socket protocol |
+| [Docker](docker.md) | Containerized test environment, auth isolation, OAuth token strategy |
 | [Roadmap](roadmap.md) | Shipped milestones and planned features |
 
 ---

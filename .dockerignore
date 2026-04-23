@@ -1,0 +1,24 @@
+# Build artefacts (rebuilt inside Docker)
+server/dist/
+server/public/
+client/dist/
+node_modules/
+server/node_modules/
+client/node_modules/
+apps/*/node_modules/
+apps/*/dist/
+
+# Database — never bake production DB into the image
+server/steward.db
+*.db
+
+# Runtime / OS
+.env
+.env.*
+*.log
+.DS_Store
+
+# Dev tooling
+.git/
+.claude/
+coverage/

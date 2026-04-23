@@ -6,6 +6,7 @@
 
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
+import { buildCleanEnv } from '../claude/clean-env.js'
 import { extractToolDetail } from '../claude/toolDetail.js'
 import { jobQueries } from './db.js'
 import type { WorkerEvent } from './protocol.js'
@@ -106,16 +107,8 @@ export class JobManager {
       args.push('--disallowed-tools', 'CronCreate,CronDelete')
     }
 
-    // Strip all Claude Code session vars to prevent sub-agent IPC hang
-    const cleanEnv: NodeJS.ProcessEnv = {}
-    for (const [key, val] of Object.entries(process.env)) {
-      if (!key.startsWith('CLAUDE') && key !== 'ANTHROPIC_BASE_URL') {
-        cleanEnv[key] = val
-      }
-    }
-    if (process.env.ANTHROPIC_BASE_URL) {
-      cleanEnv.ANTHROPIC_BASE_URL = process.env.ANTHROPIC_BASE_URL
-    }
+    // See buildCleanEnv() for the strip/allowlist policy (same in direct-spawn path).
+    const cleanEnv = buildCleanEnv(process.env)
 
     const child = spawn(CLAUDE_BIN, args, {
       env: { ...cleanEnv, CI: 'true' },
