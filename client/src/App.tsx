@@ -16,6 +16,7 @@ import { useAppConnection, type ConnState } from './hooks/useAppConnection'
 import { ArtifactFloat, type OpenArtifact } from './components/ArtifactFloat'
 import { isBelowTailwindMd } from './lib/viewport'
 import { useTheme } from './hooks/useTheme'
+import { readLastState, saveLastState } from './lib/sessionPersistence'
 
 type AuthState = 'loading' | 'unauthenticated' | 'authenticated'
 
@@ -45,23 +46,6 @@ function ConnectionDot({ state, lastSeenAt }: { state: ConnState; lastSeenAt: nu
       <span className={`inline-block w-2 h-2 rounded-full flex-shrink-0 ${dot}`} />
     </span>
   )
-}
-
-const LAST_STATE_KEY = 'steward:lastState'
-
-function readLastState(): { projectId: string | null; sessionId: string | null } {
-  try {
-    const raw = localStorage.getItem(LAST_STATE_KEY)
-    return raw ? JSON.parse(raw) : { projectId: null, sessionId: null }
-  } catch {
-    return { projectId: null, sessionId: null }
-  }
-}
-
-function saveLastState(projectId: string | null, sessionId: string | null): void {
-  try {
-    localStorage.setItem(LAST_STATE_KEY, JSON.stringify({ projectId, sessionId }))
-  } catch { /* quota exceeded or private mode — ignore */ }
 }
 
 // ── Error Boundary ────────────────────────────────────────────────────────────
