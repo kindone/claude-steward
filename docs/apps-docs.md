@@ -14,7 +14,7 @@ apps/docs server  (:4001–:4010, assigned by sidecar slot)
   ├── mkdocs.ts      — spawns/stops `mkdocs serve` subprocess on :18765
   └── routes/
        ├── chat.ts   — POST /api/chat (SSE streaming to Claude CLI)
-       └── health.ts — GET /healthz
+       └── file.ts   — GET/PATCH /file (read/edit a doc file from the panel)
 ```
 
 MkDocs runs on a fixed internal port (**18765**) regardless of the public slot port. `proxy.ts` intercepts every HTML response and injects `<link rel="stylesheet" href="/chat-panel.css">` and `<script src="/chat-panel.js">` just before `</head>`. The injected files are served statically from `apps/docs/public/` — **no build step required**; edits take effect immediately on the next page load.
@@ -85,12 +85,16 @@ apps/docs/
 │   ├── server.ts          — Express app setup + static serving of public/
 │   ├── proxy.ts           — MkDocs proxy + HTML injection
 │   ├── mkdocs.ts          — mkdocs subprocess lifecycle
+│   ├── claude/
+│   │   ├── spawn.ts       — Builds the `claude` CLI invocation
+│   │   └── system-prompt.ts
 │   └── routes/
 │       ├── chat.ts        — POST /api/chat (SSE), DELETE /api/chat/session
-│       └── health.ts      — GET /healthz
+│       └── file.ts        — GET/PATCH /file (panel file read/edit)
 ├── public/
 │   ├── chat-panel.js      — Self-contained panel IIFE (no build step)
 │   └── chat-panel.css     — Panel styles (no build step)
+├── template/              — MkDocs scaffold for new docs sites (see below)
 ├── package.json
 └── tsconfig.json
 ```
@@ -99,6 +103,43 @@ apps/docs/
 
 ## Running / integration
 
-The app is registered as a mini-app in the sidecar. Its `command_template` in the DB is the Node.js start command (`node dist/server.js --port {port}`), and the sidecar starts it when a slot is claimed. MkDocs must be installed (`pip install mkdocs-material`) in the project's working directory.
+The app is registered as a mini-app in the sidecar. Its `command_template` in the DB is the Node.js start command (`node dist/server.js --port {port} --docs-dir <path>`), and the sidecar starts it when a slot is claimed. MkDocs must be installed (`pip install mkdocs-material`) in the project's working directory.
 
 For the internal MkDocs proxy to work, port 18765 must be free and `mkdocs serve` must be reachable at `http://localhost:18765`.
+
+---
+
+## Creating a new docs site
+
+The `apps/docs/` engine is reusable: one engine binary serves N independent MkDocs sites, each passed in via `--docs-dir`. To spin up a new site, use the scaffold at `apps/docs/template/`:
+
+```bash
+bash apps/docs/template/create-app.sh <app-name> [destination-dir]
+# Example:
+bash apps/docs/template/create-app.sh my-api-docs ~/my-api-docs
+```
+
+The script:
+
+1. Copies `apps/docs/template/` to the destination (default: `~/<app-name>`)
+2. Removes `create-app.sh` from the copy (so it doesn't propagate)
+3. Patches `site_name` in `mkdocs.yml` to the given app name
+4. Prints the `curl` commands to register the new content directory as a mini-app via `POST /api/projects/:id/apps` — the `commandTemplate` it prints points at this repo's built `apps/docs/dist/server.js` with `--docs-dir` set to the new content path
+
+The generated content directory is independent of this repo — it can live anywhere on disk, have its own git history, add its own MkDocs plugins and custom hooks (e.g. `~/learn-pikchr/` adds `pikchr_hook.py` and a kroki plugin). The only coupling back to `apps/docs/` is the `commandTemplate` path.
+
+### Template shape
+
+```
+apps/docs/template/
+├── mkdocs.yml              — Material theme, dark/light toggle, nav tabs,
+│                             code-copy, tabbed content
+├── docs/
+│   ├── index.md
+│   ├── guide/{index,getting-started,configuration}.md
+│   └── reference/index.md
+├── create-app.sh
+└── .gitignore              — site/, .docs-chat.db
+```
+
+The `.docs-chat.db` is the chat panel's runtime storage (SQLite), created by `apps/docs`'s server on first message. `site/` is `mkdocs build` output. Both are always project-local and never belong in git.
