@@ -49,18 +49,43 @@ services:
       - "23003:3003"   # safe-mode fallback
 
     volumes:
-      # SQLite database — separate named volume, isolated from claude-steward
-      - opencode-steward-data:/data
+      # ── steward-managed (vendor-neutral) ────────────────────────────────
+      # These hold steward's own state, independent of which CLI adapter
+      # is active. Named without a CLI prefix so they make sense after the
+      # opencode branch merges into main.
 
-      # opencode CLI session state (per-conversation history, snapshots,
-      # SQLite db). Without this volume, every `docker compose up --build`
-      # gives the container a fresh writable layer and wipes opencode's
-      # session store, leaving steward's DB with stale `ses_xxx` pointers
-      # that opencode can't resolve ("Session not found"). Persisting it in
-      # a named volume keeps prior conversations resumable across rebuilds.
+      # Steward SQLite DB (sessions, messages, projects, artifacts, …).
+      - steward-data:/data
+
+      # Artifact files (chart JSON, report markdown, code, html, …) live
+      # at /app/artifacts/<id>-<slug>.<ext>; DB rows in steward-data point
+      # at this path. Without the mount, rebuilds wipe the files but leave
+      # the rows — UI shows the artifact but "Failed to get artifact
+      # content" on open.
+      - steward-artifacts:/app/artifacts
+
+      # MCP runtime data: the notify secret (stable across restarts so
+      # in-flight MCP child processes spawned before a steward-main
+      # `pm2 restart` keep authenticating) and the regenerated-on-startup
+      # steward-mcp.json. Lives at /app/server/data/, otherwise wiped on
+      # every rebuild.
+      - steward-mcp:/app/server/data
+
+      # User-created notebook cells + outputs. notebooks.ts writes per-cell
+      # files under /app/notebooks/<name>/cells/ and outputs/.
+      - steward-notebooks:/app/notebooks
+
+      # Files uploaded via the projects upload route land in /app/uploads/.
+      - steward-uploads:/app/uploads
+
+      # ── opencode-CLI-specific ───────────────────────────────────────────
+      # opencode persists per-conversation state in /root/.local/share/
+      # opencode/ (sessions, snapshots, its own SQLite). Without this
+      # volume, every rebuild gives the container a fresh writable layer
+      # and wipes opencode's session store, leaving steward's DB with
+      # stale `ses_xxx` pointers that opencode can't resolve ("Session
+      # not found"). The cache + state dirs are persisted for parity.
       - opencode-state:/root/.local/share/opencode
-      # opencode also writes a small cache + state dir; persist for parity
-      # so any cross-run state (auth handshakes, model index) survives too.
       - opencode-cache:/root/.cache/opencode
       - opencode-runtime-state:/root/.local/state/opencode
 
@@ -121,9 +146,18 @@ services:
       start_period: 20s
 
 volumes:
-  opencode-steward-data:
+  # Steward-managed (vendor-neutral) — see service `volumes:` above.
+  steward-data:
     driver: local
-  # opencode CLI session storage — see service `volumes:` above.
+  steward-artifacts:
+    driver: local
+  steward-mcp:
+    driver: local
+  steward-notebooks:
+    driver: local
+  steward-uploads:
+    driver: local
+  # opencode CLI-specific.
   opencode-state:
     driver: local
   opencode-cache:
