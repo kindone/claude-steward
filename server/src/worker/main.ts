@@ -6,13 +6,26 @@
  * Start: tsx server/src/worker/main.ts
  */
 
+import dotenv from 'dotenv'
+import path from 'node:path'
 import net from 'node:net'
 import fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
 import { SOCKET_PATH } from './protocol.js'
 import { JobManager } from './job-manager.js'
 import { jobQueries } from './db.js'
 import type { WorkerCommand, WorkerEvent } from './protocol.js'
+
+// Load the monorepo-root .env so adapter env reads (GEMINI_API_KEY,
+// GOOGLE_GENERATIVE_AI_API_KEY, OPENCODE_DEFAULT_MODEL, ANTHROPIC_API_KEY,
+// CLAUDE_CODE_OAUTH_TOKEN, OPENCODE_PATH, …) succeed at child-spawn time.
+// Mirrors server/src/index.ts:17 — without this the worker only sees vars
+// PM2 explicitly forwarded in ecosystem.config.cjs (DATABASE_PATH and a few
+// socket paths), which is too narrow for opencode auth.
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+// dist/worker/main.js → ../../../.env  (= monorepo root)
+dotenv.config({ path: path.join(__dirname, '../../../.env') })
 
 const manager = new JobManager()
 const clients = new Set<net.Socket>()
