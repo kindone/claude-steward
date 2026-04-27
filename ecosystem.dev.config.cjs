@@ -41,7 +41,9 @@ module.exports = {
       env: {
         NODE_ENV: 'development',
         PORT: '3002',
-        DATABASE_PATH: path.join(__dirname, 'server/steward-dev.db'),
+        // Respect an inherited DATABASE_PATH if set, else use the dev DB.
+        // See ecosystem.config.cjs for why this passthrough exists.
+        DATABASE_PATH: process.env.DATABASE_PATH || path.join(__dirname, 'server/steward-dev.db'),
         // APP_DOMAIN and VAPID_* are loaded from .env by dotenv at startup.
         // Do NOT set APP_DOMAIN here — it would override .env and break WebAuthn (rpID mismatch).
       },
@@ -54,7 +56,9 @@ module.exports = {
       watch: false,
       env: {
         NODE_ENV: 'development',
-        DATABASE_PATH: path.join(__dirname, 'server/steward-dev.db'),
+        // Respect an inherited DATABASE_PATH if set, else use the dev DB.
+        // See ecosystem.config.cjs for why this passthrough exists.
+        DATABASE_PATH: process.env.DATABASE_PATH || path.join(__dirname, 'server/steward-dev.db'),
         WORKER_SOCKET: '/tmp/claude-worker.sock',
         WORKER_DB_PATH: '/tmp/claude-worker.db',
       },

@@ -39,7 +39,12 @@ module.exports = {
       watch: false,
       env: {
         NODE_ENV: 'production',
-        DATABASE_PATH: path.join(__dirname, 'server/steward.db'),
+        // Respect an inherited DATABASE_PATH (e.g. set by docker-compose's
+        // `environment:` block, or by an operator's shell). Without the
+        // process.env passthrough, PM2's `env:` clobbers the inherited value
+        // and the server lands on the dev path inside containers — leaving
+        // any /data named-volume mount silently unused.
+        DATABASE_PATH: process.env.DATABASE_PATH || path.join(__dirname, 'server/steward.db'),
         // APP_DOMAIN and VAPID_* are loaded from .env by dotenv at startup.
         // Do NOT set APP_DOMAIN here — it would override .env and break WebAuthn (rpID mismatch).
       },
@@ -53,7 +58,12 @@ module.exports = {
       watch: false,
       env: {
         NODE_ENV: 'production',
-        DATABASE_PATH: path.join(__dirname, 'server/steward.db'),
+        // Respect an inherited DATABASE_PATH (e.g. set by docker-compose's
+        // `environment:` block, or by an operator's shell). Without the
+        // process.env passthrough, PM2's `env:` clobbers the inherited value
+        // and the server lands on the dev path inside containers — leaving
+        // any /data named-volume mount silently unused.
+        DATABASE_PATH: process.env.DATABASE_PATH || path.join(__dirname, 'server/steward.db'),
         WORKER_SOCKET: '/tmp/claude-worker.sock',
         WORKER_DB_PATH: '/tmp/claude-worker.db',
       },
