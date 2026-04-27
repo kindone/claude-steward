@@ -398,14 +398,10 @@ const updateTimezoneStmt = db.prepare(
 const updateModelStmt = db.prepare(
   `UPDATE sessions SET model = ?, updated_at = unixepoch() WHERE id = ?`
 )
-// Adapter switch carries side effects: the previous CLI's session handle
-// (claude_session_id) is meaningless to the new CLI, and the previous
-// adapter's model slug is almost certainly the wrong shape (Claude bare
-// slugs vs opencode `provider/model`). All three writes happen atomically
-// in updateCli below so a partial failure can't leave the row inconsistent.
-const updateCliStmt = db.prepare(
-  `UPDATE sessions SET cli = ?, claude_session_id = NULL, model = NULL, updated_at = unixepoch() WHERE id = ?`
-)
+// NOTE: there is intentionally no updateCliStmt. Per the immutable-per-
+// session-CLI design, `sessions.cli` is set at INSERT time (see create
+// statement above) and never updated. A clone-with-different-CLI feature
+// is the planned escape hatch — see TODO.md "Multi-CLI Support".
 const deleteSessionStmt = db.prepare(`DELETE FROM sessions WHERE id = ?`)
 const setCompactedFromStmt = db.prepare(
   `UPDATE sessions SET compacted_from = ? WHERE id = ?`
@@ -450,9 +446,8 @@ export const sessionQueries = {
     updateTimezoneStmt.run(timezone, id),
   updateModel: (model: string | null, id: string) =>
     updateModelStmt.run(model, id),
-  /** Switch the session's adapter. Atomically clears the previous CLI's
-   *  session handle and model — see updateCliStmt comment. */
-  updateCli: (cli: CliName, id: string) => updateCliStmt.run(cli, id),
+  // NOTE: no `updateCli` here. CLI is immutable per-session by design;
+  // see updateCliStmt comment above and TODO.md "Multi-CLI Support".
   setCompactedFrom: (newId: string, fromId: string) =>
     setCompactedFromStmt.run(fromId, newId),
   getChain: (rootId: string) => getChainStmt.all(rootId) as Session[],

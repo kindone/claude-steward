@@ -144,7 +144,7 @@ router.patch('/:id', (req, res) => {
     res.status(404).json({ error: 'Session not found' })
     return
   }
-  const { title, systemPrompt, permissionMode, timezone, model, cli } = req.body as { title?: string; systemPrompt?: string | null; permissionMode?: string; timezone?: string; model?: string | null; cli?: string }
+  const { title, systemPrompt, permissionMode, timezone, model } = req.body as { title?: string; systemPrompt?: string | null; permissionMode?: string; timezone?: string; model?: string | null }
 
   if (title !== undefined) {
     if (!title || typeof title !== 'string' || !title.trim()) {
@@ -183,22 +183,11 @@ router.patch('/:id', (req, res) => {
     session.model = value
   }
 
-  // Adapter switch is destructive: clears claude_session_id (the previous
-  // CLI's handle is opaque to the new CLI) and clears `model` (slug shape
-  // differs between adapters). Done atomically in updateCli. We intentionally
-  // skip the no-op case so a redundant PATCH doesn't churn the session.
-  if (cli !== undefined) {
-    if (typeof cli !== 'string' || !VALID_CLIS.has(cli as CliName)) {
-      res.status(400).json({ error: `cli must be one of: ${[...VALID_CLIS].join(', ')}` })
-      return
-    }
-    if ((cli as CliName) !== session.cli) {
-      sessionQueries.updateCli(cli as CliName, req.params.id)
-      session.cli = cli as CliName
-      session.claude_session_id = null
-      session.model = null
-    }
-  }
+  // NOTE: adapter (cli) is intentionally NOT mutable via PATCH. Per the
+  // immutable-per-session-CLI design, the CLI is fixed at session creation
+  // (POST accepts the cli field; the picker UI on the + button forces an
+  // explicit choice). The clone-with-different-CLI escape hatch is a
+  // separate future feature — see TODO.md "Multi-CLI Support".
 
   res.json(session)
 })

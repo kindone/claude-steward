@@ -826,21 +826,11 @@ export async function updateSessionModel(sessionId: string, model: string | null
   return res.json() as Promise<Session>
 }
 
-/** Switch the session's CLI adapter. Server-side this is destructive: it
- *  atomically clears `claude_session_id` (the previous adapter's session
- *  handle is meaningless to the new one) and `model` (slug shape differs
- *  between adapters). Callers should warn the user before invoking. The
- *  returned Session reflects the cleared state. */
-export async function updateSessionCli(sessionId: string, cli: CliName): Promise<Session> {
-  const res = await fetch(`/api/sessions/${sessionId}`, {
-    method: 'PATCH',
-    headers: JSON_HEADERS,
-    body: JSON.stringify({ cli }),
-    ...credentialsOpt,
-  })
-  if (!res.ok) throw new Error('Failed to update CLI')
-  return res.json() as Promise<Session>
-}
+// NOTE: no updateSessionCli helper. CLI is immutable per-session by design
+// (chosen via the + button popover on session create; see SessionSidebar).
+// PATCH /api/sessions/:id intentionally rejects a `cli` field. The clone-
+// with-different-CLI escape hatch is a separate planned feature — see
+// docs/multi-cli-merge.md.
 
 export async function deleteSession(sessionId: string): Promise<void> {
   const res = await fetch(`/api/sessions/${sessionId}`, {

@@ -73,9 +73,12 @@ describe('POST /api/sessions', () => {
   })
 })
 
-describe('PATCH /api/sessions/:id (cli switch)', () => {
-  it('switches adapter and clears claude_session_id + model atomically', async () => {
-    // Create a claude session, give it a session handle and a model
+describe('PATCH /api/sessions/:id — cli is immutable', () => {
+  // Per the immutable-per-session-CLI design, the cli field is fixed at
+  // session creation. PATCH must silently ignore any cli field passed in
+  // — the route doesn't reject it (forward-compat with older clients that
+  // may still try) but it does not mutate the session.
+  it('ignores a cli field on PATCH and leaves the session unchanged', async () => {
     const created = await request(app)
       .post('/api/sessions')
       .set('Cookie', authCookie)
@@ -83,60 +86,19 @@ describe('PATCH /api/sessions/:id (cli switch)', () => {
     expect(created.status).toBe(201)
     const id = created.body.id as string
 
-    // Pretend a turn ran: set a model and (via the DB-backed test path)
-    // a claude_session_id. We use PATCH for model, and a direct insert of
-    // a claude_session_id via PATCH wouldn't be exposed — but the route
-    // still tracks it, so we set what we can: model. claude_session_id
-    // starts NULL on a fresh session, which is fine for the assertion.
     await request(app)
       .patch(`/api/sessions/${id}`)
       .set('Cookie', authCookie)
       .send({ model: 'claude-sonnet-4-6' })
 
-    // Switch to opencode — model should clear (Claude slug is invalid for opencode)
-    const switched = await request(app)
+    // Attempt to switch — must NOT change cli or clear model.
+    const after = await request(app)
       .patch(`/api/sessions/${id}`)
       .set('Cookie', authCookie)
       .send({ cli: 'opencode' })
-    expect(switched.status).toBe(200)
-    expect(switched.body.cli).toBe('opencode')
-    expect(switched.body.model).toBeNull()
-    expect(switched.body.claude_session_id).toBeNull()
-  })
-
-  it('is a no-op when cli matches current value', async () => {
-    const created = await request(app)
-      .post('/api/sessions')
-      .set('Cookie', authCookie)
-      .send({ projectId: sharedProjectId, cli: 'opencode' })
-    const id = created.body.id as string
-
-    await request(app)
-      .patch(`/api/sessions/${id}`)
-      .set('Cookie', authCookie)
-      .send({ model: 'google/gemini-2.5-flash' })
-
-    // Re-PATCH with same cli — model should NOT be cleared (no-op)
-    const sameCli = await request(app)
-      .patch(`/api/sessions/${id}`)
-      .set('Cookie', authCookie)
-      .send({ cli: 'opencode' })
-    expect(sameCli.status).toBe(200)
-    expect(sameCli.body.model).toBe('google/gemini-2.5-flash')
-  })
-
-  it('rejects an unknown cli value', async () => {
-    const created = await request(app)
-      .post('/api/sessions')
-      .set('Cookie', authCookie)
-      .send({ projectId: sharedProjectId })
-    const id = created.body.id as string
-
-    const bad = await request(app)
-      .patch(`/api/sessions/${id}`)
-      .set('Cookie', authCookie)
-      .send({ cli: 'aider' })
-    expect(bad.status).toBe(400)
+    expect(after.status).toBe(200)
+    expect(after.body.cli).toBe('claude')
+    expect(after.body.model).toBe('claude-sonnet-4-6')
   })
 })
 
