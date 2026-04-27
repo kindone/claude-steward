@@ -63,24 +63,111 @@ cp .env docker/.env.container
 
 ---
 
-## Running
+## Three runtime modes
+
+Pick one at compose-up time. They differ only in what the container can do
+with its source — auth, ports, and DB volume are identical.
+
+| Mode | Image | Source on disk | Dev deps + git | Self-evolve? | Use case |
+|---|---|---|---|---|---|
+| **minimal** *(default)* | smallest | none — only `server/dist`, `server/public`, `safe/` | ❌ | no | smoke tests, throwaway containers |
+| **evolve** | +300–500 MB | full repo, baked in | ✅ | yes — fully self-contained | sandbox that can rebuild itself with no host involvement |
+| **shared** | same as evolve | bind-mounted from host clone | ✅ (host's source, container's deps) | yes | iterate from host editor; container picks up edits live |
+
+### Mode 1 — minimal (default)
 
 ```bash
-# Build image and start
-docker compose up --build
-
-# Subsequent starts (cached image)
-docker compose up -d
-
-# Stop (keeps DB volume intact)
-docker compose down
-
-# Stop + wipe DB (clean slate for testing)
-docker compose down -v
+docker compose up --build       # first run
+docker compose up -d            # subsequent starts (cached image)
+docker compose down             # stop (DB volume intact)
+docker compose down -v          # stop + wipe DB
 ```
 
-App: `http://localhost:13001` — Safe fallback: `http://localhost:13003`
+Inside this container, `ls /app` shows only the production runtime: `server/dist/`,
+`server/public/`, `safe/`, workspace `package.json`s, `node_modules/`. Source folders
+(`client/src/`, `server/src/`, `apps/`, `docs/`, `e2e/`, `config/`, `*.md`) are
+**not present** — the Dockerfile's `runtime-minimal` stage doesn't copy them.
+
+Steward runs opencode with `--dir /app`, so when the model lists files in
+**bash** it sees what is actually on disk in the container, not a filtered view.
+
+OpenCode's **glob** / **grep** use **ripgrep**, which **respects `.gitignore`**.
+To include ignored paths there, add a project-root **`.ignore`** file with
+negation lines like `!some-path/`
+(see [OpenCode tools — Internals](https://opencode.ai/docs/tools#internals)).
+`bash` + `ls` is a plain directory listing and ignores gitignore.
+
+### Mode 2 — evolve (self-contained, can rebuild itself)
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.evolve.yml up --build
+```
+
+The container ships with the full source tree, dev dependencies (`tsc`,
+`vite`, `vitest`), and `git`. The in-container steward can run the same
+self-upgrade loop as the host: edit source under `/app/...`, run
+`npm run build`, `POST /api/admin/reload`, watch PM2 restart.
+
+Nothing is shared with the host — git history, source, and DB are all
+container-local. Tear it down with `docker compose down -v` to start clean.
+
+Useful shell alias:
+
+```bash
+alias dce='docker compose -f docker-compose.yml -f docker-compose.evolve.yml'
+# then: dce up -d / dce logs -f / dce exec steward bash
+```
+
+### Mode 3 — shared (host source, isolated runtime state)
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.shared.yml up --build
+```
+
+Bind-mounts `/home/ubuntu/opencode-steward` → `/app`. Source edits made on
+the host (in your editor) are immediately visible to the container, and
+edits the container makes flow back to the host clone.
+
+Stays **isolated** even in shared mode:
+
+- SQLite DB (`/data`) — separate named volume
+- Claude config (`/root/.claude`) — container-local filesystem
+- `node_modules/` (root + `client/` + `server/`) — anonymous volumes mask
+  the host's; the container uses what was installed during image build
+- `server/dist` and `server/public` — anonymous volumes; container's build
+  output never overwrites the host's
+
+Caveats:
+
+- Mini-app `node_modules` (`apps/*/node_modules`) are *not* anonymous-volume'd.
+  If you've installed mini-app deps on the host against a different Node ABI
+  than the container's, things may break. Add per-app anonymous volumes to
+  `docker-compose.shared.yml` if you hit that.
+- mdart still resolves through the Dockerfile's `additional_contexts` COPY
+  (`/mdart/packages/mdart` inside the container). The bind-mount doesn't
+  cover it. If you want to iterate on mdart from the container, also mount
+  `/home/ubuntu/mdart/packages/mdart:/mdart/packages/mdart`.
+- Running `npm install` *inside* the container may fail to resolve
+  `file:../../mdart/...` paths (relative tree differs from the host). Do
+  installs on the host; the container's anon-volume `node_modules` keeps
+  the version baked in by the image build.
+
+Useful shell alias:
+
+```bash
+alias dcs='docker compose -f docker-compose.yml -f docker-compose.shared.yml'
+```
+
+---
+
+## Endpoints
+
+App: `http://localhost:23001` — Safe fallback: `http://localhost:23003`
 (mapped from container ports 3001/3003).
+
+In production this is fronted by nginx at
+`https://opencode-test.steward.jradoo.com` (configured via the `APP_DOMAIN`
+env var in `docker-compose.yml`).
 
 ---
 
@@ -116,8 +203,11 @@ any other session — including your own prod `~/.claude/`.
 
 | Host port | Container port | Service |
 |---|---|---|
-| 13001 | 3001 | Main server (HTTP API + static files) |
-| 13003 | 3003 | Safe-mode fallback |
+| 23001 | 3001 | Main server (HTTP API + static files) |
+| 23003 | 3003 | Safe-mode fallback |
+
+(Sister project `claude-steward` uses 13001/13003 — different prefix so the
+two test containers can run side-by-side without conflict.)
 
 Mini-app ports (4001–4010) are not exposed by default — add them to
 `docker-compose.yml` if needed.

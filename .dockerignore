@@ -19,6 +19,9 @@ server/steward.db
 .DS_Store
 
 # Dev tooling
-.git/
+# Note: .git/ is intentionally NOT excluded — runtime-evolve copies the full
+# /app from the builder so the in-container steward has access to git history
+# (log, diff, blame, commit). Adds ~18 MB to the build context, negligible.
+# The minimal runtime stage doesn't copy .git/, so its image is unaffected.
 .claude/
 coverage/

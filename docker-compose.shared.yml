@@ -1,0 +1,59 @@
+# OpenCode Steward — `shared` mode override
+#
+# Bind-mounts the host's opencode-steward checkout into /app so source edits
+# made on the host (in your editor) are immediately visible to the container,
+# and edits the container makes flow back to the host clone. Build target is
+# runtime-evolve, since the container needs dev deps + git to build the
+# bind-mounted source.
+#
+# What stays ISOLATED (per option-b design):
+#   - SQLite DB (/data)             — named volume `opencode-steward-data`
+#   - Claude config (/root/.claude) — container's own filesystem (not mounted)
+#   - node_modules                  — anonymous volumes mask the host's
+#       (host's modules may be built against a different Node ABI / arch;
+#        also keeps `npm install` runs in the container from rewriting host
+#        dependency state)
+#   - build outputs                 — anonymous volumes for server/dist and
+#       server/public so the container's build doesn't overwrite the host's
+#       and vice versa
+#
+# What's SHARED:
+#   - all source: client/src, server/src, scripts, docs, apps, e2e, configs,
+#     CLAUDE.md / MEMORY.md / TODO.md / BUGS.md, .git/
+#
+# Caveats:
+#   - apps/*/node_modules are not anonymous-volume'd. If you have mini-apps
+#     installed on the host, the container will see them. If they were built
+#     against the host's Node ABI and the container disagrees, things may
+#     break. Add per-app anonymous volumes here if you hit that.
+#   - mdart still resolves through the build-context COPY in the Dockerfile
+#     (/mdart/packages/mdart inside the container). The bind-mount doesn't
+#     affect that path. If you want to iterate on mdart from the container
+#     too, also bind-mount /home/ubuntu/mdart/packages/mdart into /mdart.
+#   - In-container `npm install` may fail to resolve `file:../../mdart/...`
+#     paths since the bind-mount changes the relative tree layout. Use the
+#     host's checkout for installs; the container's anon-volume node_modules
+#     keeps the version baked in by the image build.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.shared.yml up --build
+
+services:
+  steward:
+    build:
+      target: runtime-evolve
+
+    volumes:
+      # Bind-mount the host's checkout. Compose merges this list with the
+      # base file's, deduplicating by container target path. The base's
+      # `opencode-steward-data:/data` mount stays in effect for the DB.
+      - .:/app
+
+      # Anonymous volumes that mask sub-paths under /app/. Mount order
+      # matters: `.:/app` mounts first, these layer on top to hide the
+      # host's contents at those exact paths.
+      - /app/node_modules
+      - /app/client/node_modules
+      - /app/server/node_modules
+      - /app/server/dist
+      - /app/server/public

@@ -1,69 +1,112 @@
-# Claude Steward — Docker Compose
+# OpenCode Steward — Docker Compose (multi-CLI experiment branch)
 #
-# Prerequisites on the host:
-#   1. Generate a long-lived OAuth token (independent of your host's rotating
-#      credentials in ~/.claude/.credentials.json — same Claude account is
-#      fine). Run against a scratch config dir so ~/.claude/ isn't touched:
+# Successor to the original cline experiment. Targets opencode (Go binary,
+# lightweight per-invocation startup) as the primary alternative CLI to
+# Claude Code. Coexists with the host's claude-steward via container/volume
+# isolation and ports 23001/23003.
 #
-#        CLAUDE_CONFIG_DIR=$HOME/.claude-test claude setup-token
-#        # browser opens → sign in → CLI prints a long-lived token
+# ── CLI selection ─────────────────────────────────────────────────────────────
+# Set STEWARD_CLI in the host shell or .env to pick the active adapter:
+#   STEWARD_CLI=claude   # default — Anthropic claude CLI
+#   STEWARD_CLI=opencode # opencode CLI
+# The container ships both binaries; selection is per-session at runtime via
+# the CliAdapter abstraction in server/src/cli/.
 #
-#   2. Store the token in a root-level .env file (gitignored):
-#        echo 'STEWARD_TEST_OAUTH_TOKEN=<paste-token-here>' >> .env
-#        echo 'API_KEY=<some-secret>'                     >> .env   # optional
+# ── Prerequisites on the host ─────────────────────────────────────────────────
+# Required env vars in .env (gitignored):
+#   STEWARD_TEST_OAUTH_TOKEN=<long-lived Claude token from `claude setup-token`>
+#   GEMINI_API_KEY=<from https://aistudio.google.com/apikey>   # for opencode
+# Optional:
+#   ANTHROPIC_API_KEY=<key>            # opencode can also target Anthropic
+#   API_KEY=<secret>                   # optional; UI "Sign in with API key" (see environment below)
+#   OPENCODE_APP_DOMAIN=<subdomain>    # WebAuthn rpID
 #
-#   3. (Optional) Mount a .env for APP_DOMAIN / VAPID keys inside the container:
-#        cp .env docker/.env.container   # then uncomment the volume line below
+# mdart must exist at the path referenced by additional_contexts below.
 #
-# Usage:
-#   docker compose up --build          # first run
-#   docker compose up                  # subsequent runs (cached image)
-#   docker compose down -v             # stop + wipe ephemeral DB
+# ── Usage ─────────────────────────────────────────────────────────────────────
+#   docker compose up --build          # first run / source changes
+#   docker compose up                  # cached
+#   docker compose down -v             # stop + wipe volume
 
 services:
   steward:
     build:
       context: .
       dockerfile: Dockerfile
+      # Default runtime stage: minimal image, no source / dev deps / git.
+      # Override files (docker-compose.evolve.yml, docker-compose.shared.yml)
+      # flip this to `runtime-evolve`. Without an explicit target compose
+      # builds the *last* Dockerfile stage (= evolve), which we don't want as
+      # the default — minimal is smaller and faster for smoke tests.
+      target: runtime-minimal
       additional_contexts:
         mdart: "${MDART_DIR:-/home/ubuntu/mdart/packages/mdart}"
-    container_name: claude-steward
+    container_name: opencode-steward
     restart: unless-stopped
 
     ports:
-      - "13001:3001"   # main HTTP API + static files → nginx test.steward.jradoo.com
-      - "13003:3003"   # safe-mode fallback
+      - "23001:3001"   # main HTTP API + static files
+      - "23003:3003"   # safe-mode fallback
 
     volumes:
-      # SQLite database — named volume so it persists across container restarts
-      - steward-data:/data
-
-      # Optional: mount a .env for APP_DOMAIN, VAPID_*, etc.
+      # SQLite database — separate named volume, isolated from claude-steward
+      - opencode-steward-data:/data
+      # Optional: mount a .env for APP_DOMAIN / VAPID_*, etc.
       # - ./docker/.env.container:/app/.env:ro
 
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/data/steward.db
-      - APP_DOMAIN=test.steward.jradoo.com
+      - APP_DOMAIN=${OPENCODE_APP_DOMAIN:-opencode-test.steward.jradoo.com}
       # API_KEY: set this to log in via "Sign in directly" (no passkey needed for test).
       # Use a secret value; omit or leave empty to disable key-based login.
       - API_KEY=${API_KEY:-}
-      # Claude CLI is installed globally by npm install -g in the Dockerfile
-      - CLAUDE_PATH=/usr/local/bin/claude
-      # Long-lived OAuth token generated via `claude setup-token`.
-      # Independent of the host's rotating ~/.claude/.credentials.json, so
-      # running the container cannot invalidate the host's session — even
-      # though it's the same Claude account.
-      - CLAUDE_CODE_OAUTH_TOKEN=${STEWARD_TEST_OAUTH_TOKEN:-}
-      # Explicitly absent: ANTHROPIC_API_KEY (entrypoint also unsets it)
 
+      # Adapter selection — see server/src/cli/index.ts
+      - STEWARD_CLI=${STEWARD_CLI:-opencode}
+
+      # Claude CLI: still installed in the image as a fallback / for parity tests.
+      # OAuth token is independent of host's rotating credentials — same Anthropic
+      # account but a separate non-rotating grant, safe for containers.
+      - CLAUDE_PATH=/usr/local/bin/claude
+      - CLAUDE_CODE_OAUTH_TOKEN=${STEWARD_TEST_OAUTH_TOKEN:-}
+
+      # opencode CLI: provider keys passed through. opencode reads either env or
+      # ~/.local/share/opencode/auth.json; entrypoint will reconcile if needed.
+      # Note: opencode's `auth list` detects GEMINI_API_KEY, but the underlying
+      # AI-SDK Google provider call requires GOOGLE_GENERATIVE_AI_API_KEY. We
+      # populate both from the host's single GEMINI_API_KEY var so users only
+      # have to set one thing in .env.
+      - OPENCODE_PATH=/usr/local/bin/opencode
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - GOOGLE_GENERATIVE_AI_API_KEY=${GEMINI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Default model when a session doesn't pick one (opencode: provider/model).
+      # `google/gemma-4-31b-it` = Gemma 4 31B on the same Gemini API key. Override in .env if needed.
+      - OPENCODE_DEFAULT_MODEL=${OPENCODE_DEFAULT_MODEL:-google/gemma-4-31b-it}
+
+    # Defense in depth: cap container resource usage so a runaway agent
+    # process can't take the host down (lesson from the cline 09:14 lockup).
+    deploy:
+      resources:
+        limits:
+          memory: 1500M
+          cpus: '1.5'
+
+    # Healthcheck uses node (always present in the runtime image) instead of
+    # curl/wget which aren't installed in node:23-slim. Pre-fix this was
+    # logging a curl-not-found error every 10s for 800+ rounds.
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/api/meta"]
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://localhost:3001/api/meta').then(r=>r.ok?process.exit(0):process.exit(1)).catch(()=>process.exit(1))"
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 15s
+      start_period: 20s
 
 volumes:
-  steward-data:
+  opencode-steward-data:
     driver: local

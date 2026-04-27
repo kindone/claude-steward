@@ -1,0 +1,27 @@
+# OpenCode Steward — `evolve` mode override
+#
+# Builds and runs the runtime-evolve stage instead of runtime-minimal.
+# The image carries the full source tree, dev dependencies (tsc, vite,
+# vitest), and git, so the in-container steward can run its own self-upgrade
+# loop (edit source → npm run build → POST /api/admin/reload) without any
+# host involvement.
+#
+# Trade-offs vs minimal:
+#   + container is fully self-contained — can evolve independently of host
+#   + git history baked in for `git log` / `git diff` / commits inside container
+#   - image is ~300–500 MB larger
+#   - rebuilds cost more CPU/IO since dev deps + source must reinstall
+#
+# Everything else (ports, volumes, env, healthcheck, resource limits)
+# inherits from docker-compose.yml unchanged.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.evolve.yml up --build
+#
+# Tip: alias it in your shell —
+#   alias dce='docker compose -f docker-compose.yml -f docker-compose.evolve.yml'
+
+services:
+  steward:
+    build:
+      target: runtime-evolve
