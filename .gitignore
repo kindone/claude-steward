@@ -9,7 +9,12 @@ uploads/
 server/data/
 
 # Environment
+# Catch every .env.<suffix> variant (.env.local, .env.production, .env.before-*,
+# etc.) so cleanup-style backups can't slip into a commit. .env.example is the
+# documented template so it must stay tracked — explicit negation keeps it.
 .env
+.env.*
+!.env.example
 client/.env.local
 
 # Build output served by Express during production
