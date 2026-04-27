@@ -51,6 +51,19 @@ services:
     volumes:
       # SQLite database — separate named volume, isolated from claude-steward
       - opencode-steward-data:/data
+
+      # opencode CLI session state (per-conversation history, snapshots,
+      # SQLite db). Without this volume, every `docker compose up --build`
+      # gives the container a fresh writable layer and wipes opencode's
+      # session store, leaving steward's DB with stale `ses_xxx` pointers
+      # that opencode can't resolve ("Session not found"). Persisting it in
+      # a named volume keeps prior conversations resumable across rebuilds.
+      - opencode-state:/root/.local/share/opencode
+      # opencode also writes a small cache + state dir; persist for parity
+      # so any cross-run state (auth handshakes, model index) survives too.
+      - opencode-cache:/root/.cache/opencode
+      - opencode-runtime-state:/root/.local/state/opencode
+
       # Optional: mount a .env for APP_DOMAIN / VAPID_*, etc.
       # - ./docker/.env.container:/app/.env:ro
 
@@ -109,4 +122,11 @@ services:
 
 volumes:
   opencode-steward-data:
+    driver: local
+  # opencode CLI session storage — see service `volumes:` above.
+  opencode-state:
+    driver: local
+  opencode-cache:
+    driver: local
+  opencode-runtime-state:
     driver: local
