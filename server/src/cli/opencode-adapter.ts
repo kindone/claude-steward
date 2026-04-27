@@ -61,9 +61,15 @@ import { defaultUserMessageForErrorCode } from './types.js'
 import path from 'node:path'
 
 // Allow overriding the opencode binary path via env var. Default to the
-// Dockerfile-installed location.
+// official installer's actual destination — `curl -fsSL https://opencode.ai/install | bash`
+// drops the binary at $HOME/.opencode/bin/opencode. Mirrors the claude-adapter
+// pattern (which defaults to $HOME/.local/bin/claude). Container builds end up
+// at /root/.opencode/bin/opencode (HOME=/root) so the same default works there
+// without the Dockerfile's symlink to /usr/local/bin/opencode (which becomes
+// redundant — kept for now for back-compat with anything else that points at
+// /usr/local/bin).
 function resolveBinary(): string {
-  return process.env.OPENCODE_PATH ?? '/usr/local/bin/opencode'
+  return process.env.OPENCODE_PATH ?? `${process.env.HOME ?? '/root'}/.opencode/bin/opencode`
 }
 
 const CAPABILITIES: CliCapabilities = {
