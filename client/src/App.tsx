@@ -137,10 +137,15 @@ export default function App() {
   // Keep sessionsRef in sync so the SW message handler always has the latest list
   useEffect(() => { sessionsRef.current = sessions }, [sessions])
 
-  // Clear ?session= / ?project= URL params immediately so they don't persist in browser history
+  // Clear ?session= / ?project= URL *query* params after we've read them into
+  // pendingRefs above — these are one-shot push-notification tokens, not the
+  // tab's persistent state. The persistent state lives in the URL *hash*
+  // (`#project=...&session=...`), which sessionPersistence.ts maintains and
+  // which we deliberately preserve here so refresh / browser-restart can
+  // restore the right session on this tab.
   useEffect(() => {
     if (pendingSessionIdRef.current || pendingProjectIdRef.current) {
-      window.history.replaceState({}, '', window.location.pathname)
+      window.history.replaceState({}, '', window.location.pathname + window.location.hash)
     }
   }, [])
 

@@ -1,22 +1,37 @@
 /**
  * Per-tab persistence of the last-active project + session, so refresh
- * resumes the right chat in each tab.
+ * (and full browser restart) resumes the right chat in each tab.
  *
- * Why two stores:
- *   - sessionStorage is scoped to the browsing context (tab), survives refresh,
- *     and dies on tab close. Used as the *primary* read/write so each tab
- *     remembers its own session independently.
- *   - localStorage is shared across all tabs of the same origin. Used as a
- *     *fallback* on read — when a brand-new tab opens without its own session
- *     history, it falls back to "last-used session anywhere" from localStorage.
- *     Also written on save so the fallback stays fresh.
+ * Three layers, consulted in this order on read and written together on save:
  *
- * The previous implementation used only localStorage, which caused multi-tab
- * users to lose their tab's session on refresh: whichever tab most recently
- * changed state overwrote the shared key, and every other tab refreshing
- * after that would resume *that* session instead of its own.
+ *   1. URL hash fragment — `#project=<id>&session=<id>`. Most durable.
+ *      Browsers preserve a tab's URL across refresh, app close, and *full
+ *      browser restart* (Android Chrome, iOS Safari) even when sessionStorage
+ *      is wiped. Hash fragments are not sent in HTTP requests, so they
+ *      don't appear in server logs / referrer headers. Mutated via
+ *      `history.replaceState` (no new history entries).
+ *
+ *   2. sessionStorage — per-tab, survives refresh on most browsers but is
+ *      often wiped on full mobile browser restart. Useful as a redundant
+ *      backup on desktop where the URL might be edited away.
+ *
+ *   3. localStorage — shared across all tabs of the origin. Used as a
+ *      *fallback* on read so a brand-new tab (no URL params, empty
+ *      sessionStorage) opens to the last-used session anywhere. Also
+ *      written on save so that fallback stays fresh.
+ *
+ * The original implementation used only localStorage. That broke for
+ * multi-tab users: tabs raced over a single shared key, so refreshing one
+ * tab would resume whichever session another tab had most recently
+ * touched. Adding sessionStorage fixed refresh-within-a-session, but
+ * mobile browsers wipe sessionStorage on full app reopen, collapsing all
+ * restored tabs back onto the same localStorage value. The hash fragment
+ * is the only per-tab data browsers reliably preserve across full
+ * restart, which is why it's now the primary store.
  */
 export const LAST_STATE_KEY = 'steward:lastState'
+const HASH_PROJECT_KEY = 'project'
+const HASH_SESSION_KEY = 'session'
 
 export type LastState = {
   projectId: string | null
@@ -34,12 +49,80 @@ function isValidLastState(value: unknown): value is LastState {
 }
 
 /**
- * Read the last-active state for this tab. Prefers sessionStorage (per-tab,
- * survives refresh), falls back to localStorage (cross-tab default for new
- * tabs). Returns `{ projectId: null, sessionId: null }` if nothing is stored
- * or if storage is unavailable / contains invalid JSON.
+ * Parse the URL hash into URLSearchParams. Strips the leading `#` if
+ * present. Returns an empty params object if the hash is malformed.
+ */
+function parseHashParams(hash: string): URLSearchParams {
+  try {
+    return new URLSearchParams(hash.startsWith('#') ? hash.slice(1) : hash)
+  } catch {
+    return new URLSearchParams()
+  }
+}
+
+/**
+ * Read state from the URL hash. Returns `null` (signalling "fall through
+ * to next source") unless *both* keys are present — partial hashes are
+ * treated as missing rather than mixed-source state, since the writer
+ * always emits the pair atomically.
+ */
+export function readHashState(): LastState | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const params = parseHashParams(window.location.hash)
+    const projectId = params.get(HASH_PROJECT_KEY)
+    const sessionId = params.get(HASH_SESSION_KEY)
+    if (!projectId || !sessionId) return null
+    return { projectId, sessionId }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Update the URL hash to `#project=<id>&session=<id>` via
+ * `history.replaceState` so we don't pollute browser history. Other parts
+ * of the URL (pathname, search) are preserved. Any non-steward keys
+ * already in the hash are also preserved so we don't stomp on third-party
+ * use of the hash (e.g. anchor links).
+ *
+ * If either id is null, the entire steward pair is removed from the hash
+ * — we never want a half-written hash.
+ */
+export function writeHashState(projectId: string | null, sessionId: string | null): void {
+  if (typeof window === 'undefined') return
+  try {
+    const params = parseHashParams(window.location.hash)
+    if (projectId && sessionId) {
+      params.set(HASH_PROJECT_KEY, projectId)
+      params.set(HASH_SESSION_KEY, sessionId)
+    } else {
+      params.delete(HASH_PROJECT_KEY)
+      params.delete(HASH_SESSION_KEY)
+    }
+    const url = new URL(window.location.href)
+    const hashStr = params.toString()
+    url.hash = hashStr // empty string clears the hash
+    window.history.replaceState({}, '', url.toString())
+  } catch {
+    // window.history may be unavailable in some embedded contexts; non-fatal.
+  }
+}
+
+/**
+ * Read the last-active state for this tab.
+ *
+ * Priority: hash fragment → sessionStorage → localStorage. Returns
+ * `{ projectId: null, sessionId: null }` if nothing is stored, none of
+ * the sources are accessible, or all stored values are invalid.
  */
 export function readLastState(): LastState {
+  // 1. URL hash — most durable, survives Android browser restart
+  const fromHash = readHashState()
+  if (fromHash) return fromHash
+
+  // 2. sessionStorage (per-tab, refresh-survivable)
+  // 3. localStorage (cross-tab, "new tab default")
   for (const storage of candidateStorages()) {
     try {
       const raw = storage.getItem(LAST_STATE_KEY)
@@ -47,27 +130,27 @@ export function readLastState(): LastState {
       const parsed = JSON.parse(raw) as unknown
       if (isValidLastState(parsed)) return parsed
     } catch {
-      // Storage unavailable (e.g. private mode, quota, CSP) or parse failed —
-      // try the next storage, then fall through to EMPTY.
+      // Storage unavailable (private mode, quota, CSP) or invalid JSON —
+      // try the next source, then fall through to EMPTY.
     }
   }
   return EMPTY
 }
 
 /**
- * Save the last-active state. Writes to both sessionStorage (so this tab
- * resumes the right session on refresh) and localStorage (so newly opened
- * tabs default to the last-used session). Each write is independently
- * guarded so a quota/private-mode error in one doesn't skip the other.
+ * Save the last-active state to all three sources. Each write is
+ * independently try-guarded so a quota/private-mode error in one doesn't
+ * skip the others — mobile browsers in particular often allow only some
+ * of {hash, sessionStorage, localStorage}.
  */
 export function saveLastState(projectId: string | null, sessionId: string | null): void {
+  writeHashState(projectId, sessionId)
   const value = JSON.stringify({ projectId, sessionId })
   for (const storage of candidateStorages()) {
     try {
       storage.setItem(LAST_STATE_KEY, value)
     } catch {
-      // Ignore individual storage failures. A private-window sessionStorage
-      // quota error shouldn't prevent the localStorage write from succeeding.
+      // Ignore individual storage failures.
     }
   }
 }
