@@ -3,10 +3,15 @@
 How the opencode-CLI experiment lives outside this repo, what it proved, and
 what we plan to merge back into `claude-steward` (this repo).
 
-> **Status (Apr 2026)** — experiment succeeded (gemma chat via `opencode run`
-> works end-to-end). Merge back is planned but **not yet started**. Sessions,
-> memory, artifacts, and scheduler state all live in this repo; the experiment
-> repo is a sibling clone we don't want to keep diverging.
+> **Status (Apr 2026) — MERGED.** The work described here landed on `main`
+> in this repo on 2026-04-27. Both repos (claude-steward, opencode-steward)
+> now share the merged history through `origin/main`. The experimental
+> `opencode` branch is preserved on the remote for reference but is no
+> longer the source of truth — `main` is.
+>
+> See `archived_tasks.md` ("Multi-CLI foundation merged from opencode-
+> steward") for the shipped checklist; this doc is kept as the design /
+> decision-log artifact.
 >
 > **Project identity:** the repo / package name `claude-steward` is kept for
 > continuity, but the project itself is **no longer Claude-only** as of this
@@ -138,28 +143,40 @@ genuinely wants to migrate a conversation across CLIs (see TODO.md
 
 ---
 
-## Merge-back plan (high level)
+## Merge-back plan ✓ executed Apr 2026
 
-1. **Sync upstream first.** Bring `opencode-steward/main` up to current
-   `claude-steward/main`. This minimises the diff that has to be reviewed
-   in step 2.
-2. **Cherry-pick or three-way merge the 8 ahead-commits** into a feature
-   branch in this repo. Order roughly: docs/AGENTS split → schema →
-   adapter interface + claude adapter → opencode adapter → MCP sync →
-   docker volume mounts → recover.mjs / PM2 fixes.
-3. **Strip the mid-session swap.** Remove `updateCli`, the PATCH handler
-   for `cli`, and the prepared statement. Update any tests that
-   exercised it.
-4. **Verify**: `npm test` (server fast suite covering the adapter
-   interface and MCP sync), then `npm run test:e2e` (hits real Claude
-   CLI), then a manual smoke of an opencode session if `OPENCODE_BINARY`
-   is configured locally.
-5. **Update `TODO.md`** — move the foundation entry from
-   "Multi-CLI Support" planned to "shipped"; the future clone-with-CLI
-   bullet stays.
-6. **Update `MEMORY.md`** with a one-line entry pointing here, since
-   the merge represents a significant architectural shift agents will
-   need to understand.
+The actual sequence used (slightly different from the original plan because
+opencode-steward and claude-steward share an `origin`):
+
+1. **Sync claude-steward → origin** — pushed 40 ahead-commits to make
+   `origin/main` reflect canonical claude-steward state.
+2. **Sync opencode-steward** — fast-forwarded its `main` to the same
+   commit, then rebased the `opencode` branch on top (one trivial
+   `docker-compose.yml` conflict; 3 of the 8 ahead-commits were
+   already-applied cherry-picks and were skipped).
+3. **Land UI commit on opencode** — the explicit-CLI popover and the
+   strip of the client-side mid-session-swap UI. Pushed.
+4. **Fast-forward main = opencode in opencode-steward** — since opencode
+   was strictly ahead, `git merge --ff-only opencode` with no merge
+   commit gave linear history.
+5. **Strip-commit on main** — removed the now-dead swap path on the
+   server side: `sessionQueries.updateCli`, `updateCliStmt`, the PATCH
+   `cli` handler, the `updateSessionCli` client helper, and the
+   swap-related tests; replaced with one immutability assertion.
+6. **Push opencode-steward main → origin** — single push with both
+   commits so consumers fetch a coherent state.
+7. **Sync claude-steward** — `git fetch && git merge --ff-only
+   origin/main`. Trivial, no rebase needed (no local divergence).
+8. **Verify** — `npm run build` (client + server, sequential per memory
+   rules) and `npm test` (fast suite: 21 server + 14 client = 360
+   tests) green in both repos at the post-merge commit. `test:e2e` not
+   re-run on the merge — same Claude-CLI plumbing, low regression risk.
+9. **Doc updates in claude-steward** — moved the merge task into
+   `archived_tasks.md`; rewrote this status block to reflect ship.
+
+Open follow-up tracked in `TODO.md` "Multi-CLI Support":
+- Session clone with different CLI (escape hatch for the immutable
+  binding; tool-call fidelity is the unsolved problem).
 
 ---
 

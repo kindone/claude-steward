@@ -2,6 +2,16 @@
 
 ## Done
 
+- [x] **Multi-CLI foundation merged from opencode-steward** *(Apr 2026)* — pluggable `CliAdapter` abstraction lets a session be driven by either Claude CLI or opencode. End-to-end gemma chat via `opencode run` works. Shipped in this repo:
+  - `server/src/cli/{types,claude-adapter,opencode-adapter,index}.ts` — interface + per-CLI implementations + registry/dispatch
+  - `sessions.cli` column (NOT NULL, env-driven migration default) — `claude_session_id` column kept under that name
+  - `POST /api/sessions` accepts `cli` at creation; **`PATCH` is intentionally immutable** per the per-session-CLI decision (no mid-session swap)
+  - MCP schema translator (`syncOpencodeSettings()`) for opencode's different config file + schema
+  - `AGENTS.md` + slimmer `CLAUDE.md` + new `docs/agents/opencode.md` per-CLI guidance
+  - Docker volume mounts for opencode session storage (`opencode-state`, `opencode-cache`, `opencode-runtime-state`); vendor-neutral `steward-*` volume names for everything else
+  - `recover.mjs` + PM2 ecosystem configs respect `DATABASE_PATH` env
+  - UI: + button in session sidebar opens a popover forcing explicit CLI choice; flat two-button empty state; `Cmd+N` opens sidebar (so popover is reachable) on multi-adapter deploys; mid-session swap dropdown removed; CLI shown read-only in debug panel
+  - `safe/` stays Claude-only (frozen per CLAUDE.md). Stripped on merge: `sessionQueries.updateCli`, `updateCliStmt`, the PATCH `cli` handler in routes/sessions.ts, the swap-related session tests, and the `updateSessionCli` client helper. See `docs/multi-cli-merge.md` for the full plan and `b1836ee` for the strip commit. Future follow-up: session clone with different CLI (still on TODO.md).
 - [x] **MVP: monorepo scaffold** — npm workspaces, `server/` + `client/`, `concurrently` dev script
 - [x] **Express server** — auth middleware, CORS, dotenv with explicit root path, prod static serving
 - [x] **SQLite sessions** — `node:sqlite` (built-in), WAL mode, two-ID session design (`id` + `claude_session_id`)
