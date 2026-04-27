@@ -17,6 +17,10 @@ export type StartCmd = {
   permissionMode: string | null
   systemPrompt: string | null
   model?: string | null
+  /** Adapter for this turn (claude / opencode). Optional for back-compat
+   *  with HTTP servers that haven't been redeployed; absent → worker uses
+   *  STEWARD_CLI env default. */
+  cli?: 'claude' | 'opencode' | null
 }
 
 export type StopCmd = {

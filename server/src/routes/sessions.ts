@@ -1,10 +1,11 @@
 import { Router } from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import { sessionQueries, messageQueries, projectQueries, scheduleQueries, type PermissionMode } from '../db/index.js'
+import { sessionQueries, messageQueries, projectQueries, scheduleQueries, type PermissionMode, type CliName } from '../db/index.js'
 import { addWatcher, removeWatcher, addSubscriber, removeSubscriber } from '../lib/sessionWatchers.js'
 import { runClaudePrompt } from '../claude/process.js'
 
 const VALID_MODES = new Set<PermissionMode>(['default', 'plan', 'acceptEdits', 'bypassPermissions'])
+const VALID_CLIS = new Set<CliName>(['claude', 'opencode'])
 
 const router = Router()
 
@@ -17,14 +18,24 @@ router.get('/', (req, res) => {
 })
 
 router.post('/', (req, res) => {
-  const { projectId } = req.body as { projectId?: string }
+  const { projectId, cli } = req.body as { projectId?: string; cli?: string }
   if (!projectId || typeof projectId !== 'string') {
     res.status(400).json({ error: 'projectId is required' })
     return
   }
+  // `cli` is optional — when omitted, the queries layer applies the
+  // STEWARD_CLI-derived default. When present, it must be a known adapter.
+  let cliName: CliName | undefined
+  if (cli !== undefined) {
+    if (typeof cli !== 'string' || !VALID_CLIS.has(cli as CliName)) {
+      res.status(400).json({ error: `invalid cli: ${cli}` })
+      return
+    }
+    cliName = cli as CliName
+  }
   const id = uuidv4()
   const project = projectQueries.findById(projectId)
-  const session = sessionQueries.create(id, 'New Chat', projectId, project?.system_prompt)
+  const session = sessionQueries.create(id, 'New Chat', projectId, project?.system_prompt, cliName)
   res.status(201).json(session)
 })
 
@@ -133,7 +144,7 @@ router.patch('/:id', (req, res) => {
     res.status(404).json({ error: 'Session not found' })
     return
   }
-  const { title, systemPrompt, permissionMode, timezone, model } = req.body as { title?: string; systemPrompt?: string | null; permissionMode?: string; timezone?: string; model?: string | null }
+  const { title, systemPrompt, permissionMode, timezone, model, cli } = req.body as { title?: string; systemPrompt?: string | null; permissionMode?: string; timezone?: string; model?: string | null; cli?: string }
 
   if (title !== undefined) {
     if (!title || typeof title !== 'string' || !title.trim()) {
@@ -170,6 +181,23 @@ router.patch('/:id', (req, res) => {
     const value = typeof model === 'string' && model.trim() ? model.trim() : null
     sessionQueries.updateModel(value, req.params.id)
     session.model = value
+  }
+
+  // Adapter switch is destructive: clears claude_session_id (the previous
+  // CLI's handle is opaque to the new CLI) and clears `model` (slug shape
+  // differs between adapters). Done atomically in updateCli. We intentionally
+  // skip the no-op case so a redundant PATCH doesn't churn the session.
+  if (cli !== undefined) {
+    if (typeof cli !== 'string' || !VALID_CLIS.has(cli as CliName)) {
+      res.status(400).json({ error: `cli must be one of: ${[...VALID_CLIS].join(', ')}` })
+      return
+    }
+    if ((cli as CliName) !== session.cli) {
+      sessionQueries.updateCli(cli as CliName, req.params.id)
+      session.cli = cli as CliName
+      session.claude_session_id = null
+      session.model = null
+    }
   }
 
   res.json(session)

@@ -11,6 +11,7 @@ import { extractToolDetail } from '../claude/toolDetail.js'
 import { workerClient } from '../worker/client.js'
 import { buildEffectiveSystemPrompt } from '../lib/schedulePrompt.js'
 import { resolveArtifactMentions } from '../lib/artifactMentions.js'
+import { applyOpencodeToolUseToMap, opencodeTextFromChunk } from '../lib/opencodeToolChunk.js'
 
 /**
  * Normalize a tool_result content value to a plain string.
@@ -172,6 +173,10 @@ router.post('/', (req, res) => {
             const delta = ((c.event as Record<string, unknown>)?.delta as Record<string, unknown>)
             if (delta?.type === 'text_delta') streamingText += String(delta.text ?? '')
           }
+          // opencode run --format json: whole text lines (not stream_event)
+          if (c.type === 'text') {
+            streamingText += opencodeTextFromChunk(c)
+          }
           // Capture assembled tool calls from assistant chunks
           if (c.type === 'assistant') {
             const content = (c.message as Record<string, unknown>)?.content as Array<Record<string, unknown>> ?? []
@@ -197,6 +202,10 @@ router.post('/', (req, res) => {
                 }
               }
             }
+          }
+          // opencode: one JSON line with tool + result (type: tool_use)
+          if (c.type === 'tool_use') {
+            applyOpencodeToolUseToMap(c, toolCallsMap)
           }
           break
         }
@@ -232,6 +241,7 @@ router.post('/', (req, res) => {
       permissionMode: session.permission_mode,
       systemPrompt: buildEffectiveSystemPrompt(session),
       model: session.model,
+      cli: session.cli,
     })
 
     res.on('close', () => {
@@ -257,6 +267,7 @@ router.post('/', (req, res) => {
     systemPrompt: buildEffectiveSystemPrompt(session),
     permissionMode: session.permission_mode,
     model: session.model,
+    cli: session.cli,
     res,
     signal: controller.signal,
     cwd: project?.path,

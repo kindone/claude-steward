@@ -15,6 +15,7 @@ import { messageQueries, markStaleStreamingMessages } from '../db/index.js'
 import { notifyWatchers, notifySubscribers } from '../lib/sessionWatchers.js'
 import { workerClient } from './client.js'
 import type { WorkerEvent } from './protocol.js'
+import { applyOpencodeToolUseToMap, opencodeTextFromChunk } from '../lib/opencodeToolChunk.js'
 
 const RECOVERY_TIMEOUT_MS = 30_000
 
@@ -90,6 +91,13 @@ export function recoverStreamingSessions(): void {
               messageQueries.updateStreamingContent(msg.id, streamingContent)
             }
           }
+          if (c.type === 'text') {
+            const t = opencodeTextFromChunk(c)
+            if (t) {
+              streamingContent += t
+              messageQueries.updateStreamingContent(msg.id, streamingContent)
+            }
+          }
           // Accumulate tool calls from assembled assistant chunks
           if (c.type === 'assistant') {
             const content = (c.message as Record<string, unknown>)?.content as Array<Record<string, unknown>> ?? []
@@ -115,6 +123,9 @@ export function recoverStreamingSessions(): void {
                 }
               }
             }
+          }
+          if (c.type === 'tool_use') {
+            applyOpencodeToolUseToMap(c, toolCallsMap)
           }
           break
         }

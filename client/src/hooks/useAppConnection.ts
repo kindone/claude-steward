@@ -10,6 +10,11 @@ export type AppConnection = {
 }
 
 type AppConnectionOpts = {
+  /**
+   * When false, do not open `/api/events` (avoids 401 while auth status is still loading
+   * or after logout). Defaults to true for callers that are always post-auth.
+   */
+  enabled?: boolean
   onReload?: () => void
   onPushTarget?: (target: { sessionId: string; projectId: string | null }) => void
   onSchedulesChanged?: (sessionId: string | null) => void
@@ -21,18 +26,23 @@ type AppConnectionOpts = {
  * Re-exports onReload/onPushTarget/onSchedulesChanged so callers don't need to call subscribeToAppEvents separately.
  */
 export function useAppConnection(opts?: AppConnectionOpts): AppConnection {
+  const { enabled = true, ...handlers } = opts ?? {}
   const [state, setState] = useState<ConnState>('connecting')
   const [lastSeenAt, setLastSeenAt] = useState<number | null>(null)
-  const onReloadRef = useRef(opts?.onReload)
-  onReloadRef.current = opts?.onReload
-  const onPushTargetRef = useRef(opts?.onPushTarget)
-  onPushTargetRef.current = opts?.onPushTarget
-  const onSchedulesChangedRef = useRef(opts?.onSchedulesChanged)
-  onSchedulesChangedRef.current = opts?.onSchedulesChanged
-  const onArtifactUpdatedRef = useRef(opts?.onArtifactUpdated)
-  onArtifactUpdatedRef.current = opts?.onArtifactUpdated
+  const onReloadRef = useRef(handlers.onReload)
+  onReloadRef.current = handlers.onReload
+  const onPushTargetRef = useRef(handlers.onPushTarget)
+  onPushTargetRef.current = handlers.onPushTarget
+  const onSchedulesChangedRef = useRef(handlers.onSchedulesChanged)
+  onSchedulesChangedRef.current = handlers.onSchedulesChanged
+  const onArtifactUpdatedRef = useRef(handlers.onArtifactUpdated)
+  onArtifactUpdatedRef.current = handlers.onArtifactUpdated
 
   useEffect(() => {
+    if (!enabled) {
+      setState('connecting')
+      return
+    }
     const cancel = subscribeToAppEvents({
       onReload: () => onReloadRef.current?.(),
       onPushTarget: (t) => onPushTargetRef.current?.(t),
@@ -46,7 +56,7 @@ export function useAppConnection(opts?: AppConnectionOpts): AppConnection {
       onActivity: () => setLastSeenAt(Date.now()),
     })
     return cancel
-  }, [])
+  }, [enabled])
 
   return { state, lastSeenAt }
 }

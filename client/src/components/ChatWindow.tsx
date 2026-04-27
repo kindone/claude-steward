@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, getSessionChain, updateSessionTimezone, listArtifacts, createArtifact, deriveArtifactName, toolDisplayName, toolDisplayDetail, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo, type Artifact, type ArtifactType } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, updateSessionCli, compactSession, getSessionChain, updateSessionTimezone, listArtifacts, createArtifact, deriveArtifactName, toolDisplayName, toolDisplayDetail, fetchMeta, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo, type Artifact, type ArtifactType, type ModelOption, type CliName, type AdapterInfo } from '../lib/api'
 import { CompactDivider } from './CompactDivider'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
@@ -8,15 +8,23 @@ const MODES: { value: PermissionMode; label: string; title: string }[] = [
   { value: 'bypassPermissions', label: 'Full', title: 'Claude can run any tool including shell commands' },
 ]
 
-/** Curated model list — the first entry is the default (null = server default).
- *  Names verified against the installed claude CLI. */
-const MODEL_OPTIONS: { value: string | null; label: string }[] = [
+/**
+ * Fallback model list used until /api/meta replies (or if it omits `models`,
+ * which can happen when an older server build is rolling out). Mirrors the
+ * Claude adapter's curated list — that's the production default since
+ * STEWARD_CLI defaults to `claude`.
+ *
+ * The runtime list comes from the active CliAdapter on the server, so a
+ * STEWARD_CLI=opencode deployment will see opencode `provider/model` slugs
+ * here as soon as the meta fetch resolves.
+ */
+const FALLBACK_MODEL_OPTIONS: ModelOption[] = [
   { value: null,                 label: 'Default' },
-  { value: 'claude-opus-4-6',   label: 'Opus 4.6' },
-  { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
-  { value: 'claude-opus-4-5',   label: 'Opus 4.5' },
-  { value: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
-  { value: 'claude-haiku-4-5',  label: 'Haiku 4.5' },
+  { value: 'claude-opus-4-6',    label: 'Opus 4.6' },
+  { value: 'claude-sonnet-4-6',  label: 'Sonnet 4.6' },
+  { value: 'claude-opus-4-5',    label: 'Opus 4.5' },
+  { value: 'claude-sonnet-4-5',  label: 'Sonnet 4.5' },
+  { value: 'claude-haiku-4-5',   label: 'Haiku 4.5' },
 ]
 import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
@@ -87,6 +95,7 @@ type Props = {
   permissionMode: PermissionMode
   timezone?: string | null
   model?: string | null
+  cli?: CliName
   claudeSessionId?: string | null
   projectId?: string | null
   onTitle?: (title: string) => void
@@ -94,6 +103,10 @@ type Props = {
   onSystemPromptChange?: (prompt: string | null) => void
   onPermissionModeChange?: (mode: PermissionMode) => void
   onModelChange?: (model: string | null) => void
+  /** Called after a successful CLI switch — the parent should refresh its
+   *  Session record (model + claude_session_id are cleared server-side as
+   *  part of the same transaction). */
+  onCliChange?: (cli: CliName) => void
   onCompact?: (newSessionId: string) => void
   /** Incremented by App when the server emits a schedules_changed SSE event. */
   schedulesTick?: number
@@ -103,7 +116,7 @@ type Props = {
   onOpenArtifact?: (artifact: Artifact) => void
 }
 
-export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact, schedulesTick = 0, artifactRefreshTick, onOpenArtifact }: Props) {
+export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, cli, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCliChange, onCompact, schedulesTick = 0, artifactRefreshTick, onOpenArtifact }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingSession, setLoadingSession] = useState(true)
@@ -123,6 +136,21 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   const [kernelRefreshTick, setKernelRefreshTick] = useState(0)
   // Artifacts for @mention autocomplete in MessageInput
   const [projectArtifacts, setProjectArtifacts] = useState<Artifact[]>([])
+  // Per-adapter info bundle (models + capabilities), fetched once on mount
+  // from /api/meta. Keyed by CLI name. Empty until the fetch resolves;
+  // model dropdown falls back to FALLBACK_MODEL_OPTIONS in that window.
+  const [adapters, setAdapters] = useState<Partial<Record<CliName, AdapterInfo>>>({})
+  // Default CLI surfaced by /api/meta — used for the dropdown selector when
+  // the session itself doesn't yet have an explicit `cli` field (older
+  // server builds that pre-date per-session-cli).
+  const [defaultCli, setDefaultCli] = useState<CliName | undefined>(undefined)
+  // The CLI picker reads from `cli` (prop, kept fresh by the parent) when
+  // present, else falls back to the meta `defaultCli`.
+  const effectiveCli: CliName | undefined = cli ?? defaultCli
+  // Model options for the picker reflect the *session's* adapter, not the
+  // deploy-default. Falls back to the legacy single-list shape if the
+  // server hasn't shipped the `adapters` bundle yet.
+  const modelOptions: ModelOption[] = (effectiveCli && adapters[effectiveCli]?.models) ?? FALLBACK_MODEL_OPTIONS
   // Past segments: frozen messages from compacted predecessors, shown above dividers.
   const [pastSegments, setPastSegments] = useState<(ChainSegment & { messages: Message[] })[]>([])
   // The tail session this ChatWindow is currently sending to (may differ from sessionId prop after compact).
@@ -184,6 +212,24 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
     setPromptOpen(false)
   }, [sessionId, systemPrompt])
 
+  // Fetch the adapter bundle from /api/meta. Mount-only — the supported
+  // adapter set + their models don't change without a server redeploy.
+  // Errors are non-fatal: the modelOptions selector falls back to the
+  // FALLBACK list when adapters/effectiveCli aren't populated yet.
+  useEffect(() => {
+    fetchMeta().then((m) => {
+      if (m.adapters) setAdapters(m.adapters)
+      if (m.defaultCli) setDefaultCli(m.defaultCli)
+      // Legacy single-adapter fallback: pre-Phase-1 servers only return
+      // `cli` + `models`. Materialise that into the adapters bundle so the
+      // selector still finds something to render against.
+      else if (m.cli && m.models) {
+        setAdapters({ [m.cli]: { models: m.models, capabilities: { streamingTokens: true, toolUseStructured: true, supportsMcp: true, branchResume: true } } } as Partial<Record<CliName, AdapterInfo>>)
+        setDefaultCli(m.cli)
+      }
+    }).catch(() => { /* keep fallback */ })
+  }, [])
+
   // Send browser timezone to server on session open so Claude can use it for scheduling
   useEffect(() => {
     try {
@@ -213,6 +259,24 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   async function handleModelChange(value: string | null) {
     await updateSessionModel(sessionId, value)
     onModelChange?.(value)
+  }
+
+  async function handleCliChange(value: CliName) {
+    if (value === effectiveCli) return  // no-op, server would noop too
+    // Switching adapter is destructive on the server (clears claude_session_id
+    // and model). Confirm so the user knows their visible chat history stays
+    // but the CLI's view of the conversation resets.
+    const confirmed = window.confirm(
+      `Switching to ${value} will reset the conversation context from the CLI's perspective.\n\n` +
+      `Your visible message history stays, but the new CLI will treat the next message as the start of a fresh conversation. ` +
+      `The model selection also clears (slug formats differ between adapters).\n\n` +
+      `Continue?`,
+    )
+    if (!confirmed) return
+    await updateSessionCli(sessionId, value)
+    onCliChange?.(value)
+    // Server cleared model as part of the same transaction; reflect locally.
+    onModelChange?.(null)
   }
 
   function handlePromptKeyDown(e: React.KeyboardEvent) {
@@ -719,6 +783,25 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
                 <span className="text-[11px] text-app-border-3 italic">none (not yet sent)</span>
               )}
             </div>
+            {/* CLI adapter picker — only render when the server actually
+                advertises more than one adapter. Single-adapter deploys
+                (no `adapters` bundle in /api/meta, or just one entry) hide
+                the row to avoid a useless control. */}
+            {Object.keys(adapters).length > 1 && (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-app-text-7 w-28 flex-shrink-0">CLI</span>
+                <select
+                  className="bg-app-bg border border-app-bg-hover hover:border-app-border-4 rounded text-app-text-4 cursor-pointer text-xs px-2 py-1 transition-colors outline-none"
+                  value={effectiveCli ?? ''}
+                  onChange={(e) => { void handleCliChange(e.target.value as CliName) }}
+                  title="CLI adapter for this session — switching resets the CLI's view of the conversation"
+                >
+                  {(Object.keys(adapters) as CliName[]).map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-app-text-7 w-28 flex-shrink-0">model</span>
               <select
@@ -727,7 +810,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
                 onChange={(e) => handleModelChange(e.target.value || null)}
                 title="Model for this session"
               >
-                {MODEL_OPTIONS.map((opt) => (
+                {modelOptions.map((opt) => (
                   <option key={opt.value ?? ''} value={opt.value ?? ''}>{opt.label}</option>
                 ))}
               </select>

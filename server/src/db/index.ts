@@ -160,6 +160,18 @@ try {
 try {
   db.exec(`ALTER TABLE sessions ADD COLUMN compacted_from TEXT REFERENCES sessions(id)`)
 } catch { /* already exists */ }
+// `cli` records which adapter (claude / opencode) drives a session. Default
+// is locked to whatever STEWARD_CLI is set to at first migration time, so
+// existing rows on a deployment get marked with that deployment's actual
+// adapter — claude-steward gets 'claude', opencode-steward gets 'opencode'.
+// After this column exists, every new session row sets `cli` explicitly via
+// the create route, so the default never matters again. NOT NULL plus the
+// env-driven default makes the post-merge picture unambiguous: every row in
+// the merged DB carries its real adapter without env-time fallback.
+try {
+  const defaultCli = (process.env.STEWARD_CLI === 'opencode') ? 'opencode' : 'claude'
+  db.exec(`ALTER TABLE sessions ADD COLUMN cli TEXT NOT NULL DEFAULT '${defaultCli}'`)
+} catch { /* already exists */ }
 try {
   db.exec(`ALTER TABLE schedules ADD COLUMN condition TEXT`)
 } catch { /* already exists */ }
@@ -265,6 +277,11 @@ export type Project = {
   created_at: number
 }
 
+/** Which CLI adapter drives a session. NOT NULL in the DB — every row has
+ *  an explicit value. See migration in this file for the env-driven default
+ *  used at first migration time. */
+export type CliName = 'claude' | 'opencode'
+
 export type Session = {
   id: string
   title: string
@@ -274,6 +291,7 @@ export type Session = {
   permission_mode: PermissionMode
   timezone: string | null
   model: string | null
+  cli: CliName
   compacted_from: string | null
   created_at: number
   updated_at: number
@@ -355,7 +373,7 @@ export const projectQueries = {
 // ── Session queries ───────────────────────────────────────────────────────────
 
 const createSessionStmt = db.prepare(
-  `INSERT INTO sessions (id, title, project_id, system_prompt) VALUES (?, ?, ?, ?) RETURNING *`
+  `INSERT INTO sessions (id, title, project_id, system_prompt, cli) VALUES (?, ?, ?, ?, ?) RETURNING *`
 )
 const findSessionByIdStmt = db.prepare(`SELECT * FROM sessions WHERE id = ?`)
 const listAllSessionsStmt = db.prepare(`SELECT * FROM sessions ORDER BY updated_at DESC`)
@@ -380,6 +398,14 @@ const updateTimezoneStmt = db.prepare(
 const updateModelStmt = db.prepare(
   `UPDATE sessions SET model = ?, updated_at = unixepoch() WHERE id = ?`
 )
+// Adapter switch carries side effects: the previous CLI's session handle
+// (claude_session_id) is meaningless to the new CLI, and the previous
+// adapter's model slug is almost certainly the wrong shape (Claude bare
+// slugs vs opencode `provider/model`). All three writes happen atomically
+// in updateCli below so a partial failure can't leave the row inconsistent.
+const updateCliStmt = db.prepare(
+  `UPDATE sessions SET cli = ?, claude_session_id = NULL, model = NULL, updated_at = unixepoch() WHERE id = ?`
+)
 const deleteSessionStmt = db.prepare(`DELETE FROM sessions WHERE id = ?`)
 const setCompactedFromStmt = db.prepare(
   `UPDATE sessions SET compacted_from = ? WHERE id = ?`
@@ -387,19 +413,26 @@ const setCompactedFromStmt = db.prepare(
 // Walk from a root session forward through the chain (root → child → grandchild…).
 // Returns all sessions in chronological order.
 const getChainStmt = db.prepare(`
-  WITH RECURSIVE chain(id, title, system_prompt, permission_mode, model, timezone, compacted_from, created_at, updated_at) AS (
-    SELECT id, title, system_prompt, permission_mode, model, timezone, compacted_from, created_at, updated_at
+  WITH RECURSIVE chain(id, title, system_prompt, permission_mode, model, cli, timezone, compacted_from, created_at, updated_at) AS (
+    SELECT id, title, system_prompt, permission_mode, model, cli, timezone, compacted_from, created_at, updated_at
     FROM sessions WHERE id = ?
     UNION ALL
-    SELECT s.id, s.title, s.system_prompt, s.permission_mode, s.model, s.timezone, s.compacted_from, s.created_at, s.updated_at
+    SELECT s.id, s.title, s.system_prompt, s.permission_mode, s.model, s.cli, s.timezone, s.compacted_from, s.created_at, s.updated_at
     FROM sessions s JOIN chain c ON s.compacted_from = c.id
   )
   SELECT * FROM chain ORDER BY created_at ASC
 `)
 
+/** Default CLI for new sessions whose creator didn't pick one explicitly.
+ *  Mirrors the migration default; resolved lazily so test envs that mutate
+ *  STEWARD_CLI after import time still take effect. */
+function defaultSessionCli(): CliName {
+  return process.env.STEWARD_CLI === 'opencode' ? 'opencode' : 'claude'
+}
+
 export const sessionQueries = {
-  create: (id: string, title: string, projectId?: string | null, systemPrompt?: string | null) =>
-    createSessionStmt.get(id, title, projectId ?? null, systemPrompt ?? null) as Session,
+  create: (id: string, title: string, projectId?: string | null, systemPrompt?: string | null, cli?: CliName) =>
+    createSessionStmt.get(id, title, projectId ?? null, systemPrompt ?? null, cli ?? defaultSessionCli()) as Session,
   findById: (id: string) => findSessionByIdStmt.get(id) as Session | undefined,
   list: () => listAllSessionsStmt.all() as Session[],
   listByProject: (projectId: string) =>
@@ -417,6 +450,9 @@ export const sessionQueries = {
     updateTimezoneStmt.run(timezone, id),
   updateModel: (model: string | null, id: string) =>
     updateModelStmt.run(model, id),
+  /** Switch the session's adapter. Atomically clears the previous CLI's
+   *  session handle and model — see updateCliStmt comment. */
+  updateCli: (cli: CliName, id: string) => updateCliStmt.run(cli, id),
   setCompactedFrom: (newId: string, fromId: string) =>
     setCompactedFromStmt.run(fromId, newId),
   getChain: (rootId: string) => getChainStmt.all(rootId) as Session[],

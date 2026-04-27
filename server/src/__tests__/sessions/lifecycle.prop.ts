@@ -72,7 +72,11 @@ const deleteAction = new SimpleAction<SessionState>((state) => {
 
 describe('session lifecycle — stateful property', () => {
 
-  it('count, scoping, and no-resurrection invariants hold across random create/delete sequences', () => {
+  // 15s timeout: this is a stateful property test that runs many random
+  // create/delete sequences against SQLite. Default 5s is tight under
+  // parallel test load (other suites running in worker threads compete for
+  // CPU). 15s gives headroom without changing the iteration depth.
+  it('count, scoping, and no-resurrection invariants hold across random create/delete sequences', { timeout: 15000 }, () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-prop-'))
 
     // initialGen: fresh isolated project for each test run.

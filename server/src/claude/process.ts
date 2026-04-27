@@ -1,65 +1,14 @@
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
 import type { Response } from 'express'
-import { buildCleanEnv } from './clean-env.js'
-
-type SystemInitChunk = {
-  type: 'system'
-  subtype: 'init'
-  session_id: string
-}
-
-type StreamEventChunk = {
-  type: 'stream_event'
-  event: {
-    type: string
-    index?: number
-    content_block?: { type: string; name?: string }
-    delta?: { type: string; text: string }
-  }
-}
-
-type AssistantChunk = {
-  type: 'assistant'
-  message: { content: Array<{ type: string; id?: string; name?: string; text?: string; input?: Record<string, unknown> }> }
-}
-
-type UserChunk = {
-  type: 'user'
-  message: {
-    role: 'user'
-    content: Array<{
-      type: 'tool_result'
-      tool_use_id: string
-      content: string
-      is_error: boolean
-    }>
-  }
-  tool_use_result?: {
-    stdout: string
-    stderr: string
-    interrupted: boolean
-    isImage: boolean
-  }
-}
-
-type ResultChunk = {
-  type: 'result'
-  subtype: string
-  result: string
-  session_id: string
-  is_error: boolean
-  errors?: string[]
-  usage?: { input_tokens: number; output_tokens: number }
-  total_cost_usd?: number
-}
-
-type ClaudeChunk = SystemInitChunk | StreamEventChunk | AssistantChunk | UserChunk | ResultChunk
+import { getAdapter } from '../cli/index.js'
+import type { ErrorCode } from '../cli/types.js'
+import { defaultUserMessageForErrorCode } from '../cli/types.js'
 
 export type ClaudeError = {
   message: string
-  /** 'session_expired' when a --resume attempt failed; 'context_limit' when context window exceeded; 'process_error' for other failures */
-  code: 'session_expired' | 'context_limit' | 'process_error'
+  /** session_expired | context_limit | provider_quota | process_error */
+  code: ErrorCode
   detail?: string
 }
 
@@ -69,6 +18,9 @@ export type SpawnOptions = {
   systemPrompt?: string | null
   permissionMode?: string | null
   model?: string | null
+  /** Adapter for this turn. Optional for back-compat; absent → STEWARD_CLI
+   *  env default. New call sites should pass session.cli. */
+  cli?: 'claude' | 'opencode' | null
   res: Response
   onSessionId: (id: string) => void
   onComplete?: (text: string) => void
@@ -83,46 +35,26 @@ function sendSseEvent(res: Response, event: string, data: unknown): void {
   res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)
 }
 
-// Allow overriding the claude binary path via env var, with ~/.local/bin fallback
-const CLAUDE_BIN = process.env.CLAUDE_PATH ?? `${process.env.HOME ?? '/usr/local'}/.local/bin/claude`
-
-export function spawnClaude({ message, claudeSessionId, systemPrompt, permissionMode, model, res, onSessionId, onComplete, onError, onToolResult, signal, cwd }: SpawnOptions): void {
-  const args = [
-    '--print', message,
-    '--output-format', 'stream-json',
-    '--verbose',
-    '--include-partial-messages',
-  ]
-
-  if (claudeSessionId) {
-    args.push('--resume', claudeSessionId)
+export function spawnClaude({ message, claudeSessionId, systemPrompt, permissionMode, model, cli, res, onSessionId, onComplete, onError, onToolResult, signal, cwd }: SpawnOptions): void {
+  // All Claude-specific knowledge — binary path, args, env policy, parsing,
+  // and error classification — lives behind the CliAdapter interface. This
+  // function now owns only the spawn lifecycle (process, readline, abort,
+  // close handlers) and the SSE response shape.
+  const adapter = getAdapter(cli ?? undefined)
+  const launchOpts = {
+    prompt: message,
+    resumeId: claudeSessionId,
+    systemPrompt: systemPrompt ?? null,
+    permissionMode: permissionMode ?? null,
+    model: model ?? null,
+    mcpConfigPath: process.env.MCP_CONFIG_PATH ?? null,
+    workingDirectory: cwd ?? null,
   }
+  const args = adapter.buildArgs(launchOpts)
+  const cleanEnv = adapter.buildEnv(process.env)
+  const parser = adapter.createParser(launchOpts)
 
-  if (systemPrompt) {
-    args.push('--system-prompt', systemPrompt)
-  }
-
-  // 'default' means interactive prompts — unusable in our non-interactive spawn;
-  // skip the flag entirely and let Claude use its own default (which may stall).
-  // All other modes are passed explicitly.
-  if (permissionMode && permissionMode !== 'default') {
-    args.push('--permission-mode', permissionMode)
-  }
-
-  if (model) {
-    args.push('--model', model)
-  }
-
-  // MCP schedule tools — same as the worker path.
-  if (process.env.MCP_CONFIG_PATH) {
-    args.push('--mcp-config', process.env.MCP_CONFIG_PATH)
-    args.push('--disallowed-tools', 'CronCreate,CronDelete')
-  }
-
-  // See buildCleanEnv() for the strip/allowlist policy (same in worker path).
-  const cleanEnv = buildCleanEnv(process.env)
-
-  const child = spawn(CLAUDE_BIN, args, {
+  const child = spawn(adapter.binaryPath(), args, {
     // CI=true suppresses TTY detection so claude writes to pipes correctly.
     // stdin: 'ignore' prevents blocking if claude tries to read from stdin.
     env: { ...cleanEnv, CI: 'true' },
@@ -138,7 +70,6 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
   })
 
   const rl = createInterface({ input: child.stdout, crlfDelay: Infinity })
-  let sessionIdEmitted = false
   let accumulatedText = ''
   let stderrOutput = ''
 
@@ -149,93 +80,54 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
   })
 
   rl.on('line', (line) => {
-    if (!line.trim()) return
+    const { rawChunk, events } = parser.parseLine(line)
+    if (rawChunk === null) return
 
-    let chunk: ClaudeChunk
-    try {
-      chunk = JSON.parse(line) as ClaudeChunk
-    } catch {
-      return
-    }
-
-    if (chunk.type === 'system' && chunk.subtype === 'init' && !sessionIdEmitted) {
-      sessionIdEmitted = true
-      onSessionId(chunk.session_id)
-    }
-
-    // New text block starting after a tool use — inject paragraph break
-    if (
-      chunk.type === 'stream_event' &&
-      chunk.event.type === 'content_block_start' &&
-      chunk.event.content_block?.type === 'text' &&
-      accumulatedText.length > 0 &&
-      !accumulatedText.endsWith('\n')
-    ) {
-      accumulatedText += '\n\n'
-    }
-
-    if (
-      chunk.type === 'stream_event' &&
-      chunk.event.type === 'content_block_delta' &&
-      chunk.event.delta?.type === 'text_delta'
-    ) {
-      accumulatedText += chunk.event.delta.text
-    }
-
-    if (chunk.type === 'user') {
-      for (const block of chunk.message?.content ?? []) {
-        if (block.type === 'tool_result') {
-          onToolResult?.(block.tool_use_id, block.content, block.is_error)
-        }
+    for (const ev of events) {
+      switch (ev.type) {
+        case 'session_id':
+          onSessionId(ev.externalId)
+          break
+        case 'text_block_start':
+          // New text block starting after a tool use — inject paragraph break.
+          if (accumulatedText.length > 0 && !accumulatedText.endsWith('\n')) {
+            accumulatedText += '\n\n'
+          }
+          break
+        case 'text_delta':
+          accumulatedText += ev.text
+          break
+        case 'tool_result':
+          onToolResult?.(ev.toolUseId, ev.output, ev.isError)
+          break
+        // tool_use is a no-op for the SSE path (consumer doesn't track tool calls
+        // here — the worker path does).
+        case 'tool_use':
+          break
+        case 'result_done':
+          break
+        case 'result_error':
+          break
       }
     }
 
-    sendSseEvent(res, 'chunk', chunk)
+    sendSseEvent(res, 'chunk', rawChunk)
 
-    if (chunk.type === 'result') {
-      if (chunk.is_error) {
-        // Claude exited cleanly (code 0) but reported a logical error in the result.
-        // "No conversation found with session ID" is the canonical resume-failure message.
-        const errorText = chunk.errors?.join('; ') || chunk.result || `Claude error: ${chunk.subtype}`
-        const lowerError = errorText.toLowerCase()
-        const isContextLimit =
-          lowerError.includes('context') ||
-          lowerError.includes('too long') ||
-          lowerError.includes('too many tokens') ||
-          lowerError.includes('maximum') ||
-          lowerError.includes('token limit')
-        const isOverload =
-          lowerError.includes('overload') ||
-          lowerError.includes('529')
-        const isSessionError = !isContextLimit && !isOverload && (
-          Boolean(claudeSessionId) ||
-          lowerError.includes('session') ||
-          lowerError.includes('conversation')
-        )
-        const claudeErr: ClaudeError = isContextLimit
-          ? {
-              message: 'Context limit reached — your next message will start a fresh conversation.',
-              code: 'context_limit',
-              detail: errorText,
-            }
-          : isSessionError
-          ? {
-              message: 'The previous session could not be resumed — your next message will start a fresh conversation.',
-              code: 'session_expired',
-              detail: errorText,
-            }
-          : {
-              message: errorText,
-              code: 'process_error',
-            }
+    // Terminal events fire after the SSE relay so the client sees the raw
+    // result chunk before the synthesized done/error.
+    for (const ev of events) {
+      if (ev.type === 'result_error') {
+        const claudeErr: ClaudeError = { message: ev.message, code: ev.code, detail: ev.detail }
         onError?.(claudeErr)
         sendSseEvent(res, 'error', claudeErr)
         if (!res.writableEnded) res.end()
         return
       }
-      onComplete?.(accumulatedText)
-      sendSseEvent(res, 'done', { session_id: chunk.session_id })
-      if (!res.writableEnded) res.end()
+      if (ev.type === 'result_done') {
+        onComplete?.(accumulatedText)
+        sendSseEvent(res, 'done', { session_id: ev.externalId })
+        if (!res.writableEnded) res.end()
+      }
     }
   })
 
@@ -254,20 +146,9 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
     }
     if (code !== 0 && !res.writableEnded) {
       const detail = stderrOutput.trim() || undefined
-      const lowerDetail = (detail ?? '').toLowerCase()
-      const isOverload = lowerDetail.includes('overload') || lowerDetail.includes('529')
-      const isResumeAttempt = !isOverload && Boolean(claudeSessionId)
-      const claudeErr: ClaudeError = isResumeAttempt
-        ? {
-            message: 'The previous Claude session could not be resumed. Your next message will start a fresh conversation.',
-            code: 'session_expired',
-            detail,
-          }
-        : {
-            message: detail ?? `Claude exited with code ${code}`,
-            code: 'process_error',
-            detail,
-          }
+      const errCode = adapter.classifyError(detail ?? '', Boolean(claudeSessionId))
+      const message = defaultUserMessageForErrorCode(errCode, detail ?? `Claude exited with code ${code}`)
+      const claudeErr: ClaudeError = { message, code: errCode, detail }
       onError?.(claudeErr)
       sendSseEvent(res, 'error', claudeErr)
       if (!res.writableEnded) res.end()
@@ -287,11 +168,27 @@ export function spawnClaude({ message, claudeSessionId, systemPrompt, permission
  * Run a one-shot Claude prompt and return the text response.
  * No SSE streaming — resolves when Claude finishes, rejects on error.
  * Used for compact summarization where we don't need a live stream.
+ *
+ * Args differ from the streaming path: prompt is passed via stdin (avoids
+ * E2BIG when transcripts are large) and permission-mode is hardcoded to
+ * `plan`. Output parsing is delegated to the adapter parser so a future
+ * opencode-shaped one-shot path slots in cleanly.
  */
 export function runClaudePrompt(prompt: string): Promise<string> {
   return new Promise((resolve, reject) => {
-    // Pass prompt via stdin to avoid E2BIG when the transcript is large.
-    // With CI=true and stdin piped, Claude auto-detects non-interactive mode.
+    const adapter = getAdapter()
+    const launchOpts = {
+      prompt: '', // unused — prompt goes via stdin
+      resumeId: null,
+      systemPrompt: null,
+      permissionMode: 'plan',
+      model: null,
+      mcpConfigPath: null,
+    }
+
+    // One-shot args — distinct from buildArgs(launchOpts) because we don't pass
+    // --print (prompt via stdin) and intentionally skip MCP / system-prompt /
+    // resume. The parser, env, and binary still flow through the adapter.
     const args = [
       '--output-format', 'stream-json',
       '--verbose',
@@ -299,9 +196,10 @@ export function runClaudePrompt(prompt: string): Promise<string> {
       '--permission-mode', 'plan',
     ]
 
-    const cleanEnv = buildCleanEnv(process.env)
+    const cleanEnv = adapter.buildEnv(process.env)
+    const parser = adapter.createParser(launchOpts)
 
-    const child = spawn(CLAUDE_BIN, args, {
+    const child = spawn(adapter.binaryPath(), args, {
       env: { ...cleanEnv, CI: 'true' },
       shell: false,
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -318,25 +216,24 @@ export function runClaudePrompt(prompt: string): Promise<string> {
     child.stderr.on('data', (d: Buffer) => { stderr += d.toString() })
 
     rl.on('line', (line) => {
-      if (!line.trim() || settled) return
-      try {
-        const chunk = JSON.parse(line) as ClaudeChunk
-        if (
-          chunk.type === 'stream_event' &&
-          chunk.event.type === 'content_block_delta' &&
-          chunk.event.delta?.type === 'text_delta'
-        ) {
-          accumulated += chunk.event.delta.text
-        }
-        if (chunk.type === 'result') {
+      if (settled) return
+      const { rawChunk, events } = parser.parseLine(line)
+      if (rawChunk === null) return
+      for (const ev of events) {
+        if (ev.type === 'text_delta') {
+          accumulated += ev.text
+        } else if (ev.type === 'result_done') {
           settled = true
-          if (chunk.is_error) {
-            reject(new Error(chunk.errors?.join('; ') || chunk.result || 'Claude error'))
-          } else {
-            resolve(accumulated || chunk.result)
-          }
+          // Preserve legacy fallback: if no text deltas were observed, fall back
+          // to the result chunk's `.result` field. Pulled from rawChunk since
+          // the canonical event doesn't carry it.
+          const fallback = (rawChunk as { result?: string })?.result ?? ''
+          resolve(accumulated || fallback)
+        } else if (ev.type === 'result_error') {
+          settled = true
+          reject(new Error(ev.errorText))
         }
-      } catch { /* ignore malformed lines */ }
+      }
     })
 
     child.on('error', (err) => { if (!settled) { settled = true; reject(err) } })

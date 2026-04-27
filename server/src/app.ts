@@ -21,6 +21,7 @@ import { projectArtifactsRouter, artifactRouter, projectTopicsRouter, topicRoute
 import linkPreviewRouter from './routes/linkPreview.js'
 import mdartRouter from './routes/mdart.js'
 import rateLimitsRouter from './routes/rateLimits.js'
+import { getAdapter, type AdapterName } from './cli/index.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 // Monorepo root — two levels up from server/src/
@@ -44,7 +45,26 @@ export function createApp() {
 
   // Public endpoints — no auth required
   app.get('/api/meta', (_req, res) => {
-    res.json({ appRoot: APP_ROOT })
+    // Surface every supported CLI adapter's models + capabilities so the
+    // chat UI can render adapter-correct pickers regardless of which
+    // adapter a particular session uses (sessions carry their own `cli`
+    // column post per-session-adapter migration). `cli` here is the
+    // *default* for new sessions when the operator/user doesn't pick
+    // explicitly — it mirrors STEWARD_CLI.
+    const defaultAdapter = getAdapter()
+    const adapterNames: AdapterName[] = ['claude', 'opencode']
+    const adapters: Record<string, { models: typeof defaultAdapter.models; capabilities: typeof defaultAdapter.capabilities }> = {}
+    for (const name of adapterNames) {
+      const a = getAdapter(name)
+      adapters[name] = { models: a.models, capabilities: a.capabilities }
+    }
+    res.json({
+      appRoot: APP_ROOT,
+      cli: defaultAdapter.name,   // legacy: keep for older clients
+      models: defaultAdapter.models,  // legacy: keep for older clients
+      defaultCli: defaultAdapter.name,
+      adapters,
+    })
   })
   app.use('/api/auth', authRouter)
 

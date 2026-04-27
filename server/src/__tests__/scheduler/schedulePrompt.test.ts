@@ -33,6 +33,7 @@ function makeSession(overrides: Partial<Session> = {}): Session {
     updated_at: 1_700_000_000,
     timezone: null,
     model: null,
+    cli: 'claude',
     compacted_from: null,
     ...overrides,
   }

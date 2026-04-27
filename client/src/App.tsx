@@ -263,7 +263,8 @@ export default function App() {
     setTimeout(() => window.location.reload(), 1500)
   }, [])
   const { state: connState, lastSeenAt } = useAppConnection({
-    onReload: authState === 'authenticated' ? handleReload : undefined,
+    enabled: authState === 'authenticated',
+    onReload: handleReload,
     onPushTarget: handlePushTarget,
     onSchedulesChanged: () => setSchedulesTick((t) => t + 1),
     onArtifactUpdated: () => {
@@ -677,6 +678,7 @@ export default function App() {
               permissionMode={sessions.find((s) => s.id === activeSessionId)?.permission_mode ?? 'acceptEdits'}
               timezone={sessions.find((s) => s.id === activeSessionId)?.timezone ?? null}
               model={sessions.find((s) => s.id === activeSessionId)?.model ?? null}
+              cli={sessions.find((s) => s.id === activeSessionId)?.cli}
               claudeSessionId={sessions.find((s) => s.id === activeSessionId)?.claude_session_id ?? null}
               projectId={activeProjectId}
               onTitle={(title) => handleTitleUpdate(activeSessionId, title)}
@@ -690,6 +692,16 @@ export default function App() {
               onModelChange={(newModel) =>
                 setSessions((prev) =>
                   prev.map((s) => s.id === activeSessionId ? { ...s, model: newModel } : s)
+                )
+              }
+              onCliChange={(newCli) =>
+                // Switch is destructive on the server (clears claude_session_id +
+                // model atomically). Mirror the same clears locally so the next
+                // chat send doesn't try to resume the old CLI's stale handle.
+                setSessions((prev) =>
+                  prev.map((s) => s.id === activeSessionId
+                    ? { ...s, cli: newCli, claude_session_id: null, model: null }
+                    : s)
                 )
               }
               onCompact={handleCompact}

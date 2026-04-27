@@ -580,6 +580,12 @@ export function MessageBubble({ role, content, streaming = false, errorCode, sou
         style: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300',
         message: 'Session ended — your next message will start a fresh conversation.',
       },
+      provider_quota: {
+        icon: '⏱',
+        style: 'bg-amber-500/10 border-amber-500/30 text-amber-200',
+        message:
+          'The AI provider rate limit or quota was reached. Check billing, usage, and plan limits in your provider dashboard, or try again in a few minutes.',
+      },
       process_error: {
         icon: '✕',
         style: 'bg-red-500/10 border-red-500/30 text-red-300',

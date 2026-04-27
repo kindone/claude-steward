@@ -70,6 +70,7 @@ const server = net.createServer((socket) => {
         permissionMode: cmd.permissionMode,
         systemPrompt: cmd.systemPrompt,
         model: cmd.model,
+        cli: cmd.cli,
       })
     } else if (cmd.type === 'stop') {
       manager.stop(cmd.sessionId)

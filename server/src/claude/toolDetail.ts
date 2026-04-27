@@ -25,7 +25,17 @@ export function extractToolDetail(name: string, input: Record<string, unknown>):
       return s(input.query)?.slice(0, 80)
     case 'WebFetch':
       return s(input.url)?.slice(0, 80)
-    default:
-      return undefined
+    default: {
+      // opencode / generic tools (list_dir, glob, …) often use path-like fields
+      return (
+        s(input.path) ??
+        s(input.target_directory) ??
+        s(input.directory) ??
+        s(input.pattern) ??
+        s(input.file_path) ??
+        s(input.filePath) ??
+        undefined
+      )
+    }
   }
 }

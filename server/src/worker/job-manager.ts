@@ -1,33 +1,22 @@
 /**
- * Manages Claude CLI subprocesses. No Express/HTTP dependency — communicates
- * entirely via callbacks. The worker's socket layer wraps these callbacks to
- * relay events back to connected clients over NDJSON.
+ * Manages CLI subprocesses (Claude / opencode / …) for long-running jobs.
+ *
+ * No Express/HTTP dependency — communicates entirely via callbacks. The
+ * worker's socket layer wraps these callbacks to relay events back to
+ * connected clients over NDJSON.
+ *
+ * CLI-specific knowledge (binary path, args, env, parsing, error
+ * classification) lives behind {@link CliAdapter} (see `../cli/`). This
+ * file owns the spawn lifecycle, DB persistence, and event broadcasting.
  */
 
 import { spawn } from 'node:child_process'
 import { createInterface } from 'node:readline'
-import { buildCleanEnv } from '../claude/clean-env.js'
 import { extractToolDetail } from '../claude/toolDetail.js'
+import { getAdapter } from '../cli/index.js'
+import { defaultUserMessageForErrorCode } from '../cli/types.js'
 import { jobQueries } from './db.js'
 import type { WorkerEvent } from './protocol.js'
-
-// Allow overriding the claude binary path via env var, with ~/.local/bin fallback
-const CLAUDE_BIN = process.env.CLAUDE_PATH ?? `${process.env.HOME ?? '/usr/local'}/.local/bin/claude`
-
-/**
- * Normalize a tool_result content value to a plain string.
- * The Claude API allows content to be either a string or an array of text blocks.
- */
-function normalizeToolResultContent(content: unknown): string {
-  if (typeof content === 'string') return content
-  if (Array.isArray(content)) {
-    return (content as Array<{ type?: string; text?: string }>)
-      .filter((b) => b?.type === 'text')
-      .map((b) => b.text ?? '')
-      .join('\n')
-  }
-  return String(content ?? '')
-}
 
 // How often to flush accumulated text to worker.db (ms)
 const FLUSH_INTERVAL_MS = 3_000
@@ -40,6 +29,11 @@ type JobOptions = {
   permissionMode: string | null
   systemPrompt: string | null
   model?: string | null
+  /** Adapter name for this turn. Optional for back-compat with workers
+   *  spawned before the per-session adapter landed; absent → falls back
+   *  to STEWARD_CLI env via getAdapter()'s own default. New code paths
+   *  should always set this from session.cli. */
+  cli?: 'claude' | 'opencode' | null
 }
 
 type ActiveJob = {
@@ -54,7 +48,7 @@ export class JobManager {
   onEvent: (event: WorkerEvent) => void = () => {}
 
   start(opts: JobOptions): void {
-    const { sessionId, prompt, claudeSessionId, projectPath, permissionMode, systemPrompt, model } = opts
+    const { sessionId, prompt, claudeSessionId, projectPath, permissionMode, systemPrompt, model, cli } = opts
 
     if (this.jobs.has(sessionId)) {
       console.warn(`[worker] job already running for session ${sessionId}, ignoring start`)
@@ -85,32 +79,22 @@ export class JobManager {
 
     this.jobs.set(sessionId, { abort, flushTimer })
 
-    const args = [
-      '--print', prompt,
-      '--output-format', 'stream-json',
-      '--verbose',
-      '--include-partial-messages',
-    ]
-
-    if (claudeSessionId) args.push('--resume', claudeSessionId)
-    if (systemPrompt) args.push('--system-prompt', systemPrompt)
-    if (permissionMode && permissionMode !== 'default') {
-      args.push('--permission-mode', permissionMode)
+    // Prefer the session's adapter (passed in); fall back to env-default.
+    const adapter = getAdapter(cli ?? undefined)
+    const launchOpts = {
+      prompt,
+      resumeId: claudeSessionId,
+      systemPrompt,
+      permissionMode,
+      model: model ?? null,
+      mcpConfigPath: process.env.MCP_CONFIG_PATH ?? null,
+      workingDirectory: projectPath,
     }
-    if (model) args.push('--model', model)
+    const args = adapter.buildArgs(launchOpts)
+    const cleanEnv = adapter.buildEnv(process.env)
+    const parser = adapter.createParser(launchOpts)
 
-    // MCP schedule tools: load steward's schedule server and block the harness
-    // cron tools (CronCreate/CronDelete) which are session-only and would confuse
-    // schedule management — CronList is allowed for read-only inspection.
-    if (process.env.MCP_CONFIG_PATH) {
-      args.push('--mcp-config', process.env.MCP_CONFIG_PATH)
-      args.push('--disallowed-tools', 'CronCreate,CronDelete')
-    }
-
-    // See buildCleanEnv() for the strip/allowlist policy (same in direct-spawn path).
-    const cleanEnv = buildCleanEnv(process.env)
-
-    const child = spawn(CLAUDE_BIN, args, {
+    const child = spawn(adapter.binaryPath(), args, {
       env: { ...cleanEnv, CI: 'true' },
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
@@ -132,96 +116,65 @@ export class JobManager {
     const rl = createInterface({ input: child.stdout, crlfDelay: Infinity })
 
     rl.on('line', (line) => {
-      if (!line.trim()) return
+      const { rawChunk, events } = parser.parseLine(line)
+      if (rawChunk === null) return
 
-      let chunk: Record<string, unknown>
-      try {
-        chunk = JSON.parse(line)
-      } catch {
-        return
-      }
+      // Emit raw chunk so HTTP server can relay to SSE client.
+      this.onEvent({ type: 'chunk', sessionId, chunk: rawChunk as Record<string, unknown> })
 
-      // Emit raw chunk so HTTP server can relay to SSE client
-      this.onEvent({ type: 'chunk', sessionId, chunk })
+      for (const ev of events) {
+        switch (ev.type) {
+          case 'session_id':
+            if (!sessionIdEmitted) {
+              sessionIdEmitted = true
+              this.onEvent({ type: 'session_id', sessionId, claudeSessionId: ev.externalId })
+            }
+            break
 
-      // Resolve Claude session ID from system init
-      if (chunk.type === 'system' && chunk.subtype === 'init' && !sessionIdEmitted) {
-        sessionIdEmitted = true
-        this.onEvent({ type: 'session_id', sessionId, claudeSessionId: chunk.session_id as string })
-      }
+          case 'text_block_start':
+            // New text block starting after a tool use — inject paragraph break.
+            if (accumulatedText.length > 0 && !accumulatedText.endsWith('\n')) {
+              accumulatedText += '\n\n'
+            }
+            break
 
-      // New text block starting after a tool use — inject paragraph break
-      if (
-        chunk.type === 'stream_event' &&
-        (chunk.event as Record<string, unknown>)?.type === 'content_block_start' &&
-        ((chunk.event as Record<string, unknown>)?.content_block as Record<string, unknown>)?.type === 'text' &&
-        accumulatedText.length > 0 &&
-        !accumulatedText.endsWith('\n')
-      ) {
-        accumulatedText += '\n\n'
-      }
+          case 'text_delta':
+            accumulatedText += ev.text
+            break
 
-      // Accumulate text deltas
-      if (
-        chunk.type === 'stream_event' &&
-        (chunk.event as Record<string, unknown>)?.type === 'content_block_delta' &&
-        ((chunk.event as Record<string, unknown>)?.delta as Record<string, unknown>)?.type === 'text_delta'
-      ) {
-        accumulatedText += (((chunk.event as Record<string, unknown>)?.delta as Record<string, unknown>)?.text as string) ?? ''
-      }
-
-      // Assembled tool_use blocks (same shape as chat route / recovery)
-      if (chunk.type === 'assistant') {
-        const content = (chunk.message as Record<string, unknown>)?.content as Array<Record<string, unknown>> ?? []
-        for (const block of content) {
-          if (block.type === 'tool_use' && block.name && block.id) {
-            toolCallsMap.set(block.id as string, {
-              id: block.id as string,
-              name: block.name as string,
-              detail: extractToolDetail(block.name as string, (block.input as Record<string, unknown>) ?? {}),
+          case 'tool_use':
+            toolCallsMap.set(ev.id, {
+              id: ev.id,
+              name: ev.name,
+              detail: extractToolDetail(ev.name, ev.input),
             })
-          }
-        }
-      }
+            break
 
-      // Tool results
-      if (chunk.type === 'user') {
-        const content = (chunk.message as Record<string, unknown>)?.content as Array<Record<string, unknown>> ?? []
-        for (const block of content) {
-          if (block.type === 'tool_result') {
-            const tid = block.tool_use_id as string
-            const existing = toolCallsMap.get(tid)
+          case 'tool_result': {
+            const existing = toolCallsMap.get(ev.toolUseId)
             if (existing) {
-              existing.output = normalizeToolResultContent(block.content)
-              existing.isError = (block.is_error as boolean) ?? false
+              existing.output = ev.output
+              existing.isError = ev.isError
             }
             this.onEvent({
               type: 'tool_result',
               sessionId,
-              toolUseId: tid,
-              output: normalizeToolResultContent(block.content),
-              isError: block.is_error as boolean,
+              toolUseId: ev.toolUseId,
+              output: ev.output,
+              isError: ev.isError,
             })
+            break
           }
-        }
-      }
 
-      // Result chunk — job complete or errored
-      if (chunk.type === 'result') {
-        if (chunk.is_error) {
-          const errorText = (chunk.errors as string[] | undefined)?.join('; ') || (chunk.result as string) || `Claude error: ${chunk.subtype}`
-          const lower = errorText.toLowerCase()
-          const isOverload = lower.includes('overload') || lower.includes('529')
-          const errorCode = lower.includes('context') || lower.includes('too long') || lower.includes('token limit')
-            ? 'context_limit'
-            : !isOverload && (Boolean(claudeSessionId) || lower.includes('session') || lower.includes('conversation'))
-            ? 'session_expired'
-            : 'process_error'
-          finish('interrupted', errorCode)
-          this.onEvent({ type: 'error', sessionId, errorCode, message: errorText, content: accumulatedText })
-        } else {
-          finish('complete')
-          this.onEvent({ type: 'done', sessionId, content: accumulatedText, claudeSessionId: chunk.session_id as string })
+          case 'result_done':
+            finish('complete')
+            this.onEvent({ type: 'done', sessionId, content: accumulatedText, claudeSessionId: ev.externalId })
+            break
+
+          case 'result_error':
+            finish('interrupted', ev.code)
+            this.onEvent({ type: 'error', sessionId, errorCode: ev.code, message: ev.message, content: accumulatedText })
+            break
         }
       }
     })
@@ -240,10 +193,15 @@ export class JobManager {
       }
       if (code !== 0 && !resolved) {
         const detail = stderrOutput.trim() || `Claude exited with code ${code}`
-        const isOverload = detail.toLowerCase().includes('overload') || detail.includes('529')
-        const errorCode = !isOverload && Boolean(claudeSessionId) ? 'session_expired' : 'process_error'
+        const errorCode = adapter.classifyError(detail, Boolean(claudeSessionId))
         finish('interrupted', errorCode)
-        this.onEvent({ type: 'error', sessionId, errorCode, message: detail, content: accumulatedText })
+        this.onEvent({
+          type: 'error',
+          sessionId,
+          errorCode,
+          message: defaultUserMessageForErrorCode(errorCode, detail),
+          content: accumulatedText,
+        })
         return
       }
       // Code 0 but result chunk already handled — ensure job is cleaned up

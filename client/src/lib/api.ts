@@ -122,6 +122,11 @@ export type FileEntry = {
   path: string
 }
 
+/** Which CLI adapter drives a session. NOT NULL on the server side; the
+ *  field is optional in this type only for older client builds reading a
+ *  pre-migration session row over the wire. */
+export type CliName = 'claude' | 'opencode'
+
 export type Session = {
   id: string
   title: string
@@ -131,6 +136,7 @@ export type Session = {
   permission_mode: PermissionMode
   timezone: string | null
   model: string | null
+  cli?: CliName
   compacted_from: string | null
   created_at: number
   updated_at: number
@@ -173,10 +179,49 @@ export async function createProject(name: string, path: string): Promise<Project
   return res.json() as Promise<Project>
 }
 
-export async function fetchMeta(): Promise<{ appRoot: string }> {
+/** One option in the chat UI's model picker, mirrored from the server's
+ *  active CliAdapter. `value: null` means "no --model flag", letting the
+ *  CLI / env-default decide. */
+export type ModelOption = { value: string | null; label: string }
+
+/** Per-CLI capability flags, mirrored from server CliCapabilities. */
+export type CliCapabilities = {
+  streamingTokens: boolean
+  toolUseStructured: boolean
+  supportsMcp: boolean
+  branchResume: boolean
+}
+
+/** Adapter info bundle exposed at /api/meta — every supported CLI's
+ *  curated model list and capabilities, keyed by CLI name. */
+export type AdapterInfo = {
+  models: ModelOption[]
+  capabilities: CliCapabilities
+}
+
+/** Public meta exposed at /api/meta.
+ *
+ *  Modern shape (post per-session-adapter migration): the `adapters` map
+ *  contains every supported CLI's models + capabilities, plus a
+ *  `defaultCli` for new sessions.
+ *
+ *  Legacy fields `cli` and `models` describe the deploy's *default*
+ *  adapter only — kept for clients built before per-session-cli landed
+ *  so they keep rendering a sensible model picker. New code should
+ *  prefer `adapters[<session.cli>]`.
+ */
+export type ServerMeta = {
+  appRoot: string
+  cli?: CliName
+  models?: ModelOption[]
+  defaultCli?: CliName
+  adapters?: Record<CliName, AdapterInfo>
+}
+
+export async function fetchMeta(): Promise<ServerMeta> {
   const res = await fetch('/api/meta')
   if (!res.ok) throw new Error('Failed to fetch meta')
-  return res.json() as Promise<{ appRoot: string }>
+  return res.json() as Promise<ServerMeta>
 }
 
 export async function updateProject(projectId: string, patch: { permissionMode?: PermissionMode; systemPrompt?: string | null }): Promise<Project> {
@@ -660,11 +705,13 @@ export function execCommand(projectId: string, command: string, handlers: ExecHa
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
-export async function createSession(projectId: string): Promise<Session> {
+export async function createSession(projectId: string, cli?: CliName): Promise<Session> {
   const res = await fetch('/api/sessions', {
     method: 'POST',
     headers: JSON_HEADERS,
-    body: JSON.stringify({ projectId }),
+    // `cli` is optional — when omitted, the server applies its
+    // STEWARD_CLI-derived default. Pass explicitly to override per-session.
+    body: JSON.stringify(cli ? { projectId, cli } : { projectId }),
     ...credentialsOpt,
   })
   if (!res.ok) throw new Error('Failed to create session')
@@ -779,6 +826,22 @@ export async function updateSessionModel(sessionId: string, model: string | null
   return res.json() as Promise<Session>
 }
 
+/** Switch the session's CLI adapter. Server-side this is destructive: it
+ *  atomically clears `claude_session_id` (the previous adapter's session
+ *  handle is meaningless to the new one) and `model` (slug shape differs
+ *  between adapters). Callers should warn the user before invoking. The
+ *  returned Session reflects the cleared state. */
+export async function updateSessionCli(sessionId: string, cli: CliName): Promise<Session> {
+  const res = await fetch(`/api/sessions/${sessionId}`, {
+    method: 'PATCH',
+    headers: JSON_HEADERS,
+    body: JSON.stringify({ cli }),
+    ...credentialsOpt,
+  })
+  if (!res.ok) throw new Error('Failed to update CLI')
+  return res.json() as Promise<Session>
+}
+
 export async function deleteSession(sessionId: string): Promise<void> {
   const res = await fetch(`/api/sessions/${sessionId}`, {
     method: 'DELETE',
@@ -890,17 +953,35 @@ function setupVisibilityReporting(connectionId: string) {
 // Returns a cancel function to close the connection.
 export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
   let cancelled = false
-  let controller = new AbortController()
+  let controller: AbortController | null = null
 
   async function connect() {
     if (cancelled) return
-    controller = new AbortController()
+    if (controller) {
+      try {
+        controller.abort()
+      } catch { /* ignore */ }
+    }
+    const ac = new AbortController()
+    controller = ac
     try {
       const res = await fetch('/api/events', {
-        headers: JSON_HEADERS,
-        signal: controller.signal,
+        method: 'GET',
+        headers: { Accept: 'text/event-stream' },
+        cache: 'no-store',
+        signal: ac.signal,
         ...credentialsOpt,
       })
+
+      if (!res.ok) {
+        void res.text().catch(() => { /* drain body; release the HTTP/1.1 connection slot */ })
+        handlers.onDisconnect?.()
+        if (!cancelled) {
+          const delay = res.status === 401 || res.status === 403 ? 5_000 : 3_000
+          setTimeout(() => { if (!cancelled) void connect() }, delay)
+        }
+        return
+      }
 
       handlers.onConnect?.()
 
@@ -951,15 +1032,20 @@ export function subscribeToAppEvents(handlers: AppEventHandlers): () => void {
     // Reconnect after 3s on unexpected drop
     if (!cancelled) {
       handlers.onDisconnect?.()
-      setTimeout(connect, 3000)
+      setTimeout(() => { if (!cancelled) void connect() }, 3000)
     }
   }
 
-  connect()
-  return () => { cancelled = true; controller.abort() }
+  void connect()
+  return () => {
+    cancelled = true
+    try {
+      controller?.abort()
+    } catch { /* ignore */ }
+  }
 }
 
-export type ClaudeErrorCode = 'session_expired' | 'context_limit' | 'process_error' | 'http_error' | 'connection_lost'
+export type ClaudeErrorCode = 'session_expired' | 'context_limit' | 'provider_quota' | 'process_error' | 'http_error' | 'connection_lost'
 
 /**
  * Normalize a tool_result content value to a plain string.
@@ -1024,7 +1110,17 @@ function extractToolDetail(name: string, input: Record<string, unknown>): string
     case 'MultiEdit': return str(input.file_path)
     case 'WebSearch': return str(input.query)?.slice(0, 80)
     case 'WebFetch':  return str(input.url)?.slice(0, 80)
-    default:          return undefined
+    default: {
+      return (
+        str(input.path) ??
+        str(input.target_directory) ??
+        str(input.directory) ??
+        str(input.pattern) ??
+        str(input.file_path) ??
+        str(input.filePath) ??
+        undefined
+      )
+    }
   }
 }
 
@@ -1051,12 +1147,58 @@ export type ChunkHandler = {
   onUsage?: (usage: UsageInfo) => void
 }
 
+/** opencode: stringify tool result for display (object → JSON) */
+function opencodeOutputString(out: unknown): string {
+  if (typeof out === 'string') return out
+  if (out == null) return ''
+  return JSON.stringify(out)
+}
+
+/**
+ * `opencode run --format json` tool lines are `type: "tool_use"`; fire the same
+ * {@link ChunkHandler} hooks as the Claude `assistant` / `user` message shapes.
+ */
+function handleOpencodeToolUseChunk(
+  raw: Record<string, unknown>,
+  handlers: Pick<ChunkHandler, 'onToolCall' | 'onToolResult'>,
+): void {
+  if (raw.type !== 'tool_use' || !raw.part || typeof raw.part !== 'object') return
+  const part = raw.part as Record<string, unknown>
+  const tool = part.tool
+  const callID = part.callID
+  if (typeof tool !== 'string' || typeof callID !== 'string') return
+  const state = (part.state as Record<string, unknown>) ?? {}
+  const input = (state.input as Record<string, unknown>) ?? {}
+  handlers.onToolCall?.({
+    id: callID,
+    name: tool,
+    detail: extractToolDetail(tool, input),
+  })
+  if (state.status === 'completed' && 'output' in state) {
+    const output = opencodeOutputString((state as { output: unknown }).output)
+    const exit = (state.metadata as { exit?: number } | undefined)?.exit
+    const isError = typeof exit === 'number' && exit !== 0
+    handlers.onToolResult?.(callID, output, isError)
+  }
+}
+
 export function sendMessage(
   sessionId: string,
   message: string,
   handlers: ChunkHandler
 ): () => void {
   const controller = new AbortController()
+  /** Fires if we abort because the request never got a response in time (browser queue, dead server, etc.). */
+  let ttfbTimeoutFired = false
+  // Covers time until the first response headers — 90s inactivity below only runs after the body stream exists.
+  const TTFB_MS = 90_000
+  const ttfbTimer = setTimeout(() => {
+    ttfbTimeoutFired = true
+    controller.abort()
+  }, TTFB_MS)
+  const clearTtfbTimer = () => {
+    clearTimeout(ttfbTimer)
+  }
 
   fetch('/api/chat', {
     method: 'POST',
@@ -1066,6 +1208,7 @@ export function sendMessage(
     ...credentialsOpt,
   })
     .then(async (res) => {
+      clearTtfbTimer()
       if (!res.ok) {
         const body = await res.text()
         handlers.onError(`HTTP ${res.status}: ${body}`, 'http_error')
@@ -1177,6 +1320,17 @@ export function sendMessage(
                       )
                     }
                   }
+                } else if (chunk.type === 'text') {
+                  // opencode run --format json: assistant text (whole line, not stream_event)
+                  const t = (chunk as { part?: { text?: string } }).part?.text
+                  if (typeof t === 'string' && t) {
+                    if (textBlockCount > 0) handlers.onTextDelta('\n\n')
+                    textBlockCount++
+                    handlers.onToolActivity?.(null)
+                    handlers.onTextDelta(t)
+                  }
+                } else if (chunk.type === 'tool_use') {
+                  handleOpencodeToolUseChunk(chunk as Record<string, unknown>, handlers)
                 } else if (chunk.type === 'result') {
                   const r = chunk as unknown as { usage?: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number }; total_cost_usd?: number }
                   if (r.usage) {
@@ -1215,12 +1369,20 @@ export function sendMessage(
       }
     })
     .catch((err: Error) => {
-      if (!isAbortError(err)) {
-        // fetch() itself rejected — network failure before any response (e.g. DNS error,
-        // offline, connection refused).  Pass http_error so the assistant bubble shows the
-        // "Connection error" banner instead of silently staying empty with no spinner.
-        handlers.onError(err.message, 'http_error')
+      clearTtfbTimer()
+      if (isAbortError(err)) {
+        if (ttfbTimeoutFired) {
+          handlers.onError(
+            'The server did not start responding in time. Your connection may be busy (try refreshing), or the server is overloaded.',
+            'http_error',
+          )
+        }
+        return
       }
+      // fetch() itself rejected — network failure before any response (e.g. DNS error,
+      // offline, connection refused).  Pass http_error so the assistant bubble shows the
+      // "Connection error" banner instead of silently staying empty with no spinner.
+      handlers.onError(err.message, 'http_error')
     })
 
   return () => controller.abort()
