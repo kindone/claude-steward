@@ -89,7 +89,7 @@ export function writeMcpConfig(): void {
     MCP_NOTIFY_SECRET: notifySecret,
   }
 
-  function makeServer(entry: string) {
+  function makeServer(entry: string): StewardMcpServer {
     return isProd
       ? { type: 'stdio', command: nodeBin, args: [entry],                       env: sharedEnv }
       : { type: 'stdio', command: nodeBin, args: ['--import', 'tsx', entry],    env: sharedEnv }
@@ -108,11 +108,26 @@ export function writeMcpConfig(): void {
   process.env.MCP_CONFIG_PATH    = MCP_CONFIG_PATH
   process.env.MCP_NOTIFY_SECRET  = notifySecret
 
-  // Keep ~/.claude.json in sync so the Claude Code session always has the
-  // current secret and server entry points. Silently skip if the file doesn't exist.
+  // Each CLI reads MCP server registrations from a different place with a
+  // different schema. We mirror the canonical config (the steward-mcp.json
+  // we just wrote) into both so whichever CLI the user picks sees the same
+  // servers with the same secrets and entry points.
+  //   - Claude Code reads ~/.claude.json (its own format)
+  //   - opencode    reads $XDG_CONFIG_HOME/opencode/opencode.json (different format)
+  // Both sync calls are silent no-ops if the destination is unreachable.
   syncClaudeSettings(mcpConfig.mcpServers)
+  syncOpencodeSettings(mcpConfig.mcpServers)
 
   console.log(`[mcp] config written → ${MCP_CONFIG_PATH} (notify: ${notifyUrl})`)
+}
+
+/** Shape of an MCP server entry written by makeServer above. Exported so
+ *  tests can construct fixtures matching what the public API produces. */
+export type StewardMcpServer = {
+  type: 'stdio'
+  command: string
+  args: string[]
+  env: Record<string, string>
 }
 
 /**
@@ -120,7 +135,7 @@ export function writeMcpConfig(): void {
  * uses to store MCP server registrations (written by `claude mcp add`).
  * This keeps secrets and node binary paths in sync across server restarts.
  */
-function syncClaudeSettings(servers: Record<string, object>): void {
+function syncClaudeSettings(servers: Record<string, StewardMcpServer>): void {
   const claudeJson = path.join(
     process.env.HOME ?? process.env.USERPROFILE ?? '~',
     '.claude.json',
@@ -137,5 +152,66 @@ function syncClaudeSettings(servers: Record<string, object>): void {
   } catch (err) {
     // Non-fatal — a stale secret just means SSE notify won't fire until next restart.
     console.warn('[mcp] could not sync ~/.claude.json:', err)
+  }
+}
+
+/**
+ * Update steward MCP server entries in opencode's config file. opencode reads
+ * `$XDG_CONFIG_HOME/opencode/opencode.json` (or `$HOME/.config/opencode/
+ * opencode.json` if XDG_CONFIG_HOME is unset).
+ *
+ * Schema differs from Claude's:
+ *   Claude:   { type: 'stdio', command: 'node', args: ['x.js'], env: {...} }
+ *   Opencode: { type: 'local',  command: ['node', 'x.js'],     environment: {...} }
+ *
+ * Unlike syncClaudeSettings (which silently skips a missing file), this
+ * creates the config dir + file if absent — opencode doesn't ship a default
+ * file, so a missing file is the common case rather than the exceptional one.
+ *
+ * Existing user config is preserved: we only overwrite the `mcp.<name>`
+ * entries we own, leaving any other top-level keys (model defaults, theme,
+ * provider settings) and unrelated MCP servers untouched.
+ */
+export function syncOpencodeSettings(servers: Record<string, StewardMcpServer>): void {
+  const xdg = process.env.XDG_CONFIG_HOME
+  const home = process.env.HOME ?? process.env.USERPROFILE
+  if (!xdg && !home) return  // no writable user config root — give up
+
+  const configDir = xdg
+    ? path.join(xdg, 'opencode')
+    : path.join(home as string, '.config', 'opencode')
+  const configPath = path.join(configDir, 'opencode.json')
+
+  try {
+    fs.mkdirSync(configDir, { recursive: true })
+
+    // Read existing config so we preserve user customizations + non-steward
+    // MCP servers. Treat parse errors as "start fresh" rather than crashing —
+    // a malformed user config is the user's problem, not ours, and we don't
+    // want to block server startup on it.
+    let existing: { $schema?: string; mcp?: Record<string, unknown>;[k: string]: unknown } = {}
+    if (fs.existsSync(configPath)) {
+      try {
+        existing = JSON.parse(fs.readFileSync(configPath, 'utf8'))
+      } catch {
+        existing = {}
+      }
+    }
+
+    existing.$schema ??= 'https://opencode.ai/config.json'
+    existing.mcp ??= {}
+
+    for (const [name, srv] of Object.entries(servers)) {
+      existing.mcp[name] = {
+        type: 'local',
+        command: [srv.command, ...srv.args],
+        environment: srv.env,
+      }
+    }
+
+    fs.writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n')
+  } catch (err) {
+    // Non-fatal — opencode just won't see the steward MCP tools.
+    console.warn('[mcp] could not sync opencode config:', err)
   }
 }
