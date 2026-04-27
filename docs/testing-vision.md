@@ -29,7 +29,7 @@
 ### Tier 4 — Subagent Doc/Skill Verification
 - Spawn a fresh `claude` session with a specific doc or skill
 - Give it a concrete task, assert the MCP tool was called correctly / output matches expected
-- Covers: CLAUDE.md conventions staying accurate, skill correctness, docs synced with code
+- Covers: AGENTS.md / CLAUDE.md conventions staying accurate, skill correctness, docs synced with code
 - Cost: ~$0.05–0.20 per test (Sonnet/Haiku depending on task)
 - **This is the expensive one** — needs caching (hash doc + relevant source files, skip if unchanged)
 
@@ -57,7 +57,7 @@ npm run test:all   # Everything
 
 1. **`/smoke` skill** — fast sanity ritual: build succeeds, `npm test` passes, hit key API endpoints, optionally screenshot the app. Agent invokes before handing back.
 2. **Hooks** — PostToolUse on Edit/Write of `docs/`: prompt agent to check that described code still matches. PostToolUse on test file write: run it before continuing.
-3. **CLAUDE.md "verify before handoff" block** — encode the discipline as text, zero infrastructure.
+3. **AGENTS.md "verify before handoff" block** — encode the discipline as text, zero infrastructure.
 4. **`/writing_test` as a thinking prompt** — before declaring done, have I identified the invariant this should satisfy?
 
 None of these are implemented yet. They're the bridge before formal tiers 3/4.
@@ -75,4 +75,4 @@ None of these are implemented yet. They're the bridge before formal tiers 3/4.
 **Tier 4 second** — start with highest-risk docs/skills:
 - `/deploy` skill (broke once already)
 - `docs/scheduler-usage.md` (complex enough to get wrong)
-- `CLAUDE.md` scheduling convention
+- `AGENTS.md` scheduling convention

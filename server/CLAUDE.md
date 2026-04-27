@@ -21,7 +21,7 @@ cd server && npx tsc --noEmit        # type-check only
 
 **Worker path vs direct spawn** — `chat.ts` prefers the worker (Unix socket); falls back to `spawnClaude()` in `process.ts` when worker is down. Tool calls are only persisted on the worker path.
 
-**Env vars** — read inside functions, never at module top-level (ESM + dotenv ordering; see root `CLAUDE.md`).
+**Env vars** — read inside functions, never at module top-level (ESM + dotenv ordering; see root `AGENTS.md` → Working Conventions).
 
 ## Testing
 
