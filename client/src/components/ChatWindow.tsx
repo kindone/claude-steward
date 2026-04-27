@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, updateSessionCli, compactSession, getSessionChain, updateSessionTimezone, listArtifacts, createArtifact, deriveArtifactName, toolDisplayName, toolDisplayDetail, fetchMeta, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo, type Artifact, type ArtifactType, type ModelOption, type CliName, type AdapterInfo } from '../lib/api'
+import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, getSessionChain, updateSessionTimezone, listArtifacts, createArtifact, deriveArtifactName, toolDisplayName, toolDisplayDetail, fetchMeta, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo, type Artifact, type ArtifactType, type ModelOption, type CliName, type AdapterInfo } from '../lib/api'
 import { CompactDivider } from './CompactDivider'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
@@ -103,10 +103,6 @@ type Props = {
   onSystemPromptChange?: (prompt: string | null) => void
   onPermissionModeChange?: (mode: PermissionMode) => void
   onModelChange?: (model: string | null) => void
-  /** Called after a successful CLI switch — the parent should refresh its
-   *  Session record (model + claude_session_id are cleared server-side as
-   *  part of the same transaction). */
-  onCliChange?: (cli: CliName) => void
   onCompact?: (newSessionId: string) => void
   /** Incremented by App when the server emits a schedules_changed SSE event. */
   schedulesTick?: number
@@ -116,7 +112,7 @@ type Props = {
   onOpenArtifact?: (artifact: Artifact) => void
 }
 
-export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, cli, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCliChange, onCompact, schedulesTick = 0, artifactRefreshTick, onOpenArtifact }: Props) {
+export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, model, cli, claudeSessionId, projectId, onTitle, onActivity, onSystemPromptChange, onPermissionModeChange, onModelChange, onCompact, schedulesTick = 0, artifactRefreshTick, onOpenArtifact }: Props) {
   const [messages, setMessages] = useState<Message[]>([])
   const [hasMore, setHasMore] = useState(false)
   const [loadingSession, setLoadingSession] = useState(true)
@@ -259,24 +255,6 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
   async function handleModelChange(value: string | null) {
     await updateSessionModel(sessionId, value)
     onModelChange?.(value)
-  }
-
-  async function handleCliChange(value: CliName) {
-    if (value === effectiveCli) return  // no-op, server would noop too
-    // Switching adapter is destructive on the server (clears claude_session_id
-    // and model). Confirm so the user knows their visible chat history stays
-    // but the CLI's view of the conversation resets.
-    const confirmed = window.confirm(
-      `Switching to ${value} will reset the conversation context from the CLI's perspective.\n\n` +
-      `Your visible message history stays, but the new CLI will treat the next message as the start of a fresh conversation. ` +
-      `The model selection also clears (slug formats differ between adapters).\n\n` +
-      `Continue?`,
-    )
-    if (!confirmed) return
-    await updateSessionCli(sessionId, value)
-    onCliChange?.(value)
-    // Server cleared model as part of the same transaction; reflect locally.
-    onModelChange?.(null)
   }
 
   function handlePromptKeyDown(e: React.KeyboardEvent) {
@@ -783,23 +761,19 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
                 <span className="text-[11px] text-app-border-3 italic">none (not yet sent)</span>
               )}
             </div>
-            {/* CLI adapter picker — only render when the server actually
-                advertises more than one adapter. Single-adapter deploys
-                (no `adapters` bundle in /api/meta, or just one entry) hide
-                the row to avoid a useless control. */}
-            {Object.keys(adapters).length > 1 && (
+            {/* CLI adapter — read-only. Per the immutable per-session-CLI
+                design, the adapter is fixed at session creation (chosen via
+                the popover on the sidebar + button) and cannot change for
+                the session's lifetime. Shown here for debug visibility. */}
+            {effectiveCli && (
               <div className="flex items-center gap-2">
                 <span className="text-[11px] text-app-text-7 w-28 flex-shrink-0">CLI</span>
-                <select
-                  className="bg-app-bg border border-app-bg-hover hover:border-app-border-4 rounded text-app-text-4 cursor-pointer text-xs px-2 py-1 transition-colors outline-none"
-                  value={effectiveCli ?? ''}
-                  onChange={(e) => { void handleCliChange(e.target.value as CliName) }}
-                  title="CLI adapter for this session — switching resets the CLI's view of the conversation"
+                <span
+                  className="text-[11px] text-app-text-4 capitalize"
+                  title="CLI adapter for this session (immutable — chosen at session creation)"
                 >
-                  {(Object.keys(adapters) as CliName[]).map((name) => (
-                    <option key={name} value={name}>{name}</option>
-                  ))}
-                </select>
+                  {effectiveCli}
+                </span>
               </div>
             )}
             <div className="flex items-center gap-2">

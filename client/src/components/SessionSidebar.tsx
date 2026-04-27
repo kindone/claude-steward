@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import type { Session, Project, Artifact } from '../lib/api'
+import type { Session, Project, Artifact, CliName } from '../lib/api'
 import { ProjectPicker } from './ProjectPicker'
 import { FileTree } from './FileTree'
 import { TerminalPanel } from './TerminalPanel'
@@ -21,7 +21,16 @@ type Props = {
   sessions: Session[]
   activeSessionId: string | null
   onSelectSession: (id: string) => void
-  onNewSession: () => void
+  /** Create a new session bound to the given CLI adapter. The CLI is fixed
+   *  for the session's lifetime (immutable per-session-CLI design); the
+   *  popover anchored on the + button forces the user to pick before any
+   *  session is created. Single-adapter deploys skip the popover. */
+  onNewSession: (cli: CliName) => void
+  /** Available CLI adapters, fetched from /api/meta by the parent. Empty
+   *  array disables the + button (no adapters → can't create); one entry
+   *  bypasses the popover and creates directly; two or more open the
+   *  picker popover. */
+  availableClis: CliName[]
   onDeleteSession: (id: string) => void
   onDeleteAllSessions: () => void
   onRenameSession: (id: string, title: string) => Promise<void>
@@ -49,6 +58,7 @@ export function SessionSidebar({
   activeSessionId,
   onSelectSession,
   onNewSession,
+  availableClis,
   onDeleteSession,
   onDeleteAllSessions,
   onRenameSession,
@@ -70,6 +80,11 @@ export function SessionSidebar({
   const editInputRef = useRef<HTMLInputElement>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [menuPos, setMenuPos] = useState<{ x: number; y: number } | null>(null)
+  // CLI picker popover anchored to the + button. Open only when the user
+  // clicks + and there's a real choice to make (>1 adapter). Single-adapter
+  // deploys skip this entirely.
+  const [cliPopoverOpen, setCliPopoverOpen] = useState(false)
+  const cliPopoverWrapperRef = useRef<HTMLDivElement>(null)
   const [activeTab, setActiveTab] = useState<'sessions' | 'files' | 'terminal' | 'apps' | 'artifacts'>(() => {
     try { return (localStorage.getItem('steward:sidebarTab') as 'sessions' | 'files' | 'terminal' | 'apps' | 'artifacts') ?? 'sessions' }
     catch { return 'sessions' }
@@ -144,6 +159,38 @@ export function SessionSidebar({
       onDeleteAllSessions()
     }
   }
+
+  // + button → either open the picker popover (multi-adapter) or create
+  // directly (single-adapter, no choice to enforce). Empty `availableClis`
+  // is treated as "not loaded yet" and the click is a no-op so we never
+  // accidentally create a session before the adapter set is known.
+  function handlePlusClick() {
+    if (availableClis.length === 0) return
+    if (availableClis.length === 1) { onNewSession(availableClis[0]); return }
+    setCliPopoverOpen((open) => !open)
+  }
+
+  function pickCli(cli: CliName) {
+    setCliPopoverOpen(false)
+    onNewSession(cli)
+  }
+
+  // Close popover on outside-click / Escape
+  useEffect(() => {
+    if (!cliPopoverOpen) return
+    function onMouseDown(e: MouseEvent) {
+      if (!cliPopoverWrapperRef.current?.contains(e.target as Node)) setCliPopoverOpen(false)
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') setCliPopoverOpen(false)
+    }
+    document.addEventListener('mousedown', onMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [cliPopoverOpen])
 
   return (
     <aside className="h-dvh w-64 flex flex-col bg-app-bg-raised border-r border-app-border overflow-hidden">
@@ -232,13 +279,38 @@ export function SessionSidebar({
                   Clear all
                 </button>
               )}
-              <button
-                className="bg-app-blue-tint hover:bg-blue-600 text-white border-none w-8 h-8 rounded-md cursor-pointer text-lg leading-none flex items-center justify-center transition-colors"
-                onClick={onNewSession}
-                title="New Chat"
-              >
-                +
-              </button>
+              <div ref={cliPopoverWrapperRef} className="relative">
+                <button
+                  className="bg-app-blue-tint hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white border-none w-8 h-8 rounded-md cursor-pointer text-lg leading-none flex items-center justify-center transition-colors"
+                  onClick={handlePlusClick}
+                  disabled={availableClis.length === 0}
+                  title={availableClis.length === 0 ? 'Loading…' : 'New Chat'}
+                  aria-haspopup={availableClis.length > 1 || undefined}
+                  aria-expanded={availableClis.length > 1 ? cliPopoverOpen : undefined}
+                >
+                  +
+                </button>
+                {cliPopoverOpen && availableClis.length > 1 && (
+                  <div
+                    className="absolute right-0 top-full mt-1 z-50 bg-app-bg-card border border-app-border-2 rounded-lg shadow-2xl p-1 min-w-[140px]"
+                    role="menu"
+                  >
+                    <p className="text-[10px] text-app-text-7 px-2 pt-1 pb-1 uppercase tracking-wider">New chat with</p>
+                    <div className="flex flex-col gap-0.5">
+                      {availableClis.map((cli) => (
+                        <button
+                          key={cli}
+                          className="text-left px-3 py-2 rounded text-[13px] text-app-text-2 hover:bg-app-blue-tint hover:text-white transition-colors capitalize"
+                          onClick={() => pickCli(cli)}
+                          role="menuitem"
+                        >
+                          {cli}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

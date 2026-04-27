@@ -5,7 +5,7 @@ import {
   listSessions, createSession, deleteSession, renameSession,
   getAuthStatus, logout,
   getArtifactContent, putArtifactContent,
-  type Project, type Session, type Artifact,
+  type Project, type Session, type Artifact, type CliName,
 } from './lib/api'
 import { SessionSidebar } from './components/SessionSidebar'
 import { ChatWindow } from './components/ChatWindow'
@@ -86,6 +86,11 @@ export default function App() {
     new URLSearchParams(window.location.search).get('project')
   )
   const [appRoot, setAppRoot] = useState<string | null>(null)
+  // Available CLI adapters surfaced by /api/meta. Empty until the fetch
+  // resolves; SessionSidebar disables its + button while empty so we never
+  // create a session before the adapter set is known. Single-adapter
+  // deploys collapse the popover into a direct create.
+  const [availableClis, setAvailableClis] = useState<CliName[]>([])
   const [loading, setLoading] = useState(true)
   const [restarting, setRestarting] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -295,7 +300,14 @@ export default function App() {
         setActiveProjectId(restored ? restored.id : loaded[0].id)
       }
     }).catch(console.error)
-    fetchMeta().then((m) => setAppRoot(m.appRoot)).catch(console.error)
+    fetchMeta().then((m) => {
+      setAppRoot(m.appRoot)
+      // Materialise the adapter set for the new-session picker. Modern
+      // shape uses `adapters`; legacy single-adapter deploys (pre per-
+      // session-cli) only ship `cli`, so fall back to that.
+      if (m.adapters) setAvailableClis(Object.keys(m.adapters) as CliName[])
+      else if (m.cli) setAvailableClis([m.cli])
+    }).catch(console.error)
   }, [authState])
 
   // Load sessions whenever the active project changes; restore last-used session if it still exists.
@@ -364,10 +376,10 @@ export default function App() {
     })
   }
 
-  async function handleNewSession() {
+  async function handleNewSession(cli: CliName) {
     if (!activeProjectId) return
     try {
-      const session = await createSession(activeProjectId)
+      const session = await createSession(activeProjectId, cli)
       setSessions((prev) => [session, ...prev])
       setActiveSessionId(session.id)
       setSidebarOpen(false)
@@ -493,7 +505,15 @@ export default function App() {
       if (!e.metaKey && !e.ctrlKey) return
       if (e.key === 'n') {
         e.preventDefault()
-        handleNewSession()
+        // Per the immutable-CLI design we never silently default. Single-
+        // adapter deploys keep the shortcut snappy (one CLI → no choice
+        // to make); multi-adapter deploys nudge the user to the sidebar +
+        // popover by opening the sidebar instead of creating blind.
+        if (availableClis.length === 1) {
+          void handleNewSession(availableClis[0])
+        } else if (availableClis.length > 1) {
+          setSidebarOpen(true)
+        }
       } else if (e.key === '[') {
         e.preventDefault()
         setSessions((prev) => {
@@ -605,6 +625,7 @@ export default function App() {
           activeSessionId={activeSessionId}
           onSelectSession={(id) => { setActiveSessionId(id); setSidebarOpen(false) }}
           onNewSession={handleNewSession}
+          availableClis={availableClis}
           onDeleteSession={handleDeleteSession}
           onDeleteAllSessions={handleDeleteAllSessions}
           onRenameSession={handleRenameSession}
@@ -694,16 +715,6 @@ export default function App() {
                   prev.map((s) => s.id === activeSessionId ? { ...s, model: newModel } : s)
                 )
               }
-              onCliChange={(newCli) =>
-                // Switch is destructive on the server (clears claude_session_id +
-                // model atomically). Mirror the same clears locally so the next
-                // chat send doesn't try to resume the old CLI's stale handle.
-                setSessions((prev) =>
-                  prev.map((s) => s.id === activeSessionId
-                    ? { ...s, cli: newCli, claude_session_id: null, model: null }
-                    : s)
-                )
-              }
               onCompact={handleCompact}
               schedulesTick={schedulesTick}
               artifactRefreshTick={artifactRefreshTick}
@@ -714,12 +725,25 @@ export default function App() {
               {activeProjectId ? (
                 <>
                   <p>No sessions in this project yet.</p>
-                  <button
-                    className="bg-blue-600 hover:bg-blue-700 text-white border-none px-6 py-2.5 rounded-lg cursor-pointer text-[15px] transition-colors"
-                    onClick={handleNewSession}
-                  >
-                    New Chat
-                  </button>
+                  {/* One button per available adapter so the user picks
+                      explicitly — same per-session immutable-CLI rule the
+                      sidebar + button enforces, just laid out flat here
+                      since this empty state has the room. */}
+                  {availableClis.length === 0 ? (
+                    <p className="text-[12px] text-app-text-7 italic">Loading…</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {availableClis.map((cli) => (
+                        <button
+                          key={cli}
+                          className="bg-blue-600 hover:bg-blue-700 text-white border-none px-6 py-2.5 rounded-lg cursor-pointer text-[15px] transition-colors capitalize"
+                          onClick={() => { void handleNewSession(cli) }}
+                        >
+                          New Chat with {cli}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </>
               ) : (
                 <p>Create a project to start chatting.</p>

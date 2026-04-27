@@ -14,6 +14,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SessionSidebar } from '../components/SessionSidebar'
 import { mockProjects, mockSessions } from './msw-server'
+import type { CliName } from '../lib/api'
 
 function renderSidebar(overrides: Partial<React.ComponentProps<typeof SessionSidebar>> = {}) {
   const handlers = {
@@ -26,6 +27,9 @@ function renderSidebar(overrides: Partial<React.ComponentProps<typeof SessionSid
     activeSessionId: 'ses-1',
     onSelectSession: vi.fn(),
     onNewSession: vi.fn(),
+    // Default mirrors a multi-CLI deploy so the popover-path tests trigger
+    // by default. Single-CLI / loading scenarios override this explicitly.
+    availableClis: ['claude', 'opencode'] as CliName[],
     onDeleteSession: vi.fn(),
     onDeleteAllSessions: vi.fn(),
     onRenameSession: vi.fn().mockResolvedValue(undefined),
@@ -55,10 +59,39 @@ describe('SessionSidebar', () => {
     expect(onSelectSession).toHaveBeenCalledWith('ses-2')
   })
 
-  it('calls onNewSession when + button is clicked', async () => {
+  it('opens the CLI picker popover when + is clicked (multi-CLI deploy)', async () => {
     const { onNewSession } = renderSidebar()
     await userEvent.click(screen.getByTitle('New Chat'))
-    expect(onNewSession).toHaveBeenCalled()
+    // Popover header confirms it opened; both adapter buttons are present.
+    expect(screen.getByText('New chat with')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'claude' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'opencode' })).toBeInTheDocument()
+    // The + click alone must not create a session — only an explicit pick does.
+    expect(onNewSession).not.toHaveBeenCalled()
+  })
+
+  it('calls onNewSession with the picked CLI', async () => {
+    const { onNewSession } = renderSidebar()
+    await userEvent.click(screen.getByTitle('New Chat'))
+    await userEvent.click(screen.getByRole('menuitem', { name: 'opencode' }))
+    expect(onNewSession).toHaveBeenCalledWith('opencode')
+    expect(onNewSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips the popover and creates directly with the only CLI (single-adapter deploy)', async () => {
+    const { onNewSession } = renderSidebar({ availableClis: ['claude'] })
+    await userEvent.click(screen.getByTitle('New Chat'))
+    expect(onNewSession).toHaveBeenCalledWith('claude')
+    // No popover — verifies the "no useless picker" branch.
+    expect(screen.queryByText('New chat with')).not.toBeInTheDocument()
+  })
+
+  it('disables the + button while adapters are still loading', async () => {
+    const { onNewSession } = renderSidebar({ availableClis: [] })
+    const button = screen.getByTitle('Loading…')
+    expect(button).toBeDisabled()
+    await userEvent.click(button)
+    expect(onNewSession).not.toHaveBeenCalled()
   })
 
   it('calls onDeleteSession with confirmation', async () => {
