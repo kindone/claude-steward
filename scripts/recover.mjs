@@ -17,7 +17,13 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const dbPath = path.resolve(__dirname, '../server/steward.db')
+// Respect an inherited DATABASE_PATH so this script works in containers
+// (where the DB lives on a named volume at /data/steward.db) and on hosts
+// (where it lives next to the source). Without this, node:sqlite silently
+// creates a fresh empty DB at the fallback path and the script reports
+// "0 messages / DB empty" — which is what tripped up the in-container
+// rate-limit-recovery flow.
+const dbPath = process.env.DATABASE_PATH || path.resolve(__dirname, '../server/steward.db')
 const db = new DatabaseSync(dbPath)
 
 const args = process.argv.slice(2)
