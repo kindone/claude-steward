@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg: #0f1117;
+  --color-surface: #1a1d27;
+  --color-border: #2a2d3a;
+  --color-text: #e2e8f0;
+  --color-muted: #64748b;
+  --color-accent: #7c6af7;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+}
+
+textarea, pre, code {
+  font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 13px;
+}
+
+/* Prevent background scroll when a cell is in fullscreen mode */
+body.nb-fullscreen {
+  overflow: hidden;
+}
+
+/* Markdown rendering in chat */
+.prose-chat { line-height: 1.6; }
+.prose-chat p { margin: 0 0 0.5em; }
+.prose-chat p:last-child { margin-bottom: 0; }
+.prose-chat h1, .prose-chat h2, .prose-chat h3, .prose-chat h4 {
+  font-weight: 600; margin: 0.75em 0 0.25em;
+}
+.prose-chat h1 { font-size: 1.15em; }
+.prose-chat h2 { font-size: 1.05em; }
+.prose-chat h3 { font-size: 1em; }
+.prose-chat ul, .prose-chat ol { margin: 0.25em 0 0.5em 1.25em; padding: 0; }
+.prose-chat li { margin: 0.15em 0; }
+.prose-chat code {
+  font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+  font-size: 12px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 3px;
+  padding: 0.1em 0.35em;
+}
+.prose-chat pre {
+  background: rgba(0,0,0,0.35);
+  border-radius: 6px;
+  padding: 0.75em 1em;
+  overflow-x: auto;
+  margin: 0.4em 0;
+}
+.prose-chat pre code { background: none; padding: 0; font-size: 12px; }
+.prose-chat blockquote {
+  border-left: 3px solid var(--color-border);
+  margin: 0.4em 0;
+  padding: 0.2em 0.75em;
+  color: var(--color-muted);
+}
+.prose-chat hr { border: none; border-top: 1px solid var(--color-border); margin: 0.5em 0; }
+
+/* Markdown tables */
+.prose-chat table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12px;
+  margin: 0.5em 0;
+  overflow-x: auto;
+  display: block;
+}
+.prose-chat th, .prose-chat td {
+  border: 1px solid var(--color-border);
+  padding: 4px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+.prose-chat th { background: rgba(255,255,255,0.05); font-weight: 600; }
+.prose-chat tr:nth-child(even) td { background: rgba(255,255,255,0.02); }
+.prose-chat a { color: var(--color-accent); text-decoration: none; }
+.prose-chat a:hover { text-decoration: underline; }
+.prose-chat strong { font-weight: 600; }
+.prose-chat em { font-style: italic; }
+
+/* Mermaid diagram containers */
+.nb-mermaid {
+  overflow-x: auto;
+}
+
+.nb-mermaid svg {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
