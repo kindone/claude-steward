@@ -47,7 +47,7 @@ echo 'STEWARD_TEST_OAUTH_TOKEN=<paste-token-here>' >> .env
 
 # Optional: set a fixed API key so you can log into the steward UI without
 # going through the passkey flow each test run.
-echo 'STEWARD_API_KEY=<some-secret>' >> .env
+echo 'API_KEY=<some-secret>' >> .env
 ```
 
 `.env` is already gitignored.

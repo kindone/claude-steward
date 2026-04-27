@@ -10,7 +10,7 @@
 #
 #   2. Store the token in a root-level .env file (gitignored):
 #        echo 'STEWARD_TEST_OAUTH_TOKEN=<paste-token-here>' >> .env
-#        echo 'STEWARD_API_KEY=<some-secret>'               >> .env   # optional
+#        echo 'API_KEY=<some-secret>'                     >> .env   # optional
 #
 #   3. (Optional) Mount a .env for APP_DOMAIN / VAPID keys inside the container:
 #        cp .env docker/.env.container   # then uncomment the volume line below
@@ -47,7 +47,7 @@ services:
       - APP_DOMAIN=test.steward.jradoo.com
       # API_KEY: set this to log in via "Sign in directly" (no passkey needed for test).
       # Use a secret value; omit or leave empty to disable key-based login.
-      - API_KEY=${STEWARD_API_KEY:-}
+      - API_KEY=${API_KEY:-}
       # Claude CLI is installed globally by npm install -g in the Dockerfile
       - CLAUDE_PATH=/usr/local/bin/claude
       # Long-lived OAuth token generated via `claude setup-token`.
