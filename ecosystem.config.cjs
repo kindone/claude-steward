@@ -62,6 +62,20 @@ module.exports = {
       // the worker's own clean exit always wins in normal operation; this
       // safety net only fires if the worker process itself is genuinely hung.
       kill_timeout: 90000,
+      // Don't tree-kill on restart — the whole point of the drain is to let
+      // in-flight Claude/opencode child subprocesses finish their HTTPS calls
+      // before the worker exits. With PM2's default treekill: true, PM2 walks
+      // the process tree and SIGTERMs every child, aborting Google API calls
+      // mid-stream. The user sees "Request was aborted" / step_finish never
+      // fires / chat shows partial results. Worker drain is the right level
+      // of granularity; PM2 should target only the worker process.
+      //
+      // Trade-off: if drain hits its 60s timeout with an active job, the
+      // child becomes orphan and runs to completion under init — no result
+      // makes it back to steward-main since the worker socket is gone, so
+      // the user still sees a cut-off response. Acceptable; same as today,
+      // and it only happens for jobs longer than 60s (rare).
+      treekill: false,
       env: {
         NODE_ENV: 'production',
         // Respect an inherited DATABASE_PATH (e.g. set by docker-compose's

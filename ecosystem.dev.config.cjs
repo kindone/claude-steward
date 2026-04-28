@@ -57,6 +57,9 @@ module.exports = {
       // Match the prod kill_timeout so dev exercises the same drain semantics
       // — see ecosystem.config.cjs for the layered-timeout rationale.
       kill_timeout: 90000,
+      // Same reason as prod — PM2's tree-kill aborts in-flight CLI HTTPS
+      // requests mid-stream. See ecosystem.config.cjs for the long version.
+      treekill: false,
       env: {
         NODE_ENV: 'development',
         // Respect an inherited DATABASE_PATH if set, else use the dev DB.
