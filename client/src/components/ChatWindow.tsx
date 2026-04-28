@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, updateSystemPrompt, updatePermissionMode, updateSessionModel, compactSession, getSessionChain, updateSessionTimezone, listArtifacts, createArtifact, deriveArtifactName, toolDisplayName, toolDisplayDetail, fetchMeta, type ChainSegment, type ClaudeErrorCode, type PermissionMode, type ToolCall, type Message as ApiMessage, type UsageInfo, type Artifact, type ArtifactType, type ModelOption, type CliName, type AdapterInfo } from '../lib/api'
 import { CompactDivider } from './CompactDivider'
 
@@ -26,6 +26,53 @@ const FALLBACK_MODEL_OPTIONS: ModelOption[] = [
   { value: 'claude-sonnet-4-5',  label: 'Sonnet 4.5' },
   { value: 'claude-haiku-4-5',   label: 'Haiku 4.5' },
 ]
+
+/**
+ * Group dropdown options by provider prefix (everything before the first `/`
+ * in the slug — e.g. `openai/gpt-5-mini` → "Openai"). Options without a `/`
+ * (Claude adapter slugs like `claude-opus-4-6`) and the `null`-valued
+ * "Default" entry land in an unlabelled bucket. Order within each group is
+ * preserved from the source list.
+ *
+ * Why: a flat list of the opencode adapter's models mixes google/anthropic/
+ * openai entries together, making it easy to pick "anthropic/claude-…" when
+ * the user actually meant "openai/…" — same family-name shadowing that bit
+ * us in production once already.
+ */
+function groupModelOptions(opts: ModelOption[]): { label: string | null; options: ModelOption[] }[] {
+  const groups: { label: string | null; options: ModelOption[] }[] = []
+  let current: { label: string | null; options: ModelOption[] } | null = null
+  for (const opt of opts) {
+    const groupLabel: string | null = opt.value === null
+      ? null
+      : opt.value.includes('/')
+        ? capitalize(opt.value.split('/', 1)[0])
+        : null
+    if (!current || current.label !== groupLabel) {
+      current = { label: groupLabel, options: [] }
+      groups.push(current)
+    }
+    current.options.push(opt)
+  }
+  return groups
+}
+
+function capitalize(s: string): string {
+  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1)
+}
+
+/**
+ * Find the human-readable label for a session's current model value. Used by
+ * the header chip so we don't show raw slugs (`openai/gpt-5-mini`) when the
+ * adapter list has friendly names (`GPT-5 Mini`). Falls back to the raw
+ * slug if no label is registered (e.g. session was set to a model that's
+ * been removed from the curated list).
+ */
+function findModelLabel(opts: ModelOption[], value: string | null): string {
+  if (value === null) return 'Default'
+  const hit = opts.find((o) => o.value === value)
+  return hit?.label ?? value
+}
 import { MessageBubble } from './MessageBubble'
 import { MessageInput } from './MessageInput'
 import { SchedulePanel } from './SchedulePanel'
@@ -669,6 +716,21 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
             >
               ℹ
             </button>
+            {/* Current model — read-only chip in the header so the active
+                provider is visible at a glance (without opening the debug
+                panel). Click toggles the debug panel where the actual model
+                <select> lives. Truncates on small screens to fit. The chip
+                shows the friendly label (e.g. "GPT-5 Mini") rather than the
+                raw slug ("openai/gpt-5-mini") to match the dropdown UX. */}
+            <button
+              className={`bg-transparent border-none cursor-pointer text-xs py-1.5 px-1 text-left transition-colors min-w-0 ${debugOpen ? 'text-blue-400' : 'text-app-text-7 hover:text-app-text-4'}`}
+              onClick={() => setDebugOpen((o) => !o)}
+              title={`Model: ${model ?? 'Default (env)'} — click to change`}
+            >
+              <span className="truncate inline-block max-w-[10rem] sm:max-w-[14rem] align-middle">
+                {findModelLabel(modelOptions, model ?? null)}
+              </span>
+            </button>
           </span>
 
           <span className="flex items-center gap-1 sm:gap-2">
@@ -784,9 +846,18 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
                 onChange={(e) => handleModelChange(e.target.value || null)}
                 title="Model for this session"
               >
-                {modelOptions.map((opt) => (
-                  <option key={opt.value ?? ''} value={opt.value ?? ''}>{opt.label}</option>
-                ))}
+                {groupModelOptions(modelOptions).map((group, gi) => {
+                  const opts = group.options.map((opt) => (
+                    <option key={opt.value ?? ''} value={opt.value ?? ''}>{opt.label}</option>
+                  ))
+                  // <select> only accepts <option>/<optgroup>, so for unlabelled
+                  // buckets (the "Default" entry, claude-adapter bare slugs) we
+                  // emit the options directly inside a Fragment instead of
+                  // wrapping in an <optgroup label="">.
+                  return group.label
+                    ? <optgroup key={group.label} label={group.label}>{opts}</optgroup>
+                    : <Fragment key={`__bare-${gi}`}>{opts}</Fragment>
+                })}
               </select>
             </div>
           </div>
