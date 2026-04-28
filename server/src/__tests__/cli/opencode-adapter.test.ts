@@ -328,7 +328,26 @@ describe('opencodeAdapter.buildEnv', () => {
       ANTHROPIC_API_KEY: 'a',
       GEMINI_API_KEY: 'gem',
     }
-    expect(opencodeAdapter.buildEnv(env)).toEqual(env)
+    const out = opencodeAdapter.buildEnv(env)
+    expect(out.GOOGLE_GENERATIVE_AI_API_KEY).toBe('g')
+    expect(out.ANTHROPIC_API_KEY).toBe('a')
+    expect(out.GEMINI_API_KEY).toBe('gem')
+  })
+
+  it('defaults OPENCODE_ENABLE_EXA to "1" so the websearch tool is gated in', () => {
+    const out = opencodeAdapter.buildEnv({ PATH: '/usr/bin' })
+    expect(out.OPENCODE_ENABLE_EXA).toBe('1')
+  })
+
+  it('respects an explicit OPENCODE_ENABLE_EXA value (deployment override)', () => {
+    expect(opencodeAdapter.buildEnv({ OPENCODE_ENABLE_EXA: 'true' }).OPENCODE_ENABLE_EXA).toBe('true')
+    // Empty string = deployment opt-out; opencode reads it as falsy.
+    expect(opencodeAdapter.buildEnv({ OPENCODE_ENABLE_EXA: '' }).OPENCODE_ENABLE_EXA).toBe('')
+  })
+
+  it('passes EXA_API_KEY through unchanged (opencode/Exa reads it directly)', () => {
+    const out = opencodeAdapter.buildEnv({ EXA_API_KEY: 'sk-test' })
+    expect(out.EXA_API_KEY).toBe('sk-test')
   })
 })
 

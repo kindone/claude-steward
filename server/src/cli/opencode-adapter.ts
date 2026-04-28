@@ -375,6 +375,21 @@ function buildArgs(opts: LaunchOptions): string[] {
  * We still strip `CLAUDECODE`/`CLAUDE_CODE_*` proactively so an opencode child
  * can't accidentally trigger Claude-CLI sub-agent behavior if it ever spawns
  * claude as a downstream tool (defensive, not currently required).
+ *
+ * ## OPENCODE_ENABLE_EXA gate
+ *
+ * opencode's built-in `websearch` tool is gated behind this env var (or
+ * picking the OpenCode/Zen provider — not our path). Without it, the tool is
+ * never registered, so the model never sees it and `permission.websearch:
+ * "allow"` in opencode.json is permission for nothing. We default it to '1'
+ * so steward sessions get web search out of the box. Deployments that want
+ * to disable can set `OPENCODE_ENABLE_EXA=` (empty) in the host env — that
+ * gets passed through unchanged and opencode reads it as falsy.
+ *
+ * Backing service is Exa AI's anonymous MCP at mcp.exa.ai/mcp (no API key
+ * required, aggressive but unpublished rate limit). Set `EXA_API_KEY` in the
+ * host env for the free 1k/mo tier; it's already passed through by the
+ * loop above.
  */
 function buildEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const out: NodeJS.ProcessEnv = {}
@@ -382,6 +397,11 @@ function buildEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     if (val === undefined) continue
     if (key === 'CLAUDECODE') continue
     out[key] = val
+  }
+  // Default ON. Deployment can opt out by exporting OPENCODE_ENABLE_EXA=''
+  // (empty string passes through above and opencode treats it as falsy).
+  if (!('OPENCODE_ENABLE_EXA' in out)) {
+    out.OPENCODE_ENABLE_EXA = '1'
   }
   return out
 }
