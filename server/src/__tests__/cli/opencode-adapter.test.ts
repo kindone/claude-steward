@@ -366,6 +366,29 @@ describe('opencodeAdapter.classifyError', () => {
     expect(opencodeAdapter.classifyError('session not found', true)).toBe('session_expired')
   })
 
+  it('routes ProviderModelNotFoundError to process_error, NOT session_expired', () => {
+    // Regression: the error name contains "not found" — earlier versions
+    // matched the bare 'not found' substring and tagged this session_expired,
+    // bricking the chat UI with the "previous session could not be resumed"
+    // banner when the real fix is to pick a different model.
+    expect(opencodeAdapter.classifyError(
+      'ProviderModelNotFoundError: ProviderModelNotFoundError',
+      true,
+    )).toBe('process_error')
+    expect(opencodeAdapter.classifyError('model not found: gemma-x', true)).toBe('process_error')
+    expect(opencodeAdapter.classifyError('Unknown model foo/bar', false)).toBe('process_error')
+  })
+
+  it('does NOT mis-tag arbitrary errors as session_expired just because hadResume=true', () => {
+    // Regression for the same class of bug — `hadResume` alone is no longer
+    // enough to declare the session dead.
+    expect(opencodeAdapter.classifyError('Some unexpected error', true)).toBe('process_error')
+    expect(opencodeAdapter.classifyError('network unreachable', true)).toBe('process_error')
+    // Bare "not found" without "session" / "model" / "conversation" context
+    // should NOT trip session_expired either.
+    expect(opencodeAdapter.classifyError('Tool foo not found', true)).toBe('process_error')
+  })
+
   it('falls through to process_error for unknown messages without resume', () => {
     expect(opencodeAdapter.classifyError('unspecified provider failure', false)).toBe('process_error')
   })

@@ -130,15 +130,22 @@ function normalizeToolResultContent(content: unknown): string {
 }
 
 /**
- * Heuristic error classification. Inspects the raw error text and a flag
- * indicating whether a resume was being attempted. Centralized here (was
- * previously duplicated across spawnClaude / JobManager / their close handlers).
+ * Heuristic error classification. Inspects the raw error text. Centralized
+ * here (was previously duplicated across spawnClaude / JobManager / their
+ * close handlers).
  *
- * Order matters: context-limit and overload checks short-circuit before the
- * session-expired heuristic, which is the broadest catchall when a resume was
- * in flight.
+ * Order matters: quota / context / model checks short-circuit ahead of the
+ * session-expired branch.
+ *
+ * The `hadResume` flag is intentionally NOT used as a fallback. Earlier
+ * versions tagged any error during a resume as `session_expired`, which
+ * produced the misleading "previous session could not be resumed" banner
+ * for unrelated transient failures (model rejection, network blip, etc.).
+ * Now we require explicit session-failure phrasing — anything else falls
+ * through to `process_error`, which displays a generic "something went
+ * wrong; retry" instead of falsely declaring the session dead.
  */
-function classifyError(text: string, hadResume: boolean): ErrorCode {
+function classifyError(text: string, _hadResume: boolean): ErrorCode {
   const lower = (text || '').toLowerCase()
   const isProviderQuota =
     lower.includes('quota') ||
@@ -161,9 +168,28 @@ function classifyError(text: string, hadResume: boolean): ErrorCode {
     lower.includes('maximum') ||
     lower.includes('token limit')
   if (isContextLimit) return 'context_limit'
-  if (hadResume || lower.includes('session') || lower.includes('conversation')) {
-    return 'session_expired'
-  }
+
+  // Model / provider rejection. Catches Claude's "Invalid model" and the
+  // analogous opencode signal in case it ever surfaces here too.
+  const isModelError =
+    lower.includes('invalid model') ||
+    lower.includes('unknown model') ||
+    lower.includes('model not found') ||
+    (lower.includes('model') && lower.includes('not found'))
+  if (isModelError) return 'process_error'
+
+  // Session expired — explicit phrasing only.
+  const isSessionExpired =
+    lower.includes('session not found') ||
+    lower.includes('session expired') ||
+    lower.includes('session has expired') ||
+    lower.includes('no such session') ||
+    lower.includes('could not resume') ||
+    lower.includes('could not be resumed') ||
+    lower.includes('conversation not found') ||
+    lower.includes('no conversation found')
+  if (isSessionExpired) return 'session_expired'
+
   return 'process_error'
 }
 

@@ -193,12 +193,21 @@ function toolOutputToString(out: unknown): string {
 /**
  * Heuristic error classification for opencode failures. Mirrors the Claude
  * adapter's policy so canonical {@link ErrorCode} values stay consistent
- * across adapters, with one refinement: auth/credential errors short-circuit
- * to process_error before the session-expired catchall, since those errors
- * have nothing to do with session state and would otherwise be misclassified
- * when a resume was in flight.
+ * across adapters.
+ *
+ * Order matters — auth/quota/context/model checks short-circuit ahead of
+ * the session-expired branch, because those errors have nothing to do with
+ * session state and were previously misclassified when a resume happened
+ * to be in flight.
+ *
+ * The `hadResume` flag is intentionally NOT used as a fallback signal.
+ * Earlier versions tagged any error during a resume as `session_expired`,
+ * which produced the misleading "previous session could not be resumed"
+ * banner for unrelated transient failures (model rejection, MCP startup,
+ * etc.) — see commit history around the rebrand for the failure case
+ * that prompted this tightening.
  */
-function classifyError(text: string, hadResume: boolean): ErrorCode {
+function classifyError(text: string, _hadResume: boolean): ErrorCode {
   const lower = (text || '').toLowerCase()
 
   // Auth / credential / authorization failures → process_error regardless of
@@ -235,9 +244,32 @@ function classifyError(text: string, hadResume: boolean): ErrorCode {
     lower.includes('token limit')
   if (isContextLimit) return 'context_limit'
 
-  if (hadResume || lower.includes('session') || lower.includes('not found')) {
-    return 'session_expired'
-  }
+  // Model / provider rejection — opencode's `ProviderModelNotFoundError` and
+  // similar. MUST come ahead of the session-expired check because the error
+  // name contains "not found" and would otherwise be mis-tagged.
+  const isModelError =
+    lower.includes('providermodelnotfound') ||
+    lower.includes('model not found') ||
+    lower.includes('unknown model') ||
+    lower.includes('invalid model') ||
+    (lower.includes('model') && lower.includes('not found'))
+  if (isModelError) return 'process_error'
+
+  // Session expired — explicit phrasing only. We require a specific session-
+  // failure idiom; we no longer fall back on `hadResume` alone or on bare
+  // 'session' / 'not found' substrings, both of which false-positive on
+  // unrelated errors during a resume.
+  const isSessionExpired =
+    lower.includes('session not found') ||
+    lower.includes('session expired') ||
+    lower.includes('session has expired') ||
+    lower.includes('no such session') ||
+    lower.includes('could not resume') ||
+    lower.includes('could not be resumed') ||
+    lower.includes('conversation not found') ||
+    lower.includes('no conversation found')
+  if (isSessionExpired) return 'session_expired'
+
   return 'process_error'
 }
 

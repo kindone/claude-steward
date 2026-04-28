@@ -258,8 +258,23 @@ describe('claudeAdapter.classifyError', () => {
     expect(claudeAdapter.classifyError('context window too long', true)).toBe('context_limit')
   })
 
-  it('returns session_expired when a resume was in flight and not an overload', () => {
+  it('returns session_expired only when the error has explicit session phrasing', () => {
     expect(claudeAdapter.classifyError('No conversation found', true)).toBe('session_expired')
+    expect(claudeAdapter.classifyError('session not found', true)).toBe('session_expired')
+    expect(claudeAdapter.classifyError('previous session has expired', false)).toBe('session_expired')
+  })
+
+  it('does NOT mis-tag generic errors as session_expired just because hadResume=true', () => {
+    // Regression: previously `hadResume || lower.includes('session') || lower.includes('conversation')`
+    // would tag literally any error during a resume as session_expired, producing
+    // the "previous session could not be resumed" banner for unrelated failures.
+    expect(claudeAdapter.classifyError('Some unexpected error', true)).toBe('process_error')
+    expect(claudeAdapter.classifyError('network unreachable', true)).toBe('process_error')
+  })
+
+  it('routes invalid/unknown model errors to process_error', () => {
+    expect(claudeAdapter.classifyError('Invalid model: claude-foo', true)).toBe('process_error')
+    expect(claudeAdapter.classifyError('Unknown model bar', true)).toBe('process_error')
   })
 
   it('treats 529 / overload as provider_quota even when resume was in flight', () => {
