@@ -227,4 +227,10 @@ export class JobManager {
   partialContent(sessionId: string): string {
     return jobQueries.find(sessionId)?.content ?? ''
   }
+
+  /** Number of in-flight jobs. Used by the worker shutdown path to drain
+   *  before exiting. Pure read, no side effects. */
+  activeCount(): number {
+    return this.jobs.size
+  }
 }

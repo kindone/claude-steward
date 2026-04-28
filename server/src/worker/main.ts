@@ -75,6 +75,20 @@ const server = net.createServer((socket) => {
     console.log(`[worker] command: ${cmd.type} session=${cmd.sessionId}`)
 
     if (cmd.type === 'start') {
+      // Refuse new jobs once SIGTERM has arrived — we're draining.
+      // Broadcast a synthetic error so steward-main can close the SSE with a
+      // sensible message instead of leaving the user with a hung spinner.
+      if (shuttingDown) {
+        console.warn(`[worker] shutting down — rejecting start for session ${cmd.sessionId}`)
+        broadcast({
+          type: 'error',
+          sessionId: cmd.sessionId,
+          errorCode: 'process_error',
+          message: 'Worker is restarting — please retry in a moment.',
+          content: '',
+        })
+        return
+      }
       manager.start({
         sessionId: cmd.sessionId,
         prompt: cmd.prompt,
@@ -130,10 +144,69 @@ server.on('error', (err) => {
   process.exit(1)
 })
 
-// Graceful shutdown
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+//
+// On SIGTERM/SIGINT, drain in-flight jobs before exiting so the agent's
+// streaming response can land in the DB and the SSE relay through
+// steward-main can flush cleanly. PM2's kill_timeout (set in
+// ecosystem.config.cjs to 90s) gates the hard SIGKILL fallback — we self-bound
+// to 60s so the worker's own clean exit always wins in normal operation,
+// leaving 30s headroom before PM2 force-kills.
+//
+// New `start` commands during the drain are rejected (see the 'start' handler
+// above) — broadcasting an error event lets steward-main close the SSE with a
+// "retry in a moment" message instead of leaving the spinner hung.
+
+const DRAIN_TIMEOUT_MS = 60_000
+const DRAIN_POLL_MS = 200
+
+let shuttingDown = false
+
 function shutdown() {
-  console.log('[worker] shutting down')
-  server.close()
+  if (shuttingDown) return  // re-entrant safety (double-signal, etc.)
+  shuttingDown = true
+
+  const initial = manager.activeCount()
+  console.log(`[worker] shutdown requested — draining ${initial} active job(s) (max ${DRAIN_TIMEOUT_MS}ms)`)
+
+  // Stop accepting new socket connections; existing ones stay open so
+  // in-flight jobs continue streaming events back to steward-main.
+  server.close((err) => {
+    if (err) console.error('[worker] server.close error:', err.message)
+  })
+
+  if (initial === 0) {
+    finalize('no active jobs')
+    return
+  }
+
+  const start = Date.now()
+  let lastLogged = 0
+
+  const poll = setInterval(() => {
+    const active = manager.activeCount()
+    const elapsed = Date.now() - start
+
+    if (active === 0) {
+      clearInterval(poll)
+      finalize(`drain complete in ${elapsed}ms`)
+      return
+    }
+    if (elapsed >= DRAIN_TIMEOUT_MS) {
+      clearInterval(poll)
+      finalize(`drain timeout (${DRAIN_TIMEOUT_MS}ms) — ${active} job(s) still active, forcing exit`)
+      return
+    }
+    // Periodic progress log every ~5s so operators can see what's happening.
+    if (elapsed - lastLogged >= 5000) {
+      lastLogged = elapsed
+      console.log(`[worker] draining: ${active} active, ${Math.floor(elapsed / 1000)}s elapsed`)
+    }
+  }, DRAIN_POLL_MS)
+}
+
+function finalize(reason: string): void {
+  console.log(`[worker] exiting: ${reason}`)
   for (const client of clients) client.destroy()
   process.exit(0)
 }

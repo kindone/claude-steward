@@ -56,6 +56,12 @@ module.exports = {
       max_restarts: 5,
       min_uptime: '10s',
       watch: false,
+      // Give the worker up to 90s to gracefully drain in-flight jobs after
+      // SIGINT/SIGTERM before PM2 force-kills it. Worker self-bounds at 60s
+      // (see DRAIN_TIMEOUT_MS in worker/main.ts), leaving 30s headroom so
+      // the worker's own clean exit always wins in normal operation; this
+      // safety net only fires if the worker process itself is genuinely hung.
+      kill_timeout: 90000,
       env: {
         NODE_ENV: 'production',
         // Respect an inherited DATABASE_PATH (e.g. set by docker-compose's

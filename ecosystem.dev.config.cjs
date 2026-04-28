@@ -54,6 +54,9 @@ module.exports = {
       args: 'tsx watch server/src/worker/main.ts',
       autorestart: true,
       watch: false,
+      // Match the prod kill_timeout so dev exercises the same drain semantics
+      // — see ecosystem.config.cjs for the layered-timeout rationale.
+      kill_timeout: 90000,
       env: {
         NODE_ENV: 'development',
         // Respect an inherited DATABASE_PATH if set, else use the dev DB.
