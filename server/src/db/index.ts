@@ -163,7 +163,7 @@ try {
 // `cli` records which adapter (claude / opencode) drives a session. Default
 // is locked to whatever STEWARD_CLI is set to at first migration time, so
 // existing rows on a deployment get marked with that deployment's actual
-// adapter — claude-steward gets 'claude', opencode-steward gets 'opencode'.
+// adapter — steward gets 'claude', opencode-steward gets 'opencode'.
 // After this column exists, every new session row sets `cli` explicitly via
 // the create route, so the default never matters again. NOT NULL plus the
 // env-driven default makes the post-merge picture unambiguous: every row in

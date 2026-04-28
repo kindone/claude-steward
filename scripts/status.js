@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Checks which claude-steward processes are reachable on their expected ports.
+// Checks which steward processes are reachable on their expected ports.
 import net from 'node:net'
 
 const SERVERS = [
@@ -31,7 +31,7 @@ async function checkPort(port) {
   return v4 || v6
 }
 
-console.log(`\n${BOLD}Claude Steward — server status${RESET}\n`)
+console.log(`\n${BOLD}Steward — server status${RESET}\n`)
 
 const results = await Promise.all(
   SERVERS.map(async (s) => ({ ...s, up: await checkPort(s.port) }))

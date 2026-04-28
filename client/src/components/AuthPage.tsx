@@ -72,7 +72,7 @@ export default function AuthPage({ hasCredentials, onAuthenticated }: Props) {
           <div className="mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600 text-2xl">
             🧭
           </div>
-          <h1 className="text-2xl font-semibold text-white">Claude Steward</h1>
+          <h1 className="text-2xl font-semibold text-white">Steward</h1>
           <p className="mt-1 text-sm text-app-text-4">
             {hasCredentials ? 'Sign in to continue' : 'Set up your passkey to get started'}
           </p>

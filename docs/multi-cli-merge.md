@@ -1,10 +1,10 @@
 # Multi-CLI Merge Plan
 
 How the opencode-CLI experiment lives outside this repo, what it proved, and
-what we plan to merge back into `claude-steward` (this repo).
+what we plan to merge back into `steward` (this repo).
 
 > **Status (Apr 2026) — MERGED.** The work described here landed on `main`
-> in this repo on 2026-04-27. Both repos (claude-steward, opencode-steward)
+> in this repo on 2026-04-27. Both repos (steward, opencode-steward)
 > now share the merged history through `origin/main`. The experimental
 > `opencode` branch is preserved on the remote for reference but is no
 > longer the source of truth — `main` is.
@@ -171,7 +171,7 @@ opencode-steward and claude-steward share an `origin`):
    rules) and `npm test` (fast suite: 21 server + 14 client = 360
    tests) green in both repos at the post-merge commit. `test:e2e` not
    re-run on the merge — same Claude-CLI plumbing, low regression risk.
-9. **Doc updates in claude-steward** — moved the merge task into
+9. **Doc updates in steward** — moved the merge task into
    `archived_tasks.md`; rewrote this status block to reflect ship.
 
 Open follow-up tracked in `TODO.md` "Multi-CLI Support":
@@ -231,7 +231,7 @@ opencode-steward/
 
 - **Default `STEWARD_CLI` for this deployment** — confirm `claude` (the
   current default in the experiment migration) is correct for the
-  production claude-steward instance. New sessions will all carry an
+  production steward instance. New sessions will all carry an
   explicit value from the create route, so this only matters for the
   migration-time backfill of legacy rows.
 - **Mid-session swap rollback** — confirm no UI or scripts in the

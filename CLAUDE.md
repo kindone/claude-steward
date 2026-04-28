@@ -1,4 +1,4 @@
-# Claude Steward — Claude CLI Notes
+# Steward — Claude CLI Notes
 
 > **Universal conventions live in [`AGENTS.md`](./AGENTS.md).** Read that first;
 > this file only adds Claude-specific gotchas you need when working with the

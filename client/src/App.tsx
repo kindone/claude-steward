@@ -545,7 +545,7 @@ export default function App() {
 
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const activeSession = sessions.find((s) => s.id === activeSessionId)
-  const mobileTitle = activeSession?.title ?? activeProject?.name ?? 'Claude Steward'
+  const mobileTitle = activeSession?.title ?? activeProject?.name ?? 'Steward'
 
   if (authState === 'loading') {
     return (

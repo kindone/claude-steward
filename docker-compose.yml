@@ -2,7 +2,7 @@
 #
 # Successor to the original cline experiment. Targets opencode (Go binary,
 # lightweight per-invocation startup) as the primary alternative CLI to
-# Claude Code. Coexists with the host's claude-steward via container/volume
+# Claude Code. Coexists with the host's steward via container/volume
 # isolation and ports 23001/23003.
 #
 # ── CLI selection ─────────────────────────────────────────────────────────────

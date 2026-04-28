@@ -98,5 +98,5 @@ const PORT = parseInt(process.env.PORT ?? '3001', 10)
 
 const app = createApp()
 app.listen(PORT, () => {
-  console.log(`claude-steward server running on http://localhost:${PORT}`)
+  console.log(`steward server running on http://localhost:${PORT}`)
 })

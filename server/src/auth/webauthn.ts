@@ -24,7 +24,7 @@ export function getWebAuthnConfig() {
     ? ['http://localhost:5173', 'http://localhost:3001', 'http://localhost:3002']
     : [`https://${domain}`, `https://dev.${domain}`]
 
-  return { rpID, rpName: 'Claude Steward', expectedOrigins }
+  return { rpID, rpName: 'Steward', expectedOrigins }
 }
 
 export function storeChallenge(type: 'registration' | 'authentication', challenge: string) {

@@ -1,4 +1,4 @@
-# Claude Steward — Archived TODO
+# Steward — Archived TODO
 
 ## Done
 

@@ -1,4 +1,4 @@
-# Claude Steward — Bug Tracker
+# Steward — Bug Tracker
 
 Known defects. Fixed bugs → `archived_tasks.md` (§ Fixed Bugs). New features → `TODO.md`.
 

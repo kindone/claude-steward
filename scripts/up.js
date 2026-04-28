@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Starts Claude Steward in the given mode (dev or prod) via PM2.
+// Starts Steward in the given mode (dev or prod) via PM2.
 // Checks for port conflicts first and prints a clear error if any are detected.
 import net from 'node:net'
 import { execSync } from 'node:child_process'
@@ -50,7 +50,7 @@ async function checkPort(port) {
   return v4 || v6
 }
 
-console.log(`\n${BOLD}Claude Steward — starting (${mode})${RESET}\n`)
+console.log(`\n${BOLD}Steward — starting (${mode})${RESET}\n`)
 
 const results = await Promise.all(
   PORTS[mode].map(async (p) => ({ ...p, occupied: await checkPort(p.port) }))

@@ -1,4 +1,4 @@
-# Claude Steward
+# Steward
 
 > **Work in progress** — core features are functional but the project is actively evolving.
 

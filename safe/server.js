@@ -251,5 +251,5 @@ const server = http.createServer(async (req, res) => {
 })
 
 server.listen(PORT, () => {
-  console.log(`claude-steward SAFE MODE running on http://localhost:${PORT}`)
+  console.log(`steward SAFE MODE running on http://localhost:${PORT}`)
 })

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # create-app.sh — clone this template into a new docs project and register it
-# as a Claude Steward mini app.
+# as a Steward mini app.
 #
 # Usage:
 #   bash create-app.sh <app-name> [destination-dir]
@@ -46,7 +46,7 @@ echo "Next steps:"
 echo ""
 echo "  1. Customise mkdocs.yml and docs/ content."
 echo ""
-echo "  2. Register it as a Claude Steward mini app via the API:"
+echo "  2. Register it as a Steward mini app via the API:"
 echo ""
 echo "     curl -s -X POST http://localhost:3001/api/projects/<PROJECT_ID>/apps \\"
 echo "       -H 'Content-Type: application/json' \\"
@@ -58,6 +58,6 @@ echo "         \"commandTemplate\": \"node $DOCS_SERVER {port} --docs-dir $DEST_
 echo "         \"workDir\": \"$DEST_DIR\""
 echo "       }'"
 echo ""
-echo "  3. Start the app from the Claude Steward Apps panel, or:"
+echo "  3. Start the app from the Steward Apps panel, or:"
 echo "     curl -X POST http://localhost:3001/api/apps/<CONFIG_ID>/start -H 'Authorization: Bearer <TOKEN>'"
 echo ""

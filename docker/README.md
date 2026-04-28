@@ -1,4 +1,4 @@
-# Docker — Claude Steward
+# Docker — Steward
 
 ## Why a long-lived token
 
@@ -206,7 +206,7 @@ any other session — including your own prod `~/.claude/`.
 | 23001 | 3001 | Main server (HTTP API + static files) |
 | 23003 | 3003 | Safe-mode fallback |
 
-(Sister project `claude-steward` uses 13001/13003 — different prefix so the
+(Sister project `steward` uses 13001/13003 — different prefix so the
 two test containers can run side-by-side without conflict.)
 
 Mini-app ports (4001–4010) are not exposed by default — add them to

@@ -1,6 +1,6 @@
 # Self-Management
 
-Claude Steward can upgrade itself. The app is one of its own projects — Claude edits source files via chat, builds, and triggers a live reload without any manual deployment step.
+Steward can upgrade itself. The app is one of its own projects — Claude edits source files via chat, builds, and triggers a live reload without any manual deployment step.
 
 For the emergency fallback, see [Safe-Mode Core](safe.md).
 

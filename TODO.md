@@ -1,4 +1,4 @@
-# Claude Steward — TODO
+# Steward — TODO
 
 Canonical task list. Completed items → `archived_tasks.md`. Bugs → `BUGS.md`. Milestone context → `docs/roadmap.md`.
 

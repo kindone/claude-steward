@@ -1,6 +1,6 @@
 # ⚠ Safe-Mode Core — DO NOT MODIFY
 
-This directory contains the emergency terminal for Claude Steward.
+This directory contains the emergency terminal for Steward.
 
 ## What it is
 

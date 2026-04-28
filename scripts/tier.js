@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Granular tier management for Claude Steward PM2 processes.
+// Granular tier management for Steward PM2 processes.
 // Usage: node scripts/tier.js <action> <tier> [--force]
 //   action: restart | down | logs
 //   tier:   prod | dev | safe | all
