@@ -89,7 +89,13 @@ const CAPABILITIES: CliCapabilities = {
  * and falls back to OPENCODE_DEFAULT_MODEL, which is exactly the bug this
  * list exists to prevent. Each provider here requires its corresponding
  * API key in the env (GEMINI_API_KEY → google/*, ANTHROPIC_API_KEY →
- * anthropic/*); without the key, opencode rejects the call at runtime.
+ * anthropic/*, OPENAI_API_KEY → openai/*); without the key, opencode
+ * rejects the call at runtime.
+ *
+ * Pricing comments (USD per Mtok input / output) are sourced from
+ * opencode's models.dev registry — see ~/.cache/opencode/models.json.
+ * Use these to judge cost vs. tier when adding entries; not authoritative
+ * billing.
  *
  * `null` = no `--model` flag, lets opencode read OPENCODE_DEFAULT_MODEL
  * (set per-deployment in compose).
@@ -104,6 +110,20 @@ const MODELS: ModelOption[] = [
   { value: 'anthropic/claude-opus-4-6',     label: 'Opus 4.6 (via opencode)' },
   { value: 'anthropic/claude-sonnet-4-6',   label: 'Sonnet 4.6 (via opencode)' },
   { value: 'anthropic/claude-haiku-4-5',    label: 'Haiku 4.5 (via opencode)' },
+  // OpenAI — OPENAI_API_KEY (cheap → frontier; pricing per Mtok in/out)
+  { value: 'openai/gpt-5-nano',             label: 'GPT-5 Nano' },               // $0.05 / $0.4
+  { value: 'openai/gpt-5.4-nano',           label: 'GPT-5.4 Nano' },             // $0.2  / $1.25
+  { value: 'openai/gpt-5-mini',             label: 'GPT-5 Mini' },               // $0.25 / $2
+  { value: 'openai/gpt-5.4-mini',           label: 'GPT-5.4 Mini' },             // $0.75 / $4.5
+  { value: 'openai/gpt-5.1',                label: 'GPT-5.1' },                  // $1.25 / $10
+  { value: 'openai/gpt-5.1-codex',          label: 'GPT-5.1 Codex' },            // $1.25 / $10
+  { value: 'openai/gpt-5.5',                label: 'GPT-5.5 (1M ctx)' },         // $5    / $30
+  { value: 'openai/gpt-5-pro',              label: 'GPT-5 Pro' },                // $15   / $120
+  { value: 'openai/gpt-4.1',                label: 'GPT-4.1' },
+  { value: 'openai/gpt-4o-mini',            label: 'GPT-4o Mini' },
+  // OpenAI reasoning
+  { value: 'openai/o3',                     label: 'o3' },
+  { value: 'openai/o4-mini',                label: 'o4-mini' },
 ]
 
 // ── Provider-shaped chunk types (opencode JSON output format) ─────────────────
