@@ -109,7 +109,7 @@ router.post('/', (req, res) => {
     if (notified === 0 && (clientDisconnectedEarly || !hasActiveClients()) && cleanText) {
       const preview = cleanText.replace(/\s+/g, ' ').trim().slice(0, 80)
       const body = preview + (cleanText.length > 80 ? '…' : '')
-      const title = session.title === 'New Chat' ? 'Claude replied' : session.title
+      const title = session.title === 'New Chat' ? 'New reply' : session.title
       const pushTarget = { sessionId, projectId: session.project_id ?? null, title, body }
       if (hasActiveClients()) {
         // User is in the app (on a different session) — show in-app toast, skip push

@@ -197,7 +197,7 @@ export function SchedulePanel({ sessionId, timezone, refreshTick }: Props) {
         <p className="text-[11px] text-app-text-6">Loading…</p>
       ) : schedules.length === 0 ? (
         <p className="text-[11px] text-app-text-7 italic">
-          No schedules yet — ask Claude to schedule something for you.
+          No schedules yet — ask the assistant to schedule something for you.
         </p>
       ) : (
         <ul className="flex flex-col gap-2">

@@ -266,7 +266,7 @@ export function MessageInput({ sessionId, projectId, onSend, onStop, disabled, f
             ref={textareaRef}
             className="flex-1 bg-transparent text-app-text px-2.5 py-2.5 text-base font-[inherit] leading-relaxed
               resize-none outline-none border-none disabled:opacity-50"
-            placeholder={dragOver ? 'Drop files here…' : 'Message Claude…'}
+            placeholder={dragOver ? 'Drop files here…' : 'Message…'}
             rows={3}
             disabled={disabled || uploading}
             onInput={handleInput}

@@ -81,14 +81,14 @@ export function KernelOutputPanel({ state, onSendToChat, onDismiss }: Props) {
           </button>
         )}
 
-        {/* Send to Claude */}
+        {/* Send to chat */}
         {status !== 'running' && outputText && onSendToChat && (
           <button
             onClick={() => onSendToChat(outputText)}
             className="text-[11px] text-app-text-5 hover:text-app-text-3 transition-colors cursor-pointer"
-            title="Send output to Claude as a follow-up message"
+            title="Send output to chat as a follow-up message"
           >
-            ↑ Send to Claude
+            ↑ Send to chat
           </button>
         )}
 

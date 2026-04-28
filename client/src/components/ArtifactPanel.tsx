@@ -341,7 +341,7 @@ function TopicSection({
         <ul className="flex flex-col gap-2 pl-3.5">
           {artifacts.length === 0 ? (
             <li className="text-[11px] text-app-text-7 italic py-1">
-              {isRoot ? 'No artifacts yet — save a code block or ask Claude to create one.' : 'Empty topic'}
+              {isRoot ? 'No artifacts yet — save a code block or ask the assistant to create one.' : 'Empty topic'}
             </li>
           ) : (
             artifacts.map(a => (
@@ -501,7 +501,7 @@ export function ArtifactPanel({ projectId, onOpen, refreshTick }: Props) {
         <p className="text-[11px] text-red-500">{error}</p>
       ) : !hasSections && artifacts.length === 0 ? (
         <p className="text-[11px] text-app-text-7 italic">
-          No artifacts yet — save a code block or ask Claude to create one.
+          No artifacts yet — save a code block or ask the assistant to create one.
         </p>
       ) : (
         <>

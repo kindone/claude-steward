@@ -126,7 +126,7 @@ router.post('/:id/run', async (req, res) => {
     if (notified === 0 && result.content) {
       const preview = result.content.replace(/\s+/g, ' ').trim()
       const payload = {
-        title: session.title === 'New Chat' ? 'Claude replied' : session.title,
+        title: session.title === 'New Chat' ? 'New reply' : session.title,
         body: preview.slice(0, 80) + (preview.length > 80 ? '…' : ''),
         url: `/?session=${schedule.session_id}${session.project_id ? `&project=${session.project_id}` : ''}`,
       }

@@ -3,9 +3,9 @@ import { sendMessage, stopChat, getMessages, watchSession, subscribeToSession, u
 import { CompactDivider } from './CompactDivider'
 
 const MODES: { value: PermissionMode; label: string; title: string }[] = [
-  { value: 'plan',              label: 'Plan', title: 'Read-only — Claude can analyse but not edit or run commands' },
-  { value: 'acceptEdits',       label: 'Edit', title: 'Claude can read and write files but not run shell commands' },
-  { value: 'bypassPermissions', label: 'Full', title: 'Claude can run any tool including shell commands' },
+  { value: 'plan',              label: 'Plan', title: 'Read-only — the assistant can analyse but not edit or run commands' },
+  { value: 'acceptEdits',       label: 'Edit', title: 'The assistant can read and write files but not run shell commands' },
+  { value: 'bypassPermissions', label: 'Full', title: 'The assistant can run any tool including shell commands' },
 ]
 
 /**
@@ -827,7 +827,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
               value={promptDraft}
               onChange={(e) => setPromptDraft(e.target.value)}
               onKeyDown={handlePromptKeyDown}
-              placeholder="Instructions sent to Claude before every message in this session…"
+              placeholder="Instructions sent to the assistant before every message in this session…"
               rows={4}
               autoFocus
             />
@@ -923,7 +923,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
           <div className="flex items-center justify-center flex-1 text-app-text-7 text-sm">
             {loadingSession
               ? <div className="flex items-center gap-2"><span className="w-4 h-4 rounded-full border-2 border-app-text-7 border-t-transparent animate-spin" /><span>Loading conversation…</span></div>
-              : <p>Start a conversation with Claude.</p>}
+              : <p>Start a conversation.</p>}
           </div>
         )}
         {messages.map((m, i) => {
