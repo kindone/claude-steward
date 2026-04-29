@@ -89,8 +89,8 @@ const CAPABILITIES: CliCapabilities = {
  * and falls back to OPENCODE_DEFAULT_MODEL, which is exactly the bug this
  * list exists to prevent. Each provider here requires its corresponding
  * API key in the env (GEMINI_API_KEY → google/*, ANTHROPIC_API_KEY →
- * anthropic/*, OPENAI_API_KEY → openai/*); without the key, opencode
- * rejects the call at runtime.
+ * anthropic/*, OPENAI_API_KEY → openai/*, GROQ_API_KEY → groq/*); without
+ * the key, opencode rejects the call at runtime.
  *
  * Pricing comments (USD per Mtok input / output) are sourced from
  * opencode's models.dev registry — see ~/.cache/opencode/models.json.
@@ -110,20 +110,35 @@ const MODELS: ModelOption[] = [
   { value: 'anthropic/claude-opus-4-6',     label: 'Opus 4.6 (via opencode)' },
   { value: 'anthropic/claude-sonnet-4-6',   label: 'Sonnet 4.6 (via opencode)' },
   { value: 'anthropic/claude-haiku-4-5',    label: 'Haiku 4.5 (via opencode)' },
-  // OpenAI — OPENAI_API_KEY (cheap → frontier; pricing per Mtok in/out)
+  // OpenAI — OPENAI_API_KEY (cheap → frontier; pricing per Mtok in/out from models.dev)
+  // GPT-5.x family (chat-optimised)
   { value: 'openai/gpt-5-nano',             label: 'GPT-5 Nano' },               // $0.05 / $0.4
   { value: 'openai/gpt-5.4-nano',           label: 'GPT-5.4 Nano' },             // $0.2  / $1.25
   { value: 'openai/gpt-5-mini',             label: 'GPT-5 Mini' },               // $0.25 / $2
   { value: 'openai/gpt-5.4-mini',           label: 'GPT-5.4 Mini' },             // $0.75 / $4.5
   { value: 'openai/gpt-5.1',                label: 'GPT-5.1' },                  // $1.25 / $10
-  { value: 'openai/gpt-5.1-codex',          label: 'GPT-5.1 Codex' },            // $1.25 / $10
+  { value: 'openai/gpt-5.2',                label: 'GPT-5.2' },                  // ~$1.75/ $14
+  { value: 'openai/gpt-5.4',                label: 'GPT-5.4 (1M ctx)' },         // $2.50 / $15
   { value: 'openai/gpt-5.5',                label: 'GPT-5.5 (1M ctx)' },         // $5    / $30
+  { value: 'openai/gpt-5',                  label: 'GPT-5' },
   { value: 'openai/gpt-5-pro',              label: 'GPT-5 Pro' },                // $15   / $120
+  // GPT-4.x (still cheap / widely supported)
+  { value: 'openai/gpt-4.1-nano',           label: 'GPT-4.1 Nano' },
+  { value: 'openai/gpt-4.1-mini',           label: 'GPT-4.1 Mini' },
   { value: 'openai/gpt-4.1',                label: 'GPT-4.1' },
   { value: 'openai/gpt-4o-mini',            label: 'GPT-4o Mini' },
+  { value: 'openai/gpt-4o',                 label: 'GPT-4o' },
   // OpenAI reasoning
-  { value: 'openai/o3',                     label: 'o3' },
   { value: 'openai/o4-mini',                label: 'o4-mini' },
+  { value: 'openai/o3-mini',                label: 'o3-mini' },
+  { value: 'openai/o3',                     label: 'o3' },
+  { value: 'openai/o1',                     label: 'o1' },
+  // Groq — GROQ_API_KEY (LPU inference; Apr 2026 free tier).
+  // Curated to models that survive Groq's per-model TPM caps with opencode's
+  // ~50K-token system prompt + tool defs. Most Groq free models cap at 6–12K
+  // TPM (llama-3.3-70b, qwen3-32b, gpt-oss-20b/120b, llama-3.1-8b) and 429
+  // immediately. llama-4-scout passes; verified text + tool-use end-to-end.
+  { value: 'groq/meta-llama/llama-4-scout-17b-16e-instruct', label: 'Llama 4 Scout 17B (Groq, free)' },
 ]
 
 // ── Provider-shaped chunk types (opencode JSON output format) ─────────────────

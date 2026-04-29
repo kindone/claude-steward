@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { sessionQueries, messageQueries, projectQueries, scheduleQueries, type PermissionMode, type CliName } from '../db/index.js'
 import { addWatcher, removeWatcher, addSubscriber, removeSubscriber } from '../lib/sessionWatchers.js'
 import { runClaudePrompt } from '../claude/process.js'
+import { getAdapter } from '../cli/index.js'
 
 const VALID_MODES = new Set<PermissionMode>(['default', 'plan', 'acceptEdits', 'bypassPermissions'])
 const VALID_CLIS = new Set<CliName>(['claude', 'opencode'])
@@ -36,6 +37,13 @@ router.post('/', (req, res) => {
   const id = uuidv4()
   const project = projectQueries.findById(projectId)
   const session = sessionQueries.create(id, 'New Chat', projectId, project?.system_prompt, cliName)
+  // Apply the adapter's default model so new sessions don't start with null.
+  const adapter = getAdapter(session.cli as CliName)
+  if (adapter.defaultModel) {
+    sessionQueries.updateModel(adapter.defaultModel, session.id)
+    res.status(201).json({ ...session, model: adapter.defaultModel })
+    return
+  }
   res.status(201).json(session)
 })
 

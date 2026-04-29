@@ -39,11 +39,17 @@ const CAPABILITIES: CliCapabilities = {
  * (no `provider/` prefix) — Claude CLI rejects the prefixed form. Names
  * verified against `claude --model …` accepted values for the installed
  * release. `null` = no `--model` flag, lets Claude pick its own default.
+ *
+ * New sessions default to Sonnet 4.6 (see `defaultModel` on the adapter).
+ * "Default (CLI picks)" is kept so users can opt back to Claude's own tier.
  */
 const MODELS: ModelOption[] = [
-  { value: null,                 label: 'Default' },
-  { value: 'claude-opus-4-6',    label: 'Opus 4.6' },
-  { value: 'claude-sonnet-4-6',  label: 'Sonnet 4.6' },
+  { value: 'claude-sonnet-4-6',  label: 'Sonnet 4.6' },           // $3 / $15 — default for new sessions
+  { value: null,                 label: 'Default (CLI picks)' },
+  // Apr 2026 frontier per BenchLM/Anthropic: Opus 4.7 (Opus tier),
+  // Sonnet 4.6 (Sonnet tier — no 4.7 yet), Haiku 4.5 (Haiku tier).
+  { value: 'claude-opus-4-7',    label: 'Opus 4.7' },             // $5 / $25 — same per-token as 4.6, but new tokenizer can produce up to 35% more tokens for the same text
+  { value: 'claude-opus-4-6',    label: 'Opus 4.6' },             // $5 / $25
   { value: 'claude-opus-4-5',    label: 'Opus 4.5' },
   { value: 'claude-sonnet-4-5',  label: 'Sonnet 4.5' },
   { value: 'claude-haiku-4-5',   label: 'Haiku 4.5' },
@@ -320,6 +326,7 @@ export const claudeAdapter: CliAdapter = {
   name: 'claude',
   capabilities: CAPABILITIES,
   models: MODELS,
+  defaultModel: 'claude-sonnet-4-6',
   binaryPath: resolveBinary,
   buildArgs,
   buildEnv: (env) => buildCleanEnv(env),

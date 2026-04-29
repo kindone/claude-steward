@@ -137,6 +137,14 @@ export interface CliAdapter {
    */
   readonly models: ModelOption[]
 
+  /**
+   * Model to pre-select for newly created sessions. When set, `POST
+   * /api/sessions` automatically calls `updateModel` after insert so the
+   * session starts with this model rather than null (CLI's own default).
+   * Leave undefined to keep null behaviour (let the CLI pick).
+   */
+  readonly defaultModel?: string | null
+
   /** Resolve the binary path (env-overridable). */
   binaryPath(): string
 
