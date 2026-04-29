@@ -75,6 +75,71 @@ describe('extractToolDetail — tool pill invariants', () => {
 
   })
 
+  describe('opencode lowercase tool names produce non-empty detail', () => {
+    // Regression: opencode emits lowercase tool names ("bash", "websearch")
+    // and uses `filePath` (camelCase) for read inputs. Before April 2026 the
+    // switch was case-sensitive, so opencode bash/websearch tool pills had
+    // no detail (silently degraded UX). Verify both naming conventions work.
+
+    it('lowercase "bash" matches PascalCase "Bash"', () => {
+      forAll(
+        (command: string) => {
+          if (!command.trim()) return true
+          const lower = extractToolDetail('bash', { command })
+          const upper = extractToolDetail('Bash', { command })
+          return lower === upper && typeof lower === 'string' && lower.length > 0
+        },
+        Gen.asciiString(1, 50),
+      )
+    })
+
+    it('lowercase "websearch" matches PascalCase "WebSearch"', () => {
+      forAll(
+        (query: string) => {
+          if (!query.trim()) return true
+          const lower = extractToolDetail('websearch', { query })
+          const upper = extractToolDetail('WebSearch', { query })
+          return lower === upper && typeof lower === 'string' && lower.length > 0
+        },
+        Gen.asciiString(1, 50),
+      )
+    })
+
+    it('lowercase "webfetch" matches PascalCase "WebFetch"', () => {
+      forAll(
+        (url: string) => {
+          if (!url.trim()) return true
+          const lower = extractToolDetail('webfetch', { url })
+          const upper = extractToolDetail('WebFetch', { url })
+          return lower === upper && typeof lower === 'string' && lower.length > 0
+        },
+        Gen.asciiString(1, 50),
+      )
+    })
+
+    it('opencode "read" with camelCase filePath returns the path', () => {
+      forAll(
+        (filePath: string) => {
+          if (!filePath.trim()) return true
+          const result = extractToolDetail('read', { filePath })
+          return typeof result === 'string' && result.length > 0
+        },
+        Gen.asciiString(1, 50),
+      )
+    })
+
+    it('Claude "Read" with snake_case file_path still returns the path', () => {
+      forAll(
+        (file_path: string) => {
+          if (!file_path.trim()) return true
+          const result = extractToolDetail('Read', { file_path })
+          return typeof result === 'string' && result.length > 0
+        },
+        Gen.asciiString(1, 50),
+      )
+    })
+  })
+
   describe('¬∃ (name, input): extractToolDetail throws', () => {
 
     it('known tool names with arbitrary inputs', () => {
