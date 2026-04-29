@@ -244,8 +244,16 @@ export async function deleteProject(projectId: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete project')
 }
 
-export async function listFiles(projectId: string, filePath = ''): Promise<FileEntry[]> {
-  const url = `/api/projects/${projectId}/files${filePath ? `?path=${encodeURIComponent(filePath)}` : ''}`
+export async function listFiles(
+  projectId: string,
+  filePath = '',
+  showHidden = false,
+): Promise<FileEntry[]> {
+  const params = new URLSearchParams()
+  if (filePath) params.set('path', filePath)
+  if (showHidden) params.set('showHidden', '1')
+  const qs = params.toString()
+  const url = `/api/projects/${projectId}/files${qs ? `?${qs}` : ''}`
   const res = await fetch(url, { headers: JSON_HEADERS, ...credentialsOpt })
   if (!res.ok) throw new Error('Failed to list files')
   return res.json() as Promise<FileEntry[]>

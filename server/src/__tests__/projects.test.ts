@@ -32,6 +32,8 @@ beforeAll(() => {
   fs.mkdirSync(tmpSubDir)
   tmpFile = path.join(tmpProjectDir, 'README.md')
   fs.writeFileSync(tmpFile, '# Test project\n')
+  // Hidden file for `?showHidden` tests — must not appear in default listings.
+  fs.writeFileSync(path.join(tmpProjectDir, '.env'), 'SECRET=value\n')
 })
 
 afterAll(() => {
@@ -159,6 +161,35 @@ describe('GET /api/projects/:id/files — file listing', () => {
       .get(`/api/projects/${projectId}/files?path=${encodeURIComponent('../../etc')}`)
       .set('Cookie', authCookie)
     expect(res.status).toBe(400)
+  })
+
+  it('hides dotfiles by default', async () => {
+    const res = await request(app)
+      .get(`/api/projects/${projectId}/files`)
+      .set('Cookie', authCookie)
+    expect(res.status).toBe(200)
+    const names = res.body.map((e: { name: string }) => e.name)
+    expect(names).not.toContain('.env')
+    expect(names).toContain('README.md')   // sanity check
+  })
+
+  it('includes dotfiles with ?showHidden=1', async () => {
+    const res = await request(app)
+      .get(`/api/projects/${projectId}/files?showHidden=1`)
+      .set('Cookie', authCookie)
+    expect(res.status).toBe(200)
+    const names = res.body.map((e: { name: string }) => e.name)
+    expect(names).toContain('.env')
+    expect(names).toContain('README.md')
+  })
+
+  it('?showHidden=true also accepted (boolean alias)', async () => {
+    const res = await request(app)
+      .get(`/api/projects/${projectId}/files?showHidden=true`)
+      .set('Cookie', authCookie)
+    expect(res.status).toBe(200)
+    const names = res.body.map((e: { name: string }) => e.name)
+    expect(names).toContain('.env')
   })
 })
 

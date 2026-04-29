@@ -105,8 +105,12 @@ router.get('/:id/files', (req, res) => {
     return
   }
 
+  // Hide dotfiles unless ?showHidden=1 is explicitly passed. Default-off
+  // because dotfile noise (.git, .DS_Store, build caches) overwhelms most
+  // real listings; opt-in surfaces .env etc. when the user actually needs them.
+  const showHidden = req.query.showHidden === '1' || req.query.showHidden === 'true'
   const result = entries
-    .filter((e) => !e.name.startsWith('.'))   // hide dotfiles by default
+    .filter((e) => showHidden || !e.name.startsWith('.'))
     .map((e) => ({
       name: e.name,
       type: e.isDirectory() ? 'directory' : 'file',

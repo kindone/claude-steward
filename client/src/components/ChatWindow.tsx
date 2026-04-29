@@ -728,7 +728,9 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
               title={`Model: ${model ?? 'Default (env)'} — click to change`}
             >
               <span className="truncate inline-block max-w-[10rem] sm:max-w-[14rem] align-middle">
-                {findModelLabel(modelOptions, model ?? null)}
+                {effectiveCli
+                  ? `${effectiveCli} · ${findModelLabel(modelOptions, model ?? null)}`
+                  : findModelLabel(modelOptions, model ?? null)}
               </span>
             </button>
           </span>
@@ -816,7 +818,7 @@ export function ChatWindow({ sessionId, systemPrompt, permissionMode, timezone, 
         {debugOpen && (
           <div className="px-3 pb-2 flex flex-col gap-1.5">
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-app-text-7 w-28 flex-shrink-0">claude_session_id</span>
+              <span className="text-[11px] text-app-text-7 w-28 flex-shrink-0">session_id</span>
               {claudeSessionId ? (
                 <CopyableId value={claudeSessionId} />
               ) : (

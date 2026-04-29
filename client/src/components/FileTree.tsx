@@ -362,12 +362,18 @@ type Props = {
   alwaysExpanded?: boolean
 }
 
+const SHOW_HIDDEN_KEY = 'steward:showHiddenFiles'
+
 export function FileTree({ projectId, alwaysExpanded = false }: Props) {
   const [expanded, setExpanded] = useState(alwaysExpanded)
   const [tree, setTree] = useState<Map<string, FileEntry[]>>(new Map())
   const [openDirs, setOpenDirs] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
   const [viewer, setViewer] = useState<ViewerState>(null)
+  // Show hidden files (.env, .git, …) — opt-in via toggle, persisted across sessions.
+  const [showHidden, setShowHidden] = useState<boolean>(() => {
+    try { return localStorage.getItem(SHOW_HIDDEN_KEY) === '1' } catch { return false }
+  })
 
   // Upload state
   const [uploading, setUploading] = useState(false)
@@ -383,19 +389,35 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
   const refreshDir = useCallback(async (dirPath: string) => {
     setLoading(true)
     try {
-      const entries = await listFiles(projectId, dirPath)
+      const entries = await listFiles(projectId, dirPath, showHidden)
       setTree((prev) => new Map(prev).set(dirPath, entries))
     } catch (err) {
       console.error('[FileTree] load error', err)
     } finally {
       setLoading(false)
     }
-  }, [projectId])
+  }, [projectId, showHidden])
 
   const loadDir = useCallback(async (dirPath: string) => {
     if (tree.has(dirPath)) return
     await refreshDir(dirPath)
   }, [tree, refreshDir])
+
+  /**
+   * Toggle hidden-file visibility. Clears the cached listings and collapses
+   * all open subdirs — the root re-loads via the existing mount effect, and
+   * the user re-expands subdirs they care about. Simpler than refetching every
+   * known path, and avoids effect re-entry on tree-state mutation.
+   */
+  const toggleShowHidden = useCallback(() => {
+    setShowHidden((prev) => {
+      const next = !prev
+      try { localStorage.setItem(SHOW_HIDDEN_KEY, next ? '1' : '0') } catch {}
+      return next
+    })
+    setTree(new Map())
+    setOpenDirs(new Set())
+  }, [])
 
   const handleUpload = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files)
@@ -548,14 +570,23 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
             <span className="text-[11px] text-app-text-7 font-semibold tracking-widest uppercase">
               {currentDirRef.current || 'Root'}
             </span>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading}
-              className="text-[11px] text-app-text-6 hover:text-app-text-4 bg-transparent border-none cursor-pointer px-1.5 py-0.5 rounded hover:bg-app-bg-card transition-colors disabled:opacity-50"
-              title="Upload files"
-            >
-              ↑ Upload
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={toggleShowHidden}
+                className={`text-[11px] bg-transparent border-none cursor-pointer px-1.5 py-0.5 rounded hover:bg-app-bg-card transition-colors ${showHidden ? 'text-app-text-4 bg-app-bg-card' : 'text-app-text-7 hover:text-app-text-4'}`}
+                title={showHidden ? 'Hide dotfiles (.env, .git, …)' : 'Show dotfiles (.env, .git, …)'}
+              >
+                .*
+              </button>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading}
+                className="text-[11px] text-app-text-6 hover:text-app-text-4 bg-transparent border-none cursor-pointer px-1.5 py-0.5 rounded hover:bg-app-bg-card transition-colors disabled:opacity-50"
+                title="Upload files"
+              >
+                ↑ Upload
+              </button>
+            </div>
           </div>
           {uploadBar}
           <div className="flex-1 overflow-y-auto px-1.5 py-1.5 min-h-0">
@@ -590,14 +621,23 @@ export function FileTree({ projectId, alwaysExpanded = false }: Props) {
               {loading && <span className="text-app-text-7 text-[11px]">…</span>}
             </button>
             {expanded && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="text-[11px] text-app-text-6 hover:text-app-text-4 bg-transparent border-none cursor-pointer px-2 py-1.5 mr-1 rounded hover:bg-app-bg-card transition-colors disabled:opacity-50"
-                title="Upload files"
-              >
-                ↑
-              </button>
+              <>
+                <button
+                  onClick={toggleShowHidden}
+                  className={`text-[11px] bg-transparent border-none cursor-pointer px-2 py-1.5 rounded hover:bg-app-bg-card transition-colors ${showHidden ? 'text-app-text-4 bg-app-bg-card' : 'text-app-text-7 hover:text-app-text-4'}`}
+                  title={showHidden ? 'Hide dotfiles (.env, .git, …)' : 'Show dotfiles (.env, .git, …)'}
+                >
+                  .*
+                </button>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="text-[11px] text-app-text-6 hover:text-app-text-4 bg-transparent border-none cursor-pointer px-2 py-1.5 mr-1 rounded hover:bg-app-bg-card transition-colors disabled:opacity-50"
+                  title="Upload files"
+                >
+                  ↑
+                </button>
+              </>
             )}
           </div>
           {uploadBar}
