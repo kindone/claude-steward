@@ -7,26 +7,204 @@
   'use strict';
 
   const STORAGE_KEY = 'claude-docs-chat';
-  const MAX_STORED = 40;
-  const MODEL_KEY  = 'claude-docs-model';
-  const DRAFT_KEY  = 'claude-docs-draft';
-  const MODELS = [
-    { id: 'claude-haiku-3-5',  label: 'Haiku'  },
-    { id: 'claude-sonnet-4-6', label: 'Sonnet' },
-    { id: 'claude-opus-4-5',   label: 'Opus'   },
-  ];
+  const MAX_STORED  = 40;
+  const MODEL_KEY   = 'claude-docs-model';
+  const CLI_KEY     = 'claude-docs-cli';
+  const DRAFT_KEY   = 'claude-docs-draft';
   const DEFAULT_MODEL = 'claude-sonnet-4-6';
+  const DEFAULT_CLI   = 'claude';
+
+  const FALLBACK_META = {
+    defaultCli: DEFAULT_CLI,
+    adapters: {
+      claude: {
+        label: 'Claude',
+        available: true,
+        models: [
+          { value: null, label: 'Default' },
+          { value: 'claude-opus-4-6', label: 'Opus 4.6' },
+          { value: 'claude-sonnet-4-6', label: 'Sonnet 4.6' },
+          { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
+        ],
+        capabilities: { streamingTokens: true, toolUseStructured: true, branchResume: true },
+      },
+      opencode: {
+        label: 'OpenCode',
+        available: true,
+        models: [
+          { value: null, label: 'Default (env)' },
+          { value: 'google/gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+          { value: 'google/gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+          { value: 'google/gemma-4-31b-it', label: 'Gemma 4 31B' },
+          { value: 'anthropic/claude-sonnet-4-6', label: 'Sonnet 4.6 (OC)' },
+          { value: 'openai/gpt-5.1', label: 'GPT-5.1' },
+          { value: 'openai/gpt-4o-mini', label: 'GPT-4o Mini' },
+        ],
+        capabilities: { streamingTokens: false, toolUseStructured: true, branchResume: true },
+      },
+    },
+  };
 
   // ── State ──────────────────────────────────────────────────────────────────
 
+  let cliMeta = FALLBACK_META;
   let messages = [];
   let isOpen = false;
   let isSending = false;
   let isUnloading = false;   // set true in pagehide so fetch TypeErrors are treated as clean aborts
+  let currentCli = DEFAULT_CLI;
   let currentModel = DEFAULT_MODEL;
   const OPEN_KEY = 'claude-docs-open';
   let abortController = null;
   let currentAssistantId = null;
+
+  // ── CLI/meta helpers ──────────────────────────────────────────────────────
+
+  function getAdapterMeta(name) {
+    return (cliMeta.adapters && cliMeta.adapters[name]) || FALLBACK_META.adapters[name] || null;
+  }
+
+  function modelValueKey(val) {
+    return val == null ? '__default__' : String(val);
+  }
+
+  function adapterHasModel(adapter, value) {
+    if (!adapter || value === undefined) return false;
+    const key = modelValueKey(value);
+    return Array.isArray(adapter.models) && adapter.models.some(m => modelValueKey(m.value) === key);
+  }
+
+  function loadModelPreference(cli) {
+    try {
+      const raw = localStorage.getItem(MODEL_KEY);
+      if (!raw) return null;
+      if (raw.trim().startsWith('{')) {
+        const map = JSON.parse(raw);
+        return map?.[cli] ?? null;
+      }
+      return raw;
+    } catch { return null; }
+  }
+
+  function saveModelPreference(cli, value) {
+    try {
+      let map = {};
+      const raw = localStorage.getItem(MODEL_KEY);
+      if (raw) {
+        if (raw.trim().startsWith('{')) {
+          map = JSON.parse(raw) || {};
+        } else {
+          map = { [DEFAULT_CLI]: raw };
+        }
+      }
+      map[cli] = value;
+      localStorage.setItem(MODEL_KEY, JSON.stringify(map));
+    } catch { /* ignore */ }
+  }
+
+  function resolveCli(desired) {
+    const adapters = cliMeta.adapters || {};
+    if (desired && adapters[desired]?.available) return desired;
+    if (adapters[cliMeta.defaultCli]?.available) return cliMeta.defaultCli;
+    const firstAvailable = Object.entries(adapters).find(([, meta]) => meta.available);
+    if (firstAvailable) return firstAvailable[0];
+    if (desired && adapters[desired]) return desired;
+    return Object.keys(adapters)[0] || DEFAULT_CLI;
+  }
+
+  function resolveModel(cli, { preferCurrent = false } = {}) {
+    const adapter = getAdapterMeta(cli);
+    if (!adapter || !Array.isArray(adapter.models) || adapter.models.length === 0) return null;
+    const candidates = [];
+    if (preferCurrent && currentCli === cli) candidates.push(currentModel);
+    candidates.push(loadModelPreference(cli));
+    for (const candidate of candidates) {
+      if (candidate === undefined) continue;
+      if (adapterHasModel(adapter, candidate)) return candidate ?? null;
+    }
+    return adapter.models[0].value ?? null;
+  }
+
+  function hydratePreferences({ preferCurrent = false } = {}) {
+    let storedCli = null;
+    try { storedCli = localStorage.getItem(CLI_KEY); } catch { /* ignore */ }
+    currentCli = resolveCli(storedCli || currentCli || cliMeta.defaultCli || DEFAULT_CLI);
+    currentModel = resolveModel(currentCli, { preferCurrent }) ?? null;
+  }
+
+  function populateCliOptions() {
+    if (!cliSelect) return;
+    const adapters = cliMeta.adapters || {};
+    cliSelect.innerHTML = Object.entries(adapters).map(([name, info]) => {
+      const disabled = info.available ? '' : ' disabled';
+      const note = info.available ? '' : ' (missing)';
+      return `<option value="${name}"${disabled}>${info.label}${note}</option>`;
+    }).join('');
+    cliSelect.value = currentCli;
+    if (cliSelect.value !== currentCli) cliSelect.value = '';
+    cliSelect.disabled = isSending || messages.length > 0;
+    cliSelect.title = messages.length > 0
+      ? 'Changing CLI is not supported mid-session. Use New session first.'
+      : 'Choose CLI backend';
+  }
+
+  function populateModelOptions() {
+    if (!modelSelect) return;
+    const adapter = getAdapterMeta(currentCli);
+    if (!adapter || !Array.isArray(adapter.models) || adapter.models.length === 0) {
+      modelSelect.innerHTML = '<option value="">Unavailable</option>';
+      modelSelect.disabled = true;
+      return;
+    }
+    modelSelect.innerHTML = adapter.models
+      .map(m => `<option value="${m.value == null ? '' : m.value}">${m.label}</option>`)
+      .join('');
+    if (!adapterHasModel(adapter, currentModel)) {
+      currentModel = adapter.models[0].value ?? null;
+      saveModelPreference(currentCli, currentModel);
+    }
+    modelSelect.value = currentModel == null ? '' : currentModel;
+    modelSelect.disabled = isSending;
+  }
+
+  function updateCliLabel() {
+    if (!cliLabelEl) return;
+    const adapter = getAdapterMeta(currentCli);
+    cliLabelEl.textContent = adapter ? adapter.label : currentCli;
+  }
+
+  function refreshCliUi() {
+    populateCliOptions();
+    populateModelOptions();
+    updateCliLabel();
+  }
+
+  function setCli(name, { force = false, persist = true, persistModel = true } = {}) {
+    const adapter = getAdapterMeta(name);
+    if (!adapter) return;
+    if (!adapter.available && !force) return;
+    if (currentCli === name && !force) return;
+    currentCli = name;
+    if (persist) {
+      try { localStorage.setItem(CLI_KEY, currentCli); } catch { /* ignore */ }
+    }
+    currentModel = resolveModel(currentCli, { preferCurrent: false });
+    if (persistModel) saveModelPreference(currentCli, currentModel);
+    refreshCliUi();
+  }
+
+  function loadChatMeta() {
+    fetch('/api/chat/meta')
+      .then(r => r.ok ? r.json() : Promise.reject(new Error('meta request failed')))
+      .then((meta) => {
+        cliMeta = meta;
+        hydratePreferences({ preferCurrent: true });
+        refreshCliUi();
+      })
+      .catch(() => {
+        refreshCliUi();
+      });
+  }
 
   function loadMessages() {
     try {
@@ -53,6 +231,7 @@
     messages = [];
     localStorage.removeItem(STORAGE_KEY);
     fetch('/api/chat/session', { method: 'DELETE' }).catch(() => {});
+    refreshCliUi();
   }
 
   function compactMessages() {
@@ -207,6 +386,7 @@
   // ── DOM ────────────────────────────────────────────────────────────────────
 
   let toggleBtn, panel, messagesEl, textarea, sendBtn;
+  let cliSelect = null, modelSelect = null, cliLabelEl = null;
   let editorMode = false;   // true when the markdown editor is open
 
   function createUI() {
@@ -215,21 +395,27 @@
     wrapper.innerHTML = `
       <button id="claude-docs-present" class="cp-pb-hidden" title="Present this page">▶</button>
       <button id="claude-docs-edit" class="cp-pb-hidden" title="Edit this page">✎</button>
-      <button id="claude-docs-toggle" title="Ask Claude about this page">✦</button>
+      <button id="claude-docs-toggle" title="Ask about this page">✦</button>
       <div id="claude-docs-panel" class="cp-hidden">
         <div class="cp-header">
           <span class="cp-header-title">
             <span class="cp-header-dot"></span>
-            Claude
+            <span class="cp-header-name">Docs Chat</span>
+            <span class="cp-cli-chip"></span>
           </span>
           <div class="cp-header-actions">
-            <div class="cp-model-wrap">
-              <select class="cp-model-select">
-                ${MODELS.map(m => `<option value="${m.id}">${m.label}</option>`).join('')}
+            <div class="cp-select-wrap">
+              <select class="cp-select cp-cli-select">
+                ${Object.entries(FALLBACK_META.adapters).map(([name, info]) => `<option value="${name}">${info.label}</option>`).join('')}
+              </select>
+            </div>
+            <div class="cp-select-wrap">
+              <select class="cp-select cp-model-select">
+                ${FALLBACK_META.adapters[DEFAULT_CLI].models.map(m => `<option value="${m.value == null ? '' : m.value}">${m.label}</option>`).join('')}
               </select>
             </div>
             <button class="cp-btn-compact" title="Compact conversation">Compact</button>
-            <button class="cp-btn-clear" title="New conversation">New</button>
+            <button class="cp-btn-clear" title="Clear chat history and start a new backend session">New session</button>
             <button class="cp-btn-close" title="Close">✕</button>
           </div>
         </div>
@@ -249,6 +435,9 @@
     messagesEl = panel.querySelector('.cp-messages');
     textarea   = panel.querySelector('.cp-textarea');
     sendBtn    = panel.querySelector('.cp-send');
+    cliSelect  = panel.querySelector('.cp-cli-select');
+    modelSelect = panel.querySelector('.cp-model-select');
+    cliLabelEl  = panel.querySelector('.cp-cli-chip');
 
     toggleBtn.addEventListener('click', togglePanel);
     panel.querySelector('.cp-btn-close').addEventListener('click', () => setOpen(false));
@@ -257,7 +446,7 @@
     const compactBtn = panel.querySelector('.cp-btn-compact');
 
     clearBtn.addEventListener('click', () =>
-      withConfirm(clearBtn, 'New', () => { clearMessages(); renderMessages(); })
+      withConfirm(clearBtn, 'New session', () => { clearMessages(); renderMessages(); })
     );
     compactBtn.addEventListener('click', () =>
       withConfirm(compactBtn, 'Compact', () => { compactMessages(); })
@@ -269,6 +458,12 @@
     textarea.addEventListener('input', () => {
       textarea.style.height = 'auto';
       textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+    });
+
+    cliSelect.addEventListener('change', () => setCli(cliSelect.value));
+    modelSelect.addEventListener('change', () => {
+      currentModel = modelSelect.value === '' ? null : modelSelect.value;
+      saveModelPreference(currentCli, currentModel);
     });
 
   }
@@ -300,8 +495,8 @@
       messagesEl.innerHTML = `
         <div class="cp-empty">
           <div class="cp-empty-icon">✦</div>
-          <div class="cp-empty-title">Ask Claude anything</div>
-          <div class="cp-empty-sub">Explain concepts, edit pages, or add new sections — Claude can see and edit this documentation.</div>
+          <div class="cp-empty-title">Ask about this page</div>
+          <div class="cp-empty-sub">Explain concepts, edit sections, or add new content — the docs assistant can read and edit this site.</div>
         </div>`;
       return;
     }
@@ -416,7 +611,7 @@
     fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text, page_url: window.location.pathname, model: currentModel }),
+      body: JSON.stringify({ message: text, page_url: window.location.pathname, model: currentModel, cli: currentCli }),
       signal: ac.signal,
     }).then(async (res) => {
       const reader = res.body.getReader();
@@ -523,6 +718,7 @@
       textarea.disabled = false;
       textarea.focus();
     }
+    refreshCliUi();
   }
 
   // ── Unload cleanup — fix stuck isStreaming on navigate/close ───────────────
@@ -855,7 +1051,8 @@
   function reconnectIfActive() {
     fetch('/api/chat/status')
       .then(r => r.json())
-      .then(({ active }) => {
+      .then(({ active, cli }) => {
+        if (cli) setCli(cli, { force: true, persist: false, persistModel: false });
         if (!active) return;
         // Find the last assistant message to resume into
         const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
@@ -941,6 +1138,9 @@
     if (document.getElementById('claude-docs-chat')) return;
     loadMessages();
     createUI();
+    hydratePreferences();
+    refreshCliUi();
+    loadChatMeta();
     renderMessages();
     // Restore open state from previous page
     try {
@@ -967,15 +1167,6 @@
         }
       } catch { /* ignore */ }
     }, { passive: true });
-
-    // Model selector
-    const modelSelect = panel.querySelector('.cp-model-select');
-    try { currentModel = localStorage.getItem(MODEL_KEY) || DEFAULT_MODEL; } catch { /* ignore */ }
-    modelSelect.value = currentModel;
-    modelSelect.addEventListener('change', () => {
-      currentModel = modelSelect.value;
-      try { localStorage.setItem(MODEL_KEY, currentModel); } catch { /* ignore */ }
-    });
 
     presentBtn = document.getElementById('claude-docs-present');
     if (hasSlidableContent()) {

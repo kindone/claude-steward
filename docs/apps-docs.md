@@ -1,6 +1,6 @@
 # Docs Mini-App
 
-The `apps/docs/` package is the first concrete mini-app template. It wraps a MkDocs site with an Express proxy that injects a floating Claude chat panel and a presenter/slideshow mode into every page.
+The `apps/docs/` package is the first concrete mini-app template. It wraps a MkDocs site with an Express proxy that injects a floating multi-CLI docs chat panel (Claude or OpenCode) plus a presenter/slideshow mode into every page.
 
 ---
 
@@ -13,7 +13,7 @@ apps/docs server  (:4001–:4010, assigned by sidecar slot)
   ├── proxy.ts       — pipes all non-API requests to internal MkDocs
   ├── mkdocs.ts      — spawns/stops `mkdocs serve` subprocess on :18765
   └── routes/
-       ├── chat.ts   — POST /api/chat (SSE streaming to Claude CLI)
+       ├── chat.ts   — POST /api/chat (SSE streaming via CLI adapters)
        └── file.ts   — GET/PATCH /file (read/edit a doc file from the panel)
 ```
 
@@ -34,15 +34,16 @@ A self-contained vanilla JS IIFE. No external dependencies, no bundler.
 | **Open-state persistence** | `localStorage` key `claude-docs-open`; panel re-opens on page navigation without losing state |
 | **Message persistence** | Up to 40 messages stored in `localStorage` key `claude-docs-chat`; survive full page reloads and navigation |
 | **Stuck-stream recovery** | On load, any message with `isStreaming: true` is auto-healed to `false` |
-| **Model selector** | Compact pill `<select>` in the header (Haiku / Sonnet / Opus); persisted to `localStorage` key `claude-docs-model`; passed to Claude via `--model` flag |
-| **"New" button** | Clears messages + deletes server-side Claude session; requires inline confirmation (see below) |
-| **"Compact" button** | Trims displayed history to the last 6 messages (3 exchanges) in localStorage; **does not** clear the Claude session — Claude retains full memory context |
+| **CLI + model selectors** | Dual pill selects in the header: CLI picker (Claude ↔ OpenCode, disabled when a binary is missing) stored in `claude-docs-cli`, plus a per-CLI model list whose preferences are saved in a JSON map under `claude-docs-model`; every POST includes `{ cli, model }` so the server can route to the matching adapter |
+| **CLI session lock** | CLI picker is disabled once the conversation has any messages and shows a tooltip explaining that CLI changes require **New session**. Model can still be changed between turns |
+| **"New session" button** | Clears local chat history + deletes server-side chat sessions for every CLI; requires inline confirmation (see below) |
+| **"Compact" button** | Trims displayed history to the last 6 messages (3 exchanges) in localStorage; **does not** clear the server session — the assistant retains full memory context |
 | **Inline confirmation** | First click → button turns amber and shows "Sure?" for 3 s; second click → action executes; auto-reverts if ignored |
 | **Markdown rendering** | Inline (`renderInline`) + block (`renderMarkdown`): headings, bold/italic/strikethrough, inline code, fenced code blocks with language badge, ordered/unordered lists, horizontal rules, links |
 | **Tool call badges** | Compact pills below assistant messages showing Read/Edit/Write/Bash operations |
-| **Streaming cursor** | Blinking caret appended during live Claude output |
+| **Streaming cursor** | Blinking caret appended during live assistant output |
 | **Stop streaming** | Send button becomes ■; aborts the SSE fetch; `pagehide` event cleanly marks message non-streaming on navigate/close |
-| **Page context** | `page_url: window.location.pathname` sent with every message so Claude knows which doc page is being viewed |
+| **Page context** | `page_url: window.location.pathname` sent with every message so the assistant knows which doc page is being viewed |
 
 ### CSS specificity note
 
@@ -62,18 +63,11 @@ A fullscreen slideshow built from the current MkDocs page's content.
 
 ---
 
-## Claude integration (`src/claude/spawn.ts` + `src/routes/chat.ts`)
+## CLI integration (`src/cli/index.ts`, `src/cli/spawn.ts`, `src/routes/chat.ts`)
 
-`spawnClaude(options)` builds the Claude CLI invocation:
-
-```typescript
-const args = ['--output-format', 'stream-json', '--verbose', '--include-partial-messages'];
-if (sessionId) args.push('--resume', sessionId);
-if (model)     args.push('--model', model);
-// ... allowed tools, cwd, etc.
-```
-
-`chat.ts` accepts `{ message, page_url?, model? }` from the browser, prepends a `[Viewing page: /path]` line to the message when `page_url` is provided, and streams the response as SSE events (`chunk`, `done`, `error`). The session ID returned from the first response is stored server-side and reused for continuity.
+- `src/cli/index.ts` defines a `CliAdapter` contract (binary path, args/env builder, parser, capabilities, model list, error classifier). Two adapters ship out-of-the-box: `claude` and `opencode`. Each adapter carries a friendly label plus the dropdown models surfaced to the UI.
+- `src/cli/spawn.ts` runs any adapter and translates its canonical events back into the legacy SSE format (`chunk` / `done` / `error`, tool use/result blocks, etc.) so the chat panel keeps streaming without changes.
+- `routes/chat.ts` now accepts `{ message, page_url?, cli?, model? }`, tracks session IDs per CLI (`claude_session_id`, `cli_session_opencode`, …), exposes `/api/chat/meta` so the browser knows which CLIs/models are available, and surfaces the running job's CLI via `/api/chat/status` for reconnects. If the selected model changes for a CLI, the server drops that CLI's resume ID and starts a fresh backend session; OpenCode can otherwise hang when `-s <session>` is combined with a different `--model`.
 
 ---
 
@@ -85,8 +79,10 @@ apps/docs/
 │   ├── server.ts          — Express app setup + static serving of public/
 │   ├── proxy.ts           — MkDocs proxy + HTML injection
 │   ├── mkdocs.ts          — mkdocs subprocess lifecycle
+│   ├── cli/
+│   │   ├── index.ts       — Adapter registry (Claude + OpenCode)
+│   │   └── spawn.ts       — Adapter-agnostic launcher → SSE bridge
 │   ├── claude/
-│   │   ├── spawn.ts       — Builds the `claude` CLI invocation
 │   │   └── system-prompt.ts
 │   └── routes/
 │       ├── chat.ts        — POST /api/chat (SSE), DELETE /api/chat/session

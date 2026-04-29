@@ -11,11 +11,17 @@
 
 import net from 'node:net'
 import fs from 'node:fs'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createInterface } from 'node:readline'
 import { spawn, execFileSync } from 'node:child_process'
 import type { ChildProcess } from 'node:child_process'
+import dotenv from 'dotenv'
 import { APPS_SOCKET_PATH } from './protocol.js'
 import type { AppsCommand, AppsReply } from './protocol.js'
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url))
+dotenv.config({ path: path.join(__dirname, '../../../.env') })
 
 type ManagedApp = {
   process: ChildProcess

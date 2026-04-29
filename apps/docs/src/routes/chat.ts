@@ -1,7 +1,9 @@
+import fs from 'node:fs'
 import { Router, type Response } from 'express'
 import { DatabaseSync } from 'node:sqlite'
-import { spawnClaude } from '../claude/spawn.js'
+import { spawnCliJob } from '../cli/spawn.js'
 import { buildSystemPrompt } from '../claude/system-prompt.js'
+import { adapters, defaultCliName, normalizeCliName, type CliAdapter, type CliName } from '../cli/index.js'
 
 export const chatRouter = Router()
 
@@ -39,6 +41,7 @@ interface ActiveJob {
   done: boolean
   subscribers: Set<Response>
   abort: () => void
+  cli: CliName
 }
 
 let _activeJob: ActiveJob | null = null
@@ -75,12 +78,21 @@ function attachSubscriber(job: ActiveJob, res: Response): void {
   res.on('close', () => job.subscribers.delete(res))
 }
 
+function finishJob(job: ActiveJob): void {
+  job.done = true
+  for (const res of [...job.subscribers]) {
+    if (!res.writableEnded && !res.destroyed) res.end()
+  }
+  job.subscribers.clear()
+}
+
 // ── Routes ────────────────────────────────────────────────────────────────────
 
 // POST /api/chat
 chatRouter.post('/chat', (req, res) => {
-  const { message, page_url, model } = req.body as { message?: string; page_url?: string; model?: string }
+  const { message, page_url, model, cli: cliRaw } = req.body as { message?: string; page_url?: string; model?: string; cli?: string }
   if (!message?.trim()) { res.status(400).json({ error: 'message required' }); return }
+  const cli = normalizeCliName(cliRaw ?? defaultCliName())
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -96,31 +108,43 @@ chatRouter.post('/chat', (req, res) => {
   }
 
   const docsDir = req.app.locals.docsDir as string
-  const claudeSessionId = getMeta('claude_session_id')
+  const sessionKey = sessionMetaKey(cli)
+  const modelKey = modelMetaKey(cli)
+  const requestedModel = model ?? null
+  const storedModel = getMeta(modelKey)
+  let cliSessionId = getMeta(sessionKey)
+  if (cliSessionId && storedModel !== null && storedModel !== modelStorageValue(requestedModel)) {
+    deleteMeta(sessionKey)
+    cliSessionId = null
+  }
   const systemPrompt = buildSystemPrompt(docsDir)
   const fullMessage = page_url ? `[Viewing page: ${page_url}]\n\n${message}` : message
 
   const ac = new AbortController()
-  const job: ActiveJob = { events: [], done: false, subscribers: new Set(), abort: () => ac.abort() }
+  const job: ActiveJob = { events: [], done: false, subscribers: new Set(), abort: () => ac.abort(), cli }
   _activeJob = job
 
   // Attach first subscriber — but do NOT abort on disconnect.
   // Claude keeps running through browser reloads (e.g. MkDocs live-reload).
   attachSubscriber(job, res)
 
-  spawnClaude({
-    message: fullMessage,
-    claudeSessionId,
-    model: model ?? null,
+  spawnCliJob({
+    cli,
+    prompt: fullMessage,
+    resumeId: cliSessionId,
+    model: requestedModel,
     systemPrompt,
     cwd: docsDir,
     signal: ac.signal,
     onEvent:     (event, data) => broadcast(job, event, data),
-    onEnd:       () => { job.done = true; job.subscribers.clear() },
-    onSessionId: (id) => setMeta('claude_session_id', id),
+    onEnd:       () => finishJob(job),
+    onSessionId: (id) => {
+      setMeta(sessionKey, id)
+      setMeta(modelKey, modelStorageValue(requestedModel))
+    },
     onError:     (err) => {
       if (err.code === 'session_expired' || err.code === 'context_limit') {
-        deleteMeta('claude_session_id')
+        deleteMeta(sessionKey)
       }
     },
   })
@@ -148,18 +172,67 @@ chatRouter.get('/chat/reconnect', (req, res) => {
 
 // GET /api/chat/status
 chatRouter.get('/chat/status', (_req, res) => {
-  res.json({ active: !!getRunningJob() })
+  const job = getRunningJob()
+  res.json({ active: !!job, cli: job?.cli ?? null })
+})
+
+type AdapterMeta = {
+  label: string
+  available: boolean
+  models: CliAdapter['models']
+  capabilities: CliAdapter['capabilities']
+}
+
+// GET /api/chat/meta
+chatRouter.get('/chat/meta', (_req, res) => {
+  const meta: Record<CliName, AdapterMeta> = {} as Record<CliName, AdapterMeta>
+  for (const [name, adapter] of Object.entries(adapters) as Array<[CliName, CliAdapter]>) {
+    let available = false
+    try {
+      available = fs.existsSync(adapter.binaryPath())
+    } catch {
+      available = false
+    }
+    meta[name] = {
+      label: adapter.label,
+      available,
+      models: adapter.models,
+      capabilities: adapter.capabilities,
+    }
+  }
+  res.json({ defaultCli: defaultCliName(), adapters: meta })
 })
 
 // GET /api/chat/session
 chatRouter.get('/chat/session', (_req, res) => {
-  res.json({ sessionId: getMeta('claude_session_id') })
+  res.json({
+    sessionId: getMeta('claude_session_id'),
+    sessions: {
+      claude: getMeta('claude_session_id'),
+      opencode: getMeta(sessionMetaKey('opencode')),
+    },
+  })
 })
 
 // DELETE /api/chat/session — clear session and abort any running job
 chatRouter.delete('/chat/session', (_req, res) => {
   deleteMeta('claude_session_id')
+  deleteMeta(modelMetaKey('claude'))
+  deleteMeta(sessionMetaKey('opencode'))
+  deleteMeta(modelMetaKey('opencode'))
   _activeJob?.abort()
-  if (_activeJob) _activeJob.done = true
+  if (_activeJob) finishJob(_activeJob)
   res.json({ ok: true })
 })
+
+function sessionMetaKey(cli: CliName): string {
+  return cli === 'claude' ? 'claude_session_id' : `cli_session_${cli}`
+}
+
+function modelMetaKey(cli: CliName): string {
+  return cli === 'claude' ? 'claude_model' : `cli_model_${cli}`
+}
+
+function modelStorageValue(model: string | null): string {
+  return model ?? '__default__'
+}

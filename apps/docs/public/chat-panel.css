@@ -86,7 +86,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 18px 13px;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 12px 14px 11px;
   background: var(--cp-surface);
   border-bottom: 1px solid var(--cp-sep);
   flex-shrink: 0;
@@ -94,11 +96,21 @@
 .cp-header-title {
   display: flex;
   align-items: center;
+  flex: 1 1 auto;
   gap: 8px;
   font-size: 14px;
   font-weight: 600;
   color: var(--cp-text);
   letter-spacing: -0.01em;
+}
+.cp-header-name { font-weight: 600; }
+.cp-cli-chip {
+  font-size: 11px;
+  color: var(--cp-sub);
+  background: rgba(255,255,255,0.06);
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
 }
 .cp-header-dot {
   width: 7px;
@@ -111,7 +123,11 @@
 .cp-header-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
   gap: 4px;
+  min-width: 0;
 }
 .cp-btn-clear, .cp-btn-compact, .cp-btn-close {
   background: none;
@@ -138,13 +154,13 @@
   background: rgba(251,191,36,0.17) !important;
 }
 
-/* ── Model selector ──────────────────────────────────────────────────────── */
-.cp-model-wrap {
+/* ── Select controls ─────────────────────────────────────────────────────── */
+.cp-select-wrap {
   position: relative;
   display: flex;
   align-items: center;
 }
-.cp-model-wrap::after {
+.cp-select-wrap::after {
   content: '▾';
   position: absolute;
   right: 7px;
@@ -154,7 +170,7 @@
   color: var(--cp-muted);
   pointer-events: none;
 }
-.cp-model-select {
+.cp-select {
   appearance: none;
   -webkit-appearance: none;
   background: rgba(255,255,255,0.05);
@@ -167,9 +183,12 @@
   cursor: pointer;
   outline: none;
   transition: background 0.12s, border-color 0.12s;
+  max-width: 132px;
 }
-.cp-model-select:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.18); }
-.cp-model-select option { background: #1c1f2e; color: #eef0f8; }
+.cp-cli-select { max-width: 92px; }
+.cp-model-select { max-width: 132px; }
+.cp-select:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.18); }
+.cp-select option { background: #1c1f2e; color: #eef0f8; }
 .cp-btn-close {
   font-size: 14px;
   width: 28px;
