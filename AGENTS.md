@@ -174,6 +174,19 @@ artefacts and cannot self-upgrade — use `evolve` or `shared` for that.
   --workspace=client` and `--workspace=server` **sequentially**, not the
   combined `npm run build` which runs both concurrently. (3) Avoid running
   builds while CLI spawn processes are active when possible.
+- **mdart edits need TWO builds, not one.** mdart is consumed in two
+  places with different resolution strategies: the **server** imports
+  `mdart/dist/index.js` (Node `exports`, cached at boot), and the
+  **client** imports `'mdart'` which Vite's alias rewrites to
+  `node_modules/mdart/src/index.ts` (a symlink to `~/mdart/packages/mdart`)
+  and inlines into the bundle at build time. After editing mdart source:
+  (1) `npm run build --workspace=packages/mdart` in `~/mdart/` so the
+  server's `dist/` is fresh, (2) `npm run build --workspace=client` in
+  `~/claude-steward/` so the client bundle re-bakes the source,
+  (3) `POST /api/admin/reload` to PM2-restart the server and broadcast
+  the SSE reload that nudges connected browsers to the new bundle. Skip
+  step (2) and `MessageBubble.tsx` / `MdArtView.tsx` will keep rendering
+  with the stale parser even though `/api/mdart/render` is correct.
 - **Rate-limit recovery.** When the user hints at hitting a usage/rate
   limit ("we hit the limit again", "recover from the db", "what were we
   working on"), run `node scripts/recover.mjs` first. It defaults to the
