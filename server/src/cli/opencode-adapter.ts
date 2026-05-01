@@ -102,6 +102,12 @@ const CAPABILITIES: CliCapabilities = {
  */
 const MODELS: ModelOption[] = [
   { value: null,                            label: 'Default (env)' },
+  // opencode-hosted — no API key required; free, rate-limited by opencode
+  { value: 'opencode/big-pickle',           label: 'Big Pickle (opencode, free)' },
+  { value: 'opencode/gpt-5-nano',           label: 'GPT-5 Nano (opencode, free)' },
+  { value: 'opencode/nemotron-3-super-free',label: 'Nemotron 3 Super (opencode, free)' },
+  { value: 'opencode/minimax-m2.5-free',    label: 'MiniMax M2.5 (opencode, free)' },
+  { value: 'opencode/hy3-preview-free',     label: 'HY3 Preview (opencode, free)' },
   // Google — Gemini API key
   { value: 'google/gemini-2.5-pro',         label: 'Gemini 2.5 Pro' },
   { value: 'google/gemini-2.5-flash',       label: 'Gemini 2.5 Flash' },
