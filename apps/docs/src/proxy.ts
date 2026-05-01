@@ -19,9 +19,11 @@ function fileMtime(name: string): number {
 function makeInjection(): string {
   const sv = fileMtime('chat-panel.js')
   const cv = fileMtime('chat-panel.css')
+  const pv = fileMtime('pikchr-renderer.js')
   const script = `<script src="/chat-panel.js?v=${sv}"></script>`
   const style  = `<link rel="stylesheet" href="/chat-panel.css?v=${cv}">`
-  return `${style}\n${script}\n</head>`
+  const pikchrScript = `<script src="/pikchr-renderer.js?v=${pv}"></script>`
+  return `${style}\n${pikchrScript}\n${script}\n</head>`
 }
 
 // Create proxy instance — reused for all requests

@@ -52,6 +52,9 @@ app.locals.docsDir = DOCS_DIR
 const publicDir = path.join(__dirname, '..', 'public')
 app.use('/chat-panel.js', express.static(path.join(publicDir, 'chat-panel.js')))
 app.use('/chat-panel.css', express.static(path.join(publicDir, 'chat-panel.css')))
+app.use('/pikchr-renderer.js', express.static(path.join(publicDir, 'pikchr-renderer.js')))
+app.use('/pikchr.js', express.static(path.join(publicDir, 'pikchr.js')))
+app.use('/pikchr.wasm', express.static(path.join(publicDir, 'pikchr.wasm')))
 
 // API routes
 app.use('/api', chatRouter)
