@@ -184,7 +184,7 @@ type AdapterMeta = {
 }
 
 // GET /api/chat/meta
-chatRouter.get('/chat/meta', (_req, res) => {
+chatRouter.get('/chat/meta', (req, res) => {
   const meta: Record<CliName, AdapterMeta> = {} as Record<CliName, AdapterMeta>
   for (const [name, adapter] of Object.entries(adapters) as Array<[CliName, CliAdapter]>) {
     let available = false
@@ -200,7 +200,11 @@ chatRouter.get('/chat/meta', (_req, res) => {
       capabilities: adapter.capabilities,
     }
   }
-  res.json({ defaultCli: defaultCliName(), adapters: meta })
+  // docsDir is used by chat-panel.js to namespace localStorage keys,
+  // ensuring two different docs apps that run on the same slot (port/origin)
+  // never mix their chat history.
+  const docsDir: string = req.app.locals.docsDir ?? ''
+  res.json({ defaultCli: defaultCliName(), adapters: meta, docsDir })
 })
 
 // GET /api/chat/session

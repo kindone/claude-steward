@@ -93,9 +93,14 @@ function cleanClaudeEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   for (const [key, val] of Object.entries(env)) {
     if (val === undefined) continue
     if (key.startsWith('CLAUDE')) continue
+    if (key === 'ANTHROPIC_API_KEY') continue  // force OAuth, not API billing
     out[key] = val
   }
+  // Re-admit the explicit allowlist (see CLAUDE.md — Claude CLI Spawn Gotchas)
   if (env.ANTHROPIC_BASE_URL) out.ANTHROPIC_BASE_URL = env.ANTHROPIC_BASE_URL
+  // Support both the canonical name and the steward-specific alias
+  const oauthToken = env.CLAUDE_CODE_OAUTH_TOKEN ?? env.STEWARD_TEST_OAUTH_TOKEN
+  if (oauthToken) out.CLAUDE_CODE_OAUTH_TOKEN = oauthToken
   return out
 }
 

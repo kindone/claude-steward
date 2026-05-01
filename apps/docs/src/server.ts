@@ -55,6 +55,10 @@ app.use('/chat-panel.css', express.static(path.join(publicDir, 'chat-panel.css')
 app.use('/pikchr-renderer.js', express.static(path.join(publicDir, 'pikchr-renderer.js')))
 app.use('/pikchr.js', express.static(path.join(publicDir, 'pikchr.js')))
 app.use('/pikchr.wasm', express.static(path.join(publicDir, 'pikchr.wasm')))
+// mdart.js is a copy of mdart/packages/mdart/dist/index.js (ESM bundle, ~310KB).
+// To refresh after upstream changes: cp ../../mdart/packages/mdart/dist/index.js public/mdart.js
+app.use('/mdart.js', express.static(path.join(publicDir, 'mdart.js')))
+app.use('/mdart-renderer.js', express.static(path.join(publicDir, 'mdart-renderer.js')))
 
 // API routes
 app.use('/api', chatRouter)
@@ -74,9 +78,13 @@ server.on('upgrade', (req, socket, head) => {
 
 // ── Start MkDocs then listen ──────────────────────────────────────────────────
 
-console.log(`[docs] starting MkDocs in ${DOCS_DIR}…`)
+// Derive a unique internal MkDocs port from the public port so multiple
+// docs instances don't collide on the same internal port (e.g. 4002 → 14002).
+const mkdocsPort = port + 10000
 
-startMkDocs(DOCS_DIR)
+console.log(`[docs] starting MkDocs in ${DOCS_DIR} on internal port ${mkdocsPort}…`)
+
+startMkDocs(DOCS_DIR, mkdocsPort)
   .then(() => {
     server.listen(port, () => {
       console.log(`[docs] listening on :${port}  docs-dir=${DOCS_DIR}`)

@@ -1,17 +1,18 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 
 const MKDOCS_BIN = process.env.MKDOCS_PATH ?? '/home/ubuntu/venv/bin/mkdocs'
-const INTERNAL_PORT = 18765  // fixed internal port — not exposed externally
 
 let child: ChildProcess | null = null
+let internalPort = 18765  // default; overridden by startMkDocs(docsDir, port)
 
-export function startMkDocs(docsDir: string): Promise<void> {
+export function startMkDocs(docsDir: string, port?: number): Promise<void> {
+  if (port !== undefined) internalPort = port
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('MkDocs failed to start within 15s')), 15_000)
 
     child = spawn(MKDOCS_BIN, [
       'serve',
-      '--dev-addr', `127.0.0.1:${INTERNAL_PORT}`,
+      '--dev-addr', `127.0.0.1:${internalPort}`,
       '--livereload',   // explicit; WS upgrades are proxied in server.ts
     ], {
       cwd: docsDir,
@@ -57,7 +58,7 @@ export function stopMkDocs(): void {
 }
 
 export function getMkDocsPort(): number {
-  return INTERNAL_PORT
+  return internalPort
 }
 
 export function isMkDocsRunning(): boolean {

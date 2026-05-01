@@ -6,11 +6,18 @@
 (function () {
   'use strict';
 
-  const STORAGE_KEY = 'claude-docs-chat';
+  // Namespace localStorage keys by docsDir so two different docs apps that
+  // run on the same slot (same port/origin at different times) never share
+  // chat history, model preferences, or drafts.
+  // __STEWARD_DOCS_DIR__ is injected by proxy.ts before this script runs.
+  const _ns = (typeof window !== 'undefined' && window.__STEWARD_DOCS_DIR__)
+    ? ':' + window.__STEWARD_DOCS_DIR__
+    : '';
+  const STORAGE_KEY = 'claude-docs-chat'  + _ns;
   const MAX_STORED  = 40;
-  const MODEL_KEY   = 'claude-docs-model';
-  const CLI_KEY     = 'claude-docs-cli';
-  const DRAFT_KEY   = 'claude-docs-draft';
+  const MODEL_KEY   = 'claude-docs-model' + _ns;
+  const CLI_KEY     = 'claude-docs-cli'   + _ns;
+  const DRAFT_KEY   = 'claude-docs-draft' + _ns;
   const DEFAULT_MODEL = 'claude-sonnet-4-6';
   const DEFAULT_CLI   = 'claude';
 

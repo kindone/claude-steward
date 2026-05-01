@@ -15,6 +15,7 @@ import schedulesRouter from './routes/schedules.js'
 import evalRouter from './routes/eval.js'
 import appsRouter from './routes/apps.js'
 import mcpNotifyRouter from './routes/mcp.js'
+import internalRouter from './routes/internal.js'
 import kernelsRouter from './routes/kernels.js'
 import notebooksRouter from './routes/notebooks.js'
 import { projectArtifactsRouter, artifactRouter, projectTopicsRouter, topicRouter } from './routes/artifacts.js'
@@ -78,6 +79,10 @@ export function createApp() {
   // MCP notify — called by the MCP schedule server subprocess (no session cookie).
   // Auth is a shared secret header (X-MCP-Secret). Must be before requireAuth.
   app.use('/api/mcp-notify', mcpNotifyRouter)
+
+  // Internal routes — localhost-only, no session cookie required.
+  // Used for programmatic setup (e.g. registering mini-apps from Claude or scripts).
+  app.use('/api/internal', internalRouter)
 
   app.use('/api', requireAuth)
   app.use('/api/chat', chatRouter)

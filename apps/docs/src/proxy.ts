@@ -16,14 +16,20 @@ function fileMtime(name: string): number {
   } catch { return 0 }
 }
 
-function makeInjection(): string {
+function makeInjection(docsDir: string): string {
   const sv = fileMtime('chat-panel.js')
   const cv = fileMtime('chat-panel.css')
   const pv = fileMtime('pikchr-renderer.js')
+  const mv = fileMtime('mdart-renderer.js')
   const script = `<script src="/chat-panel.js?v=${sv}"></script>`
   const style  = `<link rel="stylesheet" href="/chat-panel.css?v=${cv}">`
   const pikchrScript = `<script src="/pikchr-renderer.js?v=${pv}"></script>`
-  return `${style}\n${pikchrScript}\n${script}\n</head>`
+  const mdartScript  = `<script src="/mdart-renderer.js?v=${mv}"></script>`
+  // Inject docsDir as a global so chat-panel.js can namespace its localStorage
+  // keys per docs-project. This prevents cross-contamination when two different
+  // docs apps run on the same slot (port/origin) at different times.
+  const dirScript = `<script>window.__STEWARD_DOCS_DIR__=${JSON.stringify(docsDir)}</script>`
+  return `${style}\n${pikchrScript}\n${mdartScript}\n${dirScript}\n${script}\n</head>`
 }
 
 // Create proxy instance — reused for all requests
@@ -42,6 +48,7 @@ proxy.on('error', (err, _req, res) => {
 
 // Middleware: proxy request to MkDocs, injecting chat panel into HTML responses
 export function proxyToMkDocs(req: Request, res: Response): void {
+  const docsDir: string = req.app.locals.docsDir ?? ''
   const target = `http://127.0.0.1:${getMkDocsPort()}`
   const contentType = ''  // will be determined from response
 
@@ -67,7 +74,7 @@ export function proxyToMkDocs(req: Request, res: Response): void {
         proxyRes.on('data', (chunk: Buffer) => chunks.push(chunk))
         proxyRes.on('end', () => {
           let html = Buffer.concat(chunks).toString('utf8')
-          const injection = makeInjection()
+          const injection = makeInjection(docsDir)
           // Inject before </head> if present, otherwise before </body>
           if (html.includes('</head>')) {
             html = html.replace('</head>', injection)

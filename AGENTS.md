@@ -187,6 +187,24 @@ artefacts and cannot self-upgrade — use `evolve` or `shared` for that.
   the SSE reload that nudges connected browsers to the new bundle. Skip
   step (2) and `MessageBubble.tsx` / `MdArtView.tsx` will keep rendering
   with the stale parser even though `/api/mdart/render` is correct.
+- **Registering mini-apps.** Use `POST /api/internal/register-app` — a
+  localhost-only endpoint that requires no session cookie. It finds or
+  creates the project by name and creates the app_config in one call:
+  ```bash
+  curl -s -X POST http://localhost:3001/api/internal/register-app \
+    -H 'Content-Type: application/json' \
+    -d '{
+      "project": "claude-steward",
+      "name": "my-docs",
+      "type": "docs",
+      "commandTemplate": "node /home/ubuntu/claude-steward/apps/docs/dist/server.js {port} --docs-dir /home/ubuntu/my-docs",
+      "workDir": "/home/ubuntu/my-docs"
+    }'
+  ```
+  Pass `"projectPath": "/path/to/dir"` alongside `"project"` only when
+  the project doesn't exist yet (it will be created). The endpoint
+  validates that `workDir` exists and that `commandTemplate` contains
+  `{port}`. Do **not** do raw SQLite inserts — use this endpoint instead.
 - **Rate-limit recovery.** When the user hints at hitting a usage/rate
   limit ("we hit the limit again", "recover from the db", "what were we
   working on"), run `node scripts/recover.mjs` first. It defaults to the

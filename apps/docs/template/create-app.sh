@@ -35,6 +35,9 @@ fi
 cp -r "$TEMPLATE_DIR" "$DEST_DIR"
 rm -f "$DEST_DIR/create-app.sh"          # don't copy this script into the project
 rm -f "$DEST_DIR/README.md"
+rm -f "$DEST_DIR/.docs-chat.db"          # never inherit template's chat session state
+rm -f "$DEST_DIR/.docs-chat.db-shm"
+rm -f "$DEST_DIR/.docs-chat.db-wal"
 
 # Patch site_name in mkdocs.yml
 sed -i "s/site_name: 'My Docs'/site_name: '$APP_NAME'/" "$DEST_DIR/mkdocs.yml"

@@ -339,6 +339,7 @@ const createProjectStmt = db.prepare(
 )
 const listProjectsStmt = db.prepare(`SELECT * FROM projects ORDER BY created_at ASC`)
 const findProjectByIdStmt = db.prepare(`SELECT * FROM projects WHERE id = ?`)
+const findProjectByNameStmt = db.prepare(`SELECT * FROM projects WHERE name = ?`)
 const updateAllowAllToolsStmt = db.prepare(
   `UPDATE projects SET allow_all_tools = ? WHERE id = ?`
 )
@@ -358,6 +359,7 @@ export const projectQueries = {
     createProjectStmt.get(id, name, path) as Project,
   list: () => listProjectsStmt.all() as Project[],
   findById: (id: string) => findProjectByIdStmt.get(id) as Project | undefined,
+  findByName: (name: string) => findProjectByNameStmt.get(name) as Project | undefined,
   updateAllowAllTools: (allow: boolean, id: string) =>
     updateAllowAllToolsStmt.run(allow ? 1 : 0, id),
   updatePermissionMode: (mode: PermissionMode, id: string) =>
