@@ -29,7 +29,7 @@
 #   - mdart still resolves through the build-context COPY in the Dockerfile
 #     (/mdart/packages/mdart inside the container). The bind-mount doesn't
 #     affect that path. If you want to iterate on mdart from the container
-#     too, also bind-mount /home/ubuntu/mdart/packages/mdart into /mdart.
+#     too, also bind-mount $MDART_DIR (your mdart package checkout) into /mdart.
 #   - In-container `npm install` may fail to resolve `file:../../mdart/...`
 #     paths since the bind-mount changes the relative tree layout. Use the
 #     host's checkout for installs; the container's anon-volume node_modules

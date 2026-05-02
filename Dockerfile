@@ -10,7 +10,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # mdart is a local file: dependency referenced as ../../mdart/packages/mdart
 # from client/. In the container that resolves to /mdart/packages/mdart.
-# Pass the package in via: --build-context mdart=/home/ubuntu/mdart/packages/mdart
+# Pass the package in via: --build-context mdart=/path/to/mdart/packages/mdart
+# (compose users: set MDART_DIR in your environment — see docker-compose.yml)
 COPY --from=mdart . /mdart/packages/mdart/
 
 # Install dependencies (client + server workspaces)

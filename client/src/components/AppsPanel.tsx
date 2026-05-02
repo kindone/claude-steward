@@ -7,7 +7,9 @@ type Props = {
   onOpenApp?: (url: string, name: string) => void
 }
 
-const MKDOCS_TEMPLATE = '/home/ubuntu/venv/bin/mkdocs serve --dev-addr 0.0.0.0:{port}'
+// Default placeholder shown in the create-app form. Users override the
+// path to match their own MkDocs install (system, virtualenv, pipx, etc.).
+const MKDOCS_TEMPLATE = 'mkdocs serve --dev-addr 0.0.0.0:{port}'
 
 const STATUS_DOT: Record<AppConfig['status'], string> = {
   stopped: 'bg-app-border-4',

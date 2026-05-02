@@ -22,8 +22,8 @@
  *       "project": "claude-steward",
  *       "name": "learn-crdt",
  *       "type": "docs",
- *       "commandTemplate": "node /home/ubuntu/claude-steward/apps/docs/dist/server.js {port} --docs-dir /home/ubuntu/learn-crdt",
- *       "workDir": "/home/ubuntu/learn-crdt"
+ *       "commandTemplate": "node /path/to/claude-steward/apps/docs/dist/server.js {port} --docs-dir /path/to/your-docs",
+ *       "workDir": "/path/to/your-docs"
  *     }'
  */
 

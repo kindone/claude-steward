@@ -106,9 +106,10 @@ PM2, so `syncClaudeSettings` has a file to populate on first run.
 
 ## Explicit non-goals
 
-- **No prod parity.** The container is for testing only. It uses
-  `APP_DOMAIN=test.steward.jradoo.com`, exposes non-prod ports, and has a
-  throwaway API key. Don't copy this config onto a real server.
+- **No prod parity.** The container is for testing only. It uses a
+  placeholder `APP_DOMAIN` (override via `OPENCODE_APP_DOMAIN` env var),
+  exposes non-prod ports, and has a throwaway API key. Don't copy this
+  config onto a real server.
 - **No data persistence across teardowns.** `docker compose down -v` is
   expected to wipe the DB. Session history lives in SQLite on the named
   volume; session tool calls and conversations are ephemeral by design.

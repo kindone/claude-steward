@@ -40,7 +40,10 @@ services:
       # the default — minimal is smaller and faster for smoke tests.
       target: runtime-minimal
       additional_contexts:
-        mdart: "${MDART_DIR:-/home/ubuntu/mdart/packages/mdart}"
+        # Set MDART_DIR to the absolute path of your mdart package checkout
+        # (e.g. in your shell or .env). The default below is a placeholder
+        # and will fail with "no such directory" until overridden.
+        mdart: "${MDART_DIR:-/path/to/mdart/packages/mdart}"
     container_name: opencode-steward
     restart: unless-stopped
 
@@ -95,7 +98,8 @@ services:
     environment:
       - NODE_ENV=production
       - DATABASE_PATH=/data/steward.db
-      - APP_DOMAIN=${OPENCODE_APP_DOMAIN:-opencode-test.steward.jradoo.com}
+      # Override via OPENCODE_APP_DOMAIN env var (in your shell or .env).
+      - APP_DOMAIN=${OPENCODE_APP_DOMAIN:-your-host.example.com}
       # API_KEY: set this to log in via "Sign in directly" (no passkey needed for test).
       # Use a secret value; omit or leave empty to disable key-based login.
       - API_KEY=${API_KEY:-}

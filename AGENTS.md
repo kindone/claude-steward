@@ -197,8 +197,8 @@ artefacts and cannot self-upgrade — use `evolve` or `shared` for that.
       "project": "claude-steward",
       "name": "my-docs",
       "type": "docs",
-      "commandTemplate": "node /home/ubuntu/claude-steward/apps/docs/dist/server.js {port} --docs-dir /home/ubuntu/my-docs",
-      "workDir": "/home/ubuntu/my-docs"
+      "commandTemplate": "node /path/to/claude-steward/apps/docs/dist/server.js {port} --docs-dir /path/to/my-docs",
+      "workDir": "/path/to/my-docs"
     }'
   ```
   Pass `"projectPath": "/path/to/dir"` alongside `"project"` only when

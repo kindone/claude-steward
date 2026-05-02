@@ -124,9 +124,9 @@ alias dce='docker compose -f docker-compose.yml -f docker-compose.evolve.yml'
 docker compose -f docker-compose.yml -f docker-compose.shared.yml up --build
 ```
 
-Bind-mounts `/home/ubuntu/opencode-steward` → `/app`. Source edits made on
-the host (in your editor) are immediately visible to the container, and
-edits the container makes flow back to the host clone.
+Bind-mounts the repo root → `/app`. Source edits made on the host (in
+your editor) are immediately visible to the container, and edits the
+container makes flow back to the host clone.
 
 Stays **isolated** even in shared mode:
 
@@ -146,7 +146,7 @@ Caveats:
 - mdart still resolves through the Dockerfile's `additional_contexts` COPY
   (`/mdart/packages/mdart` inside the container). The bind-mount doesn't
   cover it. If you want to iterate on mdart from the container, also mount
-  `/home/ubuntu/mdart/packages/mdart:/mdart/packages/mdart`.
+  `$MDART_DIR:/mdart/packages/mdart`.
 - Running `npm install` *inside* the container may fail to resolve
   `file:../../mdart/...` paths (relative tree differs from the host). Do
   installs on the host; the container's anon-volume `node_modules` keeps
@@ -165,9 +165,10 @@ alias dcs='docker compose -f docker-compose.yml -f docker-compose.shared.yml'
 App: `http://localhost:23001` — Safe fallback: `http://localhost:23003`
 (mapped from container ports 3001/3003).
 
-In production this is fronted by nginx at
-`https://opencode-test.steward.jradoo.com` (configured via the `APP_DOMAIN`
-env var in `docker-compose.yml`).
+In production this is fronted by nginx at `https://<APP_DOMAIN>`,
+configured via the `OPENCODE_APP_DOMAIN` env var (defaults to a
+placeholder hostname in `docker-compose.yml`; set it in your shell or
+`.env`).
 
 ---
 

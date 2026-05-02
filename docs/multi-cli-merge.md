@@ -24,8 +24,8 @@ what we plan to merge back into `steward` (this repo).
 
 | Path | Branch | Role |
 |---|---|---|
-| `/home/ubuntu/claude-steward` | `main` | **Canonical.** All session data, artifacts, scheduler rows, deployed prod + dev. |
-| `/home/ubuntu/opencode-steward` | `opencode` | **Experiment.** Same git history, branched off ~8 commits behind to add multi-CLI support and prove opencode integration. |
+| `~/claude-steward` | `main` | **Canonical.** All session data, artifacts, scheduler rows, deployed prod + dev. |
+| `~/opencode-steward` | `opencode` | **Experiment.** Same git history, branched off ~8 commits behind to add multi-CLI support and prove opencode integration. |
 
 The experiment branch is **8 commits ahead** of `origin/main` at the time of
 writing (see `git log origin/main..HEAD` in opencode-steward). Diff stat

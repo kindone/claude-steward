@@ -1,6 +1,8 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 
-const MKDOCS_BIN = process.env.MKDOCS_PATH ?? '/home/ubuntu/venv/bin/mkdocs'
+// Defaults to whatever `mkdocs` resolves to on PATH. Override via
+// MKDOCS_PATH for non-PATH installs (e.g. a Python virtualenv).
+const MKDOCS_BIN = process.env.MKDOCS_PATH ?? 'mkdocs'
 
 let child: ChildProcess | null = null
 let internalPort = 18765  // default; overridden by startMkDocs(docsDir, port)

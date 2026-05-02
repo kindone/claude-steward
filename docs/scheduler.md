@@ -121,10 +121,13 @@ On startup, `server/src/mcp/config.ts`:
 ### Recovery (if `~/.claude.json` gets corrupted or the entry disappears)
 
 ```bash
-# Re-register manually — this writes to ~/.claude.json
+# Re-register manually — this writes to ~/.claude.json.
+# Use `which node` to get the absolute path of your active node binary
+# (must be v24+ — if `which node` resolves to /usr/bin/node v18, the MCP
+# server will crash with `node:sqlite` not found).
 claude mcp add steward-schedules -s user \
-  -- /home/ubuntu/.nvm/versions/node/v24.14.0/bin/node \
-  /home/ubuntu/claude-steward/server/dist/mcp/schedule-server.js
+  -- "$(which node)" \
+  "$(pwd)/server/dist/mcp/schedule-server.js"
 
 # Then set the secret to match the running server
 MCP_NOTIFY_SECRET=$(cat server/data/steward-mcp.json | \
