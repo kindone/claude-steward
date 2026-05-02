@@ -17,16 +17,17 @@ const BOLD   = '\x1b[1m'
 const DIM    = '\x1b[2m'
 
 const TIERS = {
-  prod: ['steward-main', 'steward-worker'],
-  dev:  ['steward-server', 'steward-client', 'steward-worker'],
+  prod: ['steward-main', 'steward-worker', 'steward-apps'],
+  dev:  ['steward-server', 'steward-client', 'steward-worker', 'steward-apps'],
   safe: ['steward-safe'],
+  apps: ['steward-apps'],
 }
 
 const [action, tier, flag] = process.argv.slice(2)
 const force = flag === '--force'
 
 const VALID_ACTIONS = ['restart', 'down', 'logs']
-const VALID_TIERS   = ['prod', 'dev', 'safe', 'all']
+const VALID_TIERS   = ['prod', 'dev', 'safe', 'apps', 'all']
 
 if (!VALID_ACTIONS.includes(action) || !VALID_TIERS.includes(tier)) {
   console.error(`${RED}Usage: node scripts/tier.js <${VALID_ACTIONS.join('|')}> <${VALID_TIERS.join('|')}> [--force]${RESET}`)
